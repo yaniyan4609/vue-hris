@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" href="/logo-digaji.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Digaji.id — Sistem HRIS & Operasional Terpadu</title>
+    <script>
+      // Terapkan tema tersimpan sebelum render pertama agar tidak berkedip.
+      // Logikanya harus sama dengan initTheme (useTheme.js) dan initThemeColor (useThemeColor.js).
+      (function () {
+        try {
+          var root = document.documentElement
+          var theme = localStorage.getItem('template_theme')
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          if (theme === 'dark' || (!theme && prefersDark)) root.classList.add('dark')
+          var color = localStorage.getItem('template_theme_color')
+          if (color && color !== 'default') root.setAttribute('data-theme-color', color)
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body class="min-h-screen">
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

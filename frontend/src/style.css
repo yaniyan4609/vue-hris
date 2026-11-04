@@ -1,0 +1,327 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* ======================================================== */
+/* THEME COLOR CSS VARIABLES (Default, Pink, Blue)          */
+/* ======================================================== */
+:root {
+  /* Default Neutral Theme (Light) */
+  --theme-primary: #18181b;
+  --theme-primary-brand: #18181b;
+  --theme-primary-hover: #27272a;
+  --theme-primary-pressed: #09090b;
+  --theme-primary-text: #ffffff;
+  --theme-primary-soft: #f4f4f5;
+  --theme-primary-soft-text: #18181b;
+  --theme-bg: #f8fafc;
+  --theme-surface: #ffffff;
+  --theme-surface-muted: #f4f4f5;
+  --theme-border: #e4e4e7;
+  --theme-layer-2: #ffffff;
+  --theme-layer-main: #fafafa;
+  --theme-surface-raised: #ffffff;
+  --theme-border-strong: #d4d4d8;
+  --theme-text-primary: #18181b;
+  --theme-text-secondary: #52525b;
+  --theme-text-muted: #71717a;
+}
+
+html.dark {
+  /* Default Pure Neutral Dark (Zero Blue Tint) */
+  --theme-primary: #ffffff;
+  --theme-primary-brand: #ffffff;
+  --theme-primary-hover: #f4f4f5;
+  --theme-primary-pressed: #e4e4e7;
+  --theme-primary-text: #09090b;
+  --theme-primary-soft: #27272a;
+  --theme-primary-soft-text: #ffffff;
+  --theme-bg: #09090b;
+  --theme-surface: #141417;
+  --theme-surface-muted: #1c1c20;
+  --theme-border: #27272a;
+  --theme-layer-2: #121214;
+  --theme-layer-main: #0c0c0e;
+  --theme-surface-raised: #18181b;
+  --theme-border-strong: #333338;
+  --theme-text-primary: #f4f4f5;
+  --theme-text-secondary: #a1a1aa;
+  --theme-text-muted: #71717a;
+}
+
+/* Theme 1: Pink (Light) */
+[data-theme-color="pink"] {
+  --theme-primary: #C83D6A;
+  --theme-primary-brand: #E85D88;
+  --theme-primary-hover: #AF2D58;
+  --theme-primary-pressed: #912044;
+  --theme-primary-text: #ffffff;
+  --theme-primary-soft: #FCE7EF;
+  --theme-primary-soft-text: #912044;
+  --theme-bg: #FFF8FB;
+  --theme-surface: #FFFFFF;
+  --theme-surface-muted: #FFF0F5;
+  --theme-border: #F4DDE6;
+  --theme-text-primary: #241923;
+  --theme-text-secondary: #66515F;
+  --theme-text-muted: #806B79;
+}
+
+/* Theme 1: Pink (Dark) */
+html.dark[data-theme-color="pink"] {
+  --theme-primary: #E85D88;
+  --theme-primary-brand: #E85D88;
+  --theme-primary-hover: #f0749a;
+  --theme-primary-pressed: #c83d6a;
+  --theme-primary-text: #ffffff;
+  --theme-primary-soft: rgba(232, 93, 136, 0.18);
+  --theme-primary-soft-text: #fce7ef;
+  --theme-bg: #140810;
+  --theme-surface: #1e0e18;
+  --theme-surface-muted: #291522;
+  --theme-border: #3d1f33;
+  --theme-layer-2: #190c14;
+  --theme-layer-main: #100710;
+  --theme-surface-raised: #241220;
+  --theme-border-strong: #4a2640;
+  --theme-text-primary: #fce7ef;
+  --theme-text-secondary: #d4a5ba;
+  --theme-text-muted: #9e758a;
+}
+
+/* Theme 2: Blue (Light) */
+[data-theme-color="blue"] {
+  --theme-primary: #007AFF;
+  --theme-primary-brand: #007AFF;
+  --theme-primary-hover: #0062CC;
+  --theme-primary-pressed: #004C99;
+  --theme-primary-text: #ffffff;
+  --theme-primary-soft: #E5F1FF;
+  --theme-primary-soft-text: #004C99;
+  --theme-bg: #F8FAFC;
+  --theme-surface: #FFFFFF;
+  --theme-surface-muted: #F1F5F9;
+  --theme-border: #E2E8F0;
+  --theme-text-primary: #0F172A;
+  --theme-text-secondary: #475569;
+  --theme-text-muted: #64748B;
+}
+
+/* Theme 2: Blue (Dark) */
+html.dark[data-theme-color="blue"] {
+  --theme-primary: #007AFF;
+  --theme-primary-brand: #007AFF;
+  --theme-primary-hover: #268dff;
+  --theme-primary-pressed: #0062cc;
+  --theme-primary-text: #ffffff;
+  --theme-primary-soft: rgba(0, 122, 255, 0.18);
+  --theme-primary-soft-text: #93c5fd;
+  --theme-bg: #090e17;
+  --theme-surface: #0f1726;
+  --theme-surface-muted: #172236;
+  --theme-border: #1e2e47;
+  --theme-layer-2: #0c121f;
+  --theme-layer-main: #080c14;
+  --theme-surface-raised: #131d30;
+  --theme-border-strong: #2a3d5c;
+  --theme-text-primary: #f1f5f9;
+  --theme-text-secondary: #94a3b8;
+  --theme-text-muted: #64748b;
+}
+
+/* Theme 3: Terracotta / Warm Sand (Light) - Analisis VisionID */
+[data-theme-color="terracotta"] {
+  --theme-primary: #c03a18;
+  --theme-primary-brand: #c03a18;
+  --theme-primary-hover: #ab3315;
+  --theme-primary-pressed: #8f270d;
+  --theme-primary-text: #ffffff;
+  --theme-primary-soft: #FDF2EE;
+  --theme-primary-soft-text: #8f270d;
+  --theme-bg: #F3F1EC;
+  --theme-surface: #FFFFFF;
+  --theme-surface-muted: #F4F1EA;
+  --theme-border: #E1DBD1;
+  --theme-text-primary: #211D17;
+  --theme-text-secondary: #5C564C;
+  --theme-text-muted: #8C8578;
+}
+
+/* Theme 3: Terracotta / Warm Sand (Dark) - Deep Warm Espresso */
+html.dark[data-theme-color="terracotta"] {
+  --theme-primary: #E05D3A;
+  --theme-primary-brand: #E05D3A;
+  --theme-primary-hover: #ea7352;
+  --theme-primary-pressed: #c03a18;
+  --theme-primary-text: #ffffff;
+  --theme-primary-soft: rgba(224, 93, 58, 0.18);
+  --theme-primary-soft-text: #fcd9cf;
+  --theme-bg: #15120f;
+  --theme-surface: #1e1915;
+  --theme-surface-muted: #27221d;
+  --theme-border: #38312a;
+  --theme-layer-2: #1a1612;
+  --theme-layer-main: #110e0c;
+  --theme-surface-raised: #231e19;
+  --theme-border-strong: #4a4036;
+  --theme-text-primary: #f5f2ed;
+  --theme-text-secondary: #c4bcaf;
+  --theme-text-muted: #948a7b;
+}
+
+@layer base {
+  body {
+    background-color: var(--theme-bg);
+    color: var(--theme-text-primary);
+    @apply antialiased min-h-screen font-sans;
+  }
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #27272a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* ======================================================== */
+/* Circular Reveal / Circular Wipe View Transition CSS      */
+/* Symmetrical: Light -> Dark & Dark -> Light keduanya sama */
+/* ======================================================== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none !important;
+  mix-blend-mode: normal !important;
+  display: block;
+}
+
+/* Matikan transisi CSS per elemen selama pergantian tema (class dipasang useTheme.js).
+   Tanpa ini, warna di dalam lingkaran memudar pelan dari warna lama. */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
+/* Outgoing view stays underneath */
+::view-transition-old(root) {
+  z-index: 1 !important;
+  will-change: opacity;
+}
+
+/* Incoming view is ALWAYS on top, expanding outward as a circle */
+/* Isolasi GPU layer promotion & contain: paint mencegah repaint di layer bawah */
+::view-transition-new(root) {
+  z-index: 9999 !important;
+  contain: paint;
+  will-change: clip-path;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* ======================================================== */
+/* Dasar Pertama Background Patterns (Dynamic with Theme)   */
+/* ======================================================== */
+.bg-grid-pattern {
+  background-color: var(--theme-bg) !important;
+  background-size: 28px 28px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+}
+
+.dark .bg-grid-pattern {
+  background-color: var(--theme-bg) !important;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+}
+
+.bg-dots-pattern {
+  background-color: var(--theme-bg) !important;
+  background-size: 24px 24px;
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.15) 1.5px, transparent 1.5px);
+}
+
+.dark .bg-dots-pattern {
+  background-color: var(--theme-bg) !important;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.18) 1.5px, transparent 1.5px);
+}
+
+/* ======================================================== */
+/* Lightweight Staggered Entrance Animations                */
+/* ======================================================== */
+@keyframes fadeInUpSubtle {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.anim-fade-up {
+  animation: fadeInUpSubtle 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.anim-delay-1 { animation-delay: 40ms; }
+.anim-delay-2 { animation-delay: 90ms; }
+.anim-delay-3 { animation-delay: 150ms; }
+.anim-delay-4 { animation-delay: 210ms; }
+.anim-delay-5 { animation-delay: 270ms; }
+
+/* ======================================================== */
+/* Skeleton Shimmer Waves                                   */
+/* ======================================================== */
+@keyframes shimmerSweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(228, 228, 231, 0.8) 0%,
+    rgba(244, 244, 245, 1) 50%,
+    rgba(228, 228, 231, 0.8) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerSweep 1.8s infinite linear;
+}
+
+html.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(34, 34, 40, 0.8) 0%,
+    rgba(50, 50, 60, 1) 50%,
+    rgba(34, 34, 40, 0.8) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerSweep 1.8s infinite linear;
+}
