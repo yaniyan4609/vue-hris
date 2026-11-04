@@ -13,9 +13,10 @@ Organisasi memisahkan wilayah/kantor dari divisi → departemen → jabatan. Keh
 ## Keputusan teknis yang sudah ada
 
 - Vue 3 + Vite + Tailwind v4 + Vue Router; komponen `Base*` dan pola layout dari template.
-- Go, MySQL 8.x, Redis, storage S3-compatible, OpenAPI, Docker/Linux.
+- Go, MariaDB 10.11, Redis, storage S3-compatible, OpenAPI, Docker/Linux.
 - Router backend: **Chi**, dipilih Product Owner pada 4 November 2026.
-- Database `staging-saas-hris` dibuat pada server yang diberikan Product Owner. Server tersebut terverifikasi MariaDB 10.11, sementara PRD mewajibkan MySQL 8.x. Migrasi dan skema fisik menunggu penyelarasan lingkungan.
+- Database `staging-saas-hris` dibuat pada server MariaDB 10.11 milik Product Owner. Pada 4 November 2026, Product Owner memilih server itu sebagai target implementasi.
+- Setelah kata sandi benar, akun dengan beberapa keanggotaan memilih tenant dari daftar keanggotaan aktif. Idle timeout awal saat Simpan Sesi OFF: 60 menit, dapat diatur per tenant.
 - Mulai sebagai modular monolith Go. Ini keputusan implementasi yang dapat ditinjau kembali, sesuai usulan PRD.
 - Repo template di-clone ke `frontend/`. Data dan halaman demonstrasi di dalamnya adalah referensi, bukan fitur produk.
 
@@ -23,7 +24,7 @@ Organisasi memisahkan wilayah/kantor dari divisi → departemen → jabatan. Keh
 
 | Fase | Hasil yang dapat diuji | Syarat selesai |
 |---|---|---|
-| 0. Fondasi | Struktur backend Go, API `/api/v1/health`, kontrak error/versi, evaluasi akses murni, draft ERD dan OpenAPI, setup MySQL/Redis/S3 lokal; template Vue tetap dapat dijalankan | `go test ./...`, `npm run build`, health merespons; keputusan terbuka yang menyentuh fase berikut dicatat |
+| 0. Fondasi | Struktur backend Go, API `/api/v1/health`, kontrak error/versi, evaluasi akses murni, draft ERD dan OpenAPI, migrasi MariaDB, setup Redis/S3 lokal; template Vue tetap dapat dijalankan | `go test ./...`, `npm run build`, health merespons; keputusan terbuka yang menyentuh fase berikut dicatat |
 | 1. Identitas dan organisasi | Login/logout dengan cookie sesi opaque, tenant membership/switcher, satu sesi lintas panel, permission registry, role bertanggal, override, scope SQL, entitlement, audit; wilayah/kantor dan divisi/departemen/jabatan, karyawan serta riwayat | Uji lintas tenant, deny dan override, scope AND/OR, perubahan hak berlaku pada request berikutnya, audit dan re-autentikasi aksi berisiko |
 | 2. Operasi harian | ESS mobile PWA, shift master/roster/instance, geofence, clock-in/out idempotent, koreksi, cuti/izin, lembur, approval terpusat | Uji shift lintas hari, flexible, lokasi, retry, saldo dan approval atomik, larangan approve sendiri |
 | 3. Komunikasi dan keuangan HR | Notification outbox, inbox REST + WebSocket, Web Push, reminder, broadcast bertarget; kasbon dan reimbursement; laporan | Uji penerima berdasarkan tenant/scope, dedupe, reconnect/replay, reminder recheck, pembayaran sekali |
@@ -41,7 +42,6 @@ Organisasi memisahkan wilayah/kantor dari divisi → departemen → jabatan. Keh
 
 Butir berikut tidak akan diberi aturan bisnis tersirat saat modulnya dikerjakan:
 
-- Alur login ketika satu email ada di beberapa tenant; idle timeout sesi non-persisten.
 - Masa trial/grace, perilaku tenant suspended, dan retensi setelah berhenti.
 - Perlu tidaknya legal entity di MVP; tanggal kerja shift fleksibel tanpa jam baku.
 - Ambang akurasi GPS, toleransi tepi geofence, dan alur kegagalan lokasi.
@@ -59,4 +59,4 @@ Butir berikut tidak akan diberi aturan bisnis tersirat saat modulnya dikerjakan:
 
 ## Pekerjaan awal pada sesi ini
 
-Fondasi Go/Chi dan evaluasi akses murni dibuat terlebih dahulu. Evaluator ini belum menjadi otorisasi API sampai identitas, membership, registry, entitlement, dan filter SQL tersedia. Endpoint health tidak mengakses data tenant.
+Fondasi Go/Chi dan evaluasi akses murni dibuat terlebih dahulu. Migrasi inti identitas/akses versi 1 sudah diterapkan ke staging MariaDB 10.11; skema ada di `SCHEMA_CORE.md` dan kontrak health/readiness di `openapi.yaml`. Evaluator ini belum menjadi otorisasi API sampai identitas, membership, registry, entitlement, dan filter SQL tersedia. Endpoint health tidak mengakses data tenant.

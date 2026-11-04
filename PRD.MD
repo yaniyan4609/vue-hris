@@ -2,6 +2,8 @@
 
 **Versi 2.3** · 4 November 2026 · Draft konsolidasi
 
+**Amendemen keputusan 4 November 2026:** implementasi memakai MariaDB 10.11 sesuai server Product Owner; router Go adalah Chi. Untuk akun multi-tenant, pilihan perusahaan muncul setelah kata sandi benar. Default idle timeout saat “Simpan Sesi” OFF adalah 60 menit dan dapat diatur per tenant.
+
 Dua Panel (Admin \& ESS) · Multi-Role · Permission \& Data Scope per User · Sesi dengan Toggle “Simpan Sesi” · Real-Time Notification Engine
 
 |Item|Nilai|
@@ -9,7 +11,7 @@ Dua Panel (Admin \& ESS) · Multi-Role · Permission \& Data Scope per User · S
 |Bahasa produk|Indonesia|
 |Jenis produk|SaaS HRIS/HRM multi-tenant|
 |Platform|Web SPA untuk Superadmin dan Admin Panel (desktop-first); PWA untuk ESS Panel (mobile-first)|
-|Stack|Vue 3 + Go (Golang) + MySQL 8.x|
+|Stack|Vue 3 + Go (Golang) + MariaDB 10.11|
 |UI|Template Vue 3 digaji.id. Komponen Base sudah selesai dibuat|
 
 > \\\*\\\*Tujuan dokumen:\\\*\\\* acuan tunggal bagi Product Owner, desainer, frontend, backend, QA, dan AI coding agent. PRD menjelaskan \\\*\\\*apa\\\*\\\* yang dibutuhkan dan \\\*\\\*bagaimana sistem berperilaku\\\*\\\*. Detail kode dan skema database ada di dokumen teknis turunan (Bagian 17).
@@ -151,9 +153,9 @@ Semua data bisnis tenant memiliki `tenant\\\_id`. Pembacaan, perubahan, laporan,
 
 * Tenant ditentukan backend dari sesi dan keanggotaan yang terverifikasi, **bukan** dari `tenant\\\_id` di body request atau URL.
 * Modul lintas tenant hanya untuk pengguna platform yang berwenang.
-* MySQL tidak punya Row-Level Security. Karena itu isolasi dijaga di aplikasi: `tenant\\\_id` ada di setiap primary/composite index, akses data hanya lewat lapisan data access yang menyuntikkan tenant (termasuk raw query, join, dan worker), serta test otomatis lintas tenant.
+* MariaDB tidak punya Row-Level Security. Karena itu isolasi dijaga di aplikasi: `tenant\\\_id` ada di setiap primary/composite index, akses data hanya lewat lapisan data access yang menyuntikkan tenant (termasuk raw query, join, dan worker), serta test otomatis lintas tenant.
 * Backup, restore, ekspor, cache, dan objek storage punya strategi pemisahan tenant.
-* Satu email dapat tergabung di beberapa tenant lewat `tenant\\\_memberships`. Pergantian tenant lewat tenant switcher. **\[TERBUKA]** rincian alur login multi-tenant.
+* Satu email dapat tergabung di beberapa tenant lewat `tenant\\\_memberships`. Setelah kata sandi benar, pengguna memilih tenant dari daftar keanggotaan aktifnya; pergantian berikutnya lewat tenant switcher. Satu sesi dipakai lintas panel dan tenant yang dipilih diverifikasi di backend pada setiap request.
 
 ### 2.2 Hierarki organisasi \[WAJIB]
 
@@ -641,7 +643,7 @@ Pembuat berwenang membuat **draft** (judul, isi, lampiran), memilih penerima, me
 |**Email**|\[BERTAHAP]|Kanal tambahan sesuai preferensi|
 |**WhatsApp**|\[BERTAHAP]|Butuh gateway, biaya, consent, template|
 
-* **MySQL adalah sumber kebenaran** notifikasi dan status baca. WebSocket dan Redis bukan penyimpanan utama.
+* **MariaDB adalah sumber kebenaran** notifikasi dan status baca. WebSocket dan Redis bukan penyimpanan utama.
 * WebSocket **tidak menggantikan REST**. REST untuk inbox, detail, arsip, preferensi, pencarian, tandai terbaca, dan aksi bisnis.
 * Saat koneksi putus, UI reconnect dan menyinkronkan notifikasi yang terlewat dari REST memakai cursor atau ID event.
 * **Dilarang** memasukkan NIK, rekening, nominal gaji, isi dokumen medis, atau data rahasia lain ke payload push atau pratinjau layar terkunci.
@@ -698,7 +700,7 @@ Pembuat berwenang membuat **draft** (judul, isi, lampiran), memilih penerima, me
                      │
      ┌─────────────┼─────────────┐
      ▼               ▼               ▼
- MySQL            Go Worker       Redis Pub/Sub
+ MariaDB          Go Worker       Redis Pub/Sub
  notifications    Scheduler       (distribusi antar
  + outbox         + Retry          instance)
      └─────────────┼─────────────┘
@@ -719,7 +721,7 @@ Pembuat berwenang membuat **draft** (judul, isi, lampiran), memilih penerima, me
 3. WebSocket hanya mendorong notifikasi ke user terautentikasi dan terotorisasi, dengan pengecekan tenant di jalur event. Cek `Origin` saat handshake.
 4. Redis untuk distribusi antar instance. **Pub/sub bukan antrean durable.**
 5. Scheduler menilai ulang kondisi reminder **tepat sebelum kirim**.
-6. **\[USULAN]** Jadwal disimpan di tabel MySQL (`next\\\_fire\\\_at`) dan diambil worker dengan `SELECT … FOR UPDATE SKIP LOCKED`.
+6. **\[USULAN]** Jadwal disimpan di tabel MariaDB (`next\\\_fire\\\_at`) dan diambil worker dengan `SELECT … FOR UPDATE SKIP LOCKED`.
 7. Broadcast besar (mis. 10.000 penerima) diproses **bertahap**, dengan pencatatan kegagalan parsial dan riwayat yang dapat diaudit.
 
 **Model data konseptual:** `notification\\\_events`, `notifications`, `notification\\\_deliveries`, `notification\\\_read\\\_states`, `notification\\\_templates`, `notification\\\_preferences`, `notification\\\_rules`, `notification\\\_schedules`, `notification\\\_outbox`, `broadcasts`, `broadcast\\\_targets`, `broadcast\\\_recipients`, `broadcast\\\_deliveries`, `push\\\_subscriptions`. Bentuk fisik final ditentukan di ERD.
@@ -805,11 +807,11 @@ Komponen demonstrasi template yang tidak relevan (Gunung, Pesanan, Invoice demo)
 |Frontend|Vue 3, Vite, Tailwind CSS v4, Vue Router, **Pinia**, lucide-vue-next|\[WAJIB]|
 |PWA|**vite-plugin-pwa** (service worker, Web Push)|\[USULAN]|
 |Klien API|**openapi-typescript** dari kontrak OpenAPI|\[USULAN]|
-|Backend|Go, REST API. **Satu router: Chi atau Gin**|Go \[WAJIB]. Router **\[TERBUKA]**, harus diputuskan sebelum Fase 0|
+|Backend|Go, REST API, router Chi|\[WAJIB]|
 |Akses data|GORM v2 untuk CRUD. **sqlc / raw SQL** untuk laporan dan query ber-scope|\[USULAN]|
 |Evaluator akses|**Dibuat sendiri** (bukan Casbin) karena scope berbasis data. Hasil di-cache dengan versi hak akses per user|\[USULAN]|
-|Database|MySQL 8.x. Migrasi dengan golang-migrate atau goose. Uang: integer rupiah atau `shopspring/decimal`|\[WAJIB] MySQL|
-|Cache, antrean, jobs|Redis, Go worker, scheduler berbasis tabel MySQL|\[WAJIB]|
+|Database|MariaDB 10.11. Migrasi dengan goose. Uang: integer rupiah atau `shopspring/decimal`|\[WAJIB] MariaDB|
+|Cache, antrean, jobs|Redis, Go worker, scheduler berbasis tabel MariaDB|\[WAJIB]|
 |Real-time|WebSocket gateway di Go (coder/websocket atau gorilla). REST tetap jalur utama|\[WAJIB]|
 |Penyimpanan file|S3-compatible (MinIO / R2 / AWS S3)|\[WAJIB]|
 |Peta geofence|Library peta untuk editor polygon (mis. Leaflet) sebagai **pengecualian resmi** aturan “tanpa library baru”|\[USULAN]|
@@ -838,14 +840,14 @@ Vue 3 (Admin Panel, ESS Panel, Platform; design system bersama)
   Payroll     Subscription  Notification
   └─────────────┴──────────────┴──────────┘
                    │
-           MySQL / Redis / S3
+           MariaDB / Redis / S3
                    │
                Go Workers
 ```
 
 * **Vue:** pengalaman pengguna, presentasi, form, route.
 * **Go:** otorisasi final, validasi bisnis, perubahan data, payroll, audit.
-* **MySQL:** sumber kebenaran. Cache tidak boleh menyebabkan akses lintas tenant atau hak akses basi.
+* **MariaDB:** sumber kebenaran. Cache tidak boleh menyebabkan akses lintas tenant atau hak akses basi.
 * **Worker:** ekspor dan impor besar, rekap, notifikasi, dokumen, payroll batch.
 
 ### 9.3 Kelompok entitas data (konseptual)
@@ -883,7 +885,7 @@ Konsisten pada pagination, filter, sort, format error, idempotency aksi kritis, 
 |Cocok untuk|Perangkat pribadi, PWA terpasang|Komputer bersama, kantor|
 |Berakhir karena|Logout, dicabut admin, akun nonaktif, ganti kata sandi, resign|Semua di kiri, ditambah idle timeout|
 
-**Mengapa OFF tetap punya idle timeout:** beberapa browser memulihkan cookie sesi saat dibuka kembali. Nilai idle timeout **\[TERBUKA]** dan dibuat configurable (per tenant).
+**Mengapa OFF tetap punya idle timeout:** beberapa browser memulihkan cookie sesi saat dibuka kembali. Nilai awal idle timeout adalah **60 menit**, dapat diatur per tenant.
 
 ### 10.2 Aturan
 

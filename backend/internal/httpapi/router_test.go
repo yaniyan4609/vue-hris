@@ -9,7 +9,7 @@ import (
 
 func TestHealth(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Router().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/health", nil))
+	Router(nil).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/health", nil))
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "application/json; charset=utf-8" {
 		t.Fatalf("unexpected response: %d %q", rec.Code, rec.Body.String())
 	}
@@ -18,5 +18,13 @@ func TestHealth(t *testing.T) {
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || body.Status != "ok" {
 		t.Fatalf("invalid health body: %+v, %v", body, err)
+	}
+}
+
+func TestReadyWithoutDatabase(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Router(nil).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/ready", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", rec.Code)
 	}
 }

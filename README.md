@@ -19,10 +19,15 @@ npm run dev
 
 ```powershell
 cd backend
+$env:DB_ADDR = '<host-database>:3306'
+$env:DB_USER = '<pengguna-database>'
+$env:DB_NAME = 'staging-saas-hris'
+go run ./cmd/migrate -action up  # meminta kata sandi lewat terminal
+$env:DB_PASSWORD = ConvertFrom-SecureString -SecureString (Read-Host 'Kata sandi database' -AsSecureString) -AsPlainText
 go run ./cmd/api
 ```
 
-Frontend default di `http://localhost:5173`, API di `http://127.0.0.1:8080`; endpoint awal `GET /api/v1/health`.
+Frontend default di `http://localhost:5173`, API di `http://127.0.0.1:8080`. `GET /api/v1/health` memeriksa proses API dan `GET /api/v1/ready` memeriksa koneksi database. Kontrak awal ada di `docs/openapi.yaml`.
 
 ## Verifikasi
 
@@ -37,4 +42,6 @@ go test ./...
 go vet ./...
 ```
 
-Database staging bernama `staging-saas-hris`. Kredensial hanya diberikan melalui konfigurasi lokal yang tidak di-commit. Server staging yang tersedia saat fondasi dibuat adalah MariaDB 10.11; PRD menetapkan MySQL 8.x, sehingga migrasi fisik menunggu kesesuaian lingkungan database.
+Database staging bernama `staging-saas-hris` pada MariaDB 10.11 sesuai keputusan Product Owner. Kredensial hanya diberikan melalui konfigurasi lokal yang tidak di-commit.
+
+Migrasi 00001 sudah diterapkan ke staging. Struktur inti dan batas implementasinya dijelaskan di `docs/SCHEMA_CORE.md`. Jangan menyimpan `DB_PASSWORD` di file proyek atau commit.

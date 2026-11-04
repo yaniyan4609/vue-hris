@@ -11,11 +11,11 @@ func TestEffectivePermissionAndScope(t *testing.T) {
 		"absensi.lihat": {Code: "absensi.lihat", Entitlement: "absensi", RequiresScope: true},
 	}
 	subject := Subject{
-		TenantID: "tenant-a", UserID: "u-1", MemberActive: true,
+		TenantID: "tenant-a", UserID: "u-1", EmployeeID: "e-1", MemberActive: true,
 		Entitlements: map[string]bool{"absensi": true},
 		Roles: []Role{
-			{Code: "KARYAWAN", Grants: []Grant{{Permission: "absensi.lihat", Scopes: []ScopeRule{{Self: true}}}}},
-			{Code: "SPV", ValidFrom: day, Grants: []Grant{{Permission: "absensi.lihat", Scopes: []ScopeRule{{DirectReports: true}}}}},
+			{TenantID: "tenant-a", Code: "KARYAWAN", Grants: []Grant{{Permission: "absensi.lihat", Scopes: []ScopeRule{{Self: true}}}}},
+			{TenantID: "tenant-a", Code: "SPV", ValidFrom: day, Grants: []Grant{{Permission: "absensi.lihat", Scopes: []ScopeRule{{DirectReports: true}}}}},
 		},
 	}
 	effective := Evaluate(day, "tenant-a", subject, registry, "absensi.lihat")
@@ -24,7 +24,7 @@ func TestEffectivePermissionAndScope(t *testing.T) {
 	}
 	for _, target := range []Target{
 		{TenantID: "tenant-a", UserID: "u-1"},
-		{TenantID: "tenant-a", UserID: "u-2", ReportsToID: "u-1"},
+		{TenantID: "tenant-a", UserID: "u-2", ReportsToID: "e-1"},
 	} {
 		if !effective.Includes(subject, target) {
 			t.Fatalf("expected target %+v to be included", target)
@@ -44,6 +44,13 @@ func TestEffectivePermissionAndScope(t *testing.T) {
 	if Evaluate(day, "tenant-a", subject, registry, "unknown.lihat").Allowed {
 		t.Fatal("unknown permission was accepted")
 	}
+	subject.Roles[0].TenantID = "tenant-b"
+	subject.Roles[1].TenantID = "tenant-b"
+	if Evaluate(day, "tenant-a", subject, registry, "absensi.lihat").Allowed {
+		t.Fatal("role from another tenant was accepted")
+	}
+	subject.Roles[0].TenantID = "tenant-a"
+	subject.Roles[1].TenantID = "tenant-a"
 
 	subject.Overrides = map[string]Override{"absensi.lihat": {Decision: Deny}}
 	if Evaluate(day, "tenant-a", subject, registry, "absensi.lihat").Allowed {
@@ -62,7 +69,7 @@ func TestScopeOverrideReplacesRoleScope(t *testing.T) {
 	newScopes := []ScopeRule{{Offices: []string{"office-1", "office-2"}, Divisions: []string{"division-1"}}}
 	subject := Subject{
 		TenantID: "t", UserID: "u", MemberActive: true,
-		Roles:     []Role{{Code: "HR", Grants: []Grant{{Permission: "karyawan.lihat", Scopes: []ScopeRule{{AllTenant: true}}}}}},
+		Roles:     []Role{{TenantID: "t", Code: "HR", Grants: []Grant{{Permission: "karyawan.lihat", Scopes: []ScopeRule{{AllTenant: true}}}}}},
 		Overrides: map[string]Override{"karyawan.lihat": {Decision: Inherit, Scopes: &newScopes}},
 	}
 	effective := Evaluate(day, "t", subject, registry, "karyawan.lihat")
@@ -88,7 +95,7 @@ func TestRoleDateBoundariesAndAllowWithoutScope(t *testing.T) {
 	registry := Registry{"cuti.approve": {Code: "cuti.approve", RequiresScope: true}}
 	subject := Subject{
 		TenantID: "t", UserID: "u", MemberActive: true,
-		Roles: []Role{{Code: "SPV", ValidFrom: start, ValidUntil: &end, Grants: []Grant{{Permission: "cuti.approve", Scopes: []ScopeRule{{DirectReports: true}}}}}},
+		Roles: []Role{{TenantID: "t", Code: "SPV", ValidFrom: start, ValidUntil: &end, Grants: []Grant{{Permission: "cuti.approve", Scopes: []ScopeRule{{DirectReports: true}}}}}},
 	}
 	if Evaluate(start.AddDate(0, 0, -1), "t", subject, registry, "cuti.approve").Allowed {
 		t.Fatal("future role was active")
@@ -110,7 +117,7 @@ func TestInvalidScopeFailsClosed(t *testing.T) {
 	registry := Registry{"karyawan.lihat": {Code: "karyawan.lihat", RequiresScope: true}}
 	subject := Subject{
 		TenantID: "t", UserID: "u", MemberActive: true,
-		Roles: []Role{{Code: "HR", Grants: []Grant{{Permission: "karyawan.lihat", Scopes: []ScopeRule{{AllTenant: true, Offices: []string{"office-1"}}}}}}},
+		Roles: []Role{{TenantID: "t", Code: "HR", Grants: []Grant{{Permission: "karyawan.lihat", Scopes: []ScopeRule{{AllTenant: true, Offices: []string{"office-1"}}}}}}},
 	}
 	result := Evaluate(time.Now(), "t", subject, registry, "karyawan.lihat")
 	if result.Allowed || result.Reason != "scope_invalid" {

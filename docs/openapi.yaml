@@ -1,0 +1,43 @@
+openapi: 3.0.3
+info:
+  title: digaji.id API
+  version: 0.1.0
+  description: Kontrak awal API. Endpoint bisnis ditambahkan bersama otorisasi tenant dan scope.
+paths:
+  /api/v1/health:
+    get:
+      summary: Status proses API
+      operationId: getHealth
+      responses:
+        '200':
+          description: Proses berjalan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /api/v1/ready:
+    get:
+      summary: Kesiapan koneksi database
+      operationId: getReady
+      responses:
+        '200':
+          description: Database dapat diakses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+        '503':
+          description: Database belum siap
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+components:
+  schemas:
+    Status:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, ready, unavailable]

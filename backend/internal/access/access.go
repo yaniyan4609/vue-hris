@@ -37,6 +37,7 @@ type Grant struct {
 }
 
 type Role struct {
+	TenantID   string
 	Code       string
 	ValidFrom  time.Time
 	ValidUntil *time.Time // inclusive calendar date; nil means no end date
@@ -51,6 +52,7 @@ type Override struct {
 type Subject struct {
 	TenantID     string
 	UserID       string
+	EmployeeID   string
 	MemberActive bool
 	Roles        []Role
 	Overrides    map[string]Override
@@ -89,7 +91,7 @@ func Evaluate(now time.Time, tenantID string, subject Subject, registry Registry
 
 	result := Effective{}
 	for _, role := range subject.Roles {
-		if !roleActive(now, role) {
+		if role.TenantID != tenantID || !roleActive(now, role) {
 			continue
 		}
 		for _, grant := range role.Grants {
@@ -164,7 +166,7 @@ func (rule ScopeRule) matches(subject Subject, target Target) bool {
 	}
 	if rule.Self || rule.DirectReports {
 		return (rule.Self && target.UserID == subject.UserID) ||
-			(rule.DirectReports && target.ReportsToID == subject.UserID)
+			(rule.DirectReports && subject.EmployeeID != "" && target.ReportsToID == subject.EmployeeID)
 	}
 	return matchesDimension(rule.Regions, target.RegionID) &&
 		matchesDimension(rule.Offices, target.BaseOfficeID) &&
