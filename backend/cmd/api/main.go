@@ -25,8 +25,12 @@ func main() {
 	}
 	defer db.Close()
 	server := &http.Server{
-		Addr:              addr,
-		Handler:           httpapi.Router(db),
+		Addr: addr,
+		Handler: httpapi.Router(db, httpapi.Options{
+			DemoLogin:     os.Getenv("APP_ENV") == "staging" && os.Getenv("ENABLE_DEMO_LOGIN") == "true" && os.Getenv("DB_NAME") == "staging-saas-hris",
+			CookieSecure:  os.Getenv("COOKIE_SECURE") != "false",
+			AllowedOrigin: os.Getenv("APP_ORIGIN"),
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	slog.Info("API berjalan", "address", addr)

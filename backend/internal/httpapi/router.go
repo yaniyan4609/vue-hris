@@ -11,7 +11,17 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func Router(db *sql.DB) http.Handler {
+type Options struct {
+	DemoLogin     bool
+	CookieSecure  bool
+	AllowedOrigin string
+}
+
+func Router(db *sql.DB, options ...Options) http.Handler {
+	config := Options{CookieSecure: true}
+	if len(options) > 0 {
+		config = options[0]
+	}
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
@@ -30,6 +40,9 @@ func Router(db *sql.DB) http.Handler {
 		}
 		writeStatus(w, http.StatusOK, "ready")
 	})
+	if db != nil {
+		mountAuth(r, db, config)
+	}
 	return r
 }
 

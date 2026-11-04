@@ -32,6 +32,103 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Status'
+  /api/v1/auth/login:
+    post:
+      summary: Masuk dengan email dan kata sandi
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+                remember: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Sesi dibuat dalam cookie HttpOnly; jika ada beberapa tenant, pilih melalui select-tenant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthState' }
+        '401': { description: Email atau kata sandi salah }
+  /api/v1/auth/me:
+    get:
+      summary: State sesi saat ini
+      operationId: getCurrentSession
+      responses:
+        '200':
+          description: Sesi aktif
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthState' }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/auth/select-tenant:
+    post:
+      summary: Pilih tenant yang diikuti pengguna dan putar token sesi
+      operationId: selectTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId]
+              properties:
+                tenantId: { type: string }
+      responses:
+        '200':
+          description: Tenant terpilih
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthState' }
+        '403': { description: Pengguna bukan anggota tenant tersebut }
+  /api/v1/auth/logout:
+    post:
+      summary: Cabut sesi saat ini
+      operationId: logout
+      responses:
+        '204': { description: Sesi dicabut }
+  /api/v1/auth/demo-accounts:
+    get:
+      summary: Daftar akun demo (hanya staging)
+      operationId: getDemoAccounts
+      responses:
+        '200':
+          description: Akun demo tersedia
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    email: { type: string, format: email }
+                    label: { type: string }
+        '404': { description: Mode demo tidak aktif }
+  /api/v1/auth/demo-login:
+    post:
+      summary: Masuk cepat ke akun demo (hanya staging)
+      operationId: demoLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account]
+              properties:
+                account: { type: string, enum: [super, admin, ess] }
+      responses:
+        '200':
+          description: Sesi demo dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthState' }
+        '404': { description: Mode demo tidak aktif }
 components:
   schemas:
     Status:
@@ -41,3 +138,27 @@ components:
         status:
           type: string
           enum: [ok, ready, unavailable]
+    AuthState:
+      type: object
+      required: [user, platform, tenants, remember]
+      properties:
+        user:
+          type: object
+          required: [id, email, name]
+          properties:
+            id: { type: string }
+            email: { type: string, format: email }
+            name: { type: string }
+        platform: { type: boolean }
+        selectedTenantId: { type: string }
+        tenants:
+          type: array
+          items:
+            type: object
+            required: [id, name, admin, ess]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              admin: { type: boolean }
+              ess: { type: boolean }
+        remember: { type: boolean }

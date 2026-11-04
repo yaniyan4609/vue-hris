@@ -1,83 +1,101 @@
-import { ref } from 'vue'
-import { useToast } from './useToast'
+import { computed, ref } from 'vue'
 
-const currentUser = ref({
-  name: 'Admin Digaji.id',
-  email: 'admin@digaji.id',
-  role: 'Super Admin',
+const state = ref(null)
+const isAuthenticated = computed(() => Boolean(state.value?.user))
+const demoAccounts = ref([])
+const selectedTenant = computed(() => state.value?.tenants?.find((tenant) => tenant.id === state.value.selectedTenantId) || null)
+const currentUser = computed(() => ({
+  name: state.value?.user?.name || '',
+  email: state.value?.user?.email || '',
+  role: state.value?.platform ? 'Superadmin' : selectedTenant.value?.admin ? 'Admin Tenant' : 'Karyawan',
+  company: selectedTenant.value?.name || 'Digaji.id',
   avatar: '',
-  company: 'PT Digaji Indonesia',
-})
+}))
 
-// Default false agar user langsung melihat tampilan wireframe login saat membuka aplikasi
-const isAuthenticated = ref(false)
-const isLoggingOut = ref(false)
+async function request(path, options = {}) {
+  const response = await fetch(`/api/v1/auth${path}`, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  })
+  if (response.status === 204) return null
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error || 'Permintaan gagal. Coba lagi.')
+  return payload
+}
+
+export function defaultPanelRoute(authState = state.value) {
+  if (authState?.platform) return '/platform'
+  const selected = authState?.tenants?.find((tenant) => tenant.id === authState.selectedTenantId)
+  if (selected?.admin) return '/admin'
+  if (selected?.ess) return '/ess'
+  return '/pilih-perusahaan'
+}
 
 export function useAuth() {
-  const toast = useToast()
-
-  const login = async (identifier = 'admin@digaji.id') => {
-    if (identifier.includes('hr')) {
-      currentUser.value = {
-        name: 'Sarah HR Manager',
-        email: identifier,
-        role: 'HR & Payroll Lead',
-        avatar: '',
-        company: 'PT Digaji Indonesia',
-      }
-    } else if (identifier.includes('staf')) {
-      currentUser.value = {
-        name: 'Budi Santoso',
-        email: identifier,
-        role: 'Staf Operasional',
-        avatar: '',
-        company: 'PT Digaji Indonesia',
-      }
-    } else {
-      currentUser.value = {
-        name: 'Admin Digaji.id',
-        email: identifier || 'admin@digaji.id',
-        role: 'Super Admin',
-        avatar: '',
-        company: 'PT Digaji Indonesia',
-      }
-    }
-
-    isAuthenticated.value = true
+  const restore = async () => {
     try {
-      sessionStorage.setItem('digaji_auth', 'true')
-    } catch {
-      // ignore
+      state.value = await request('/me')
+    } catch (error) {
+      if (error.message.startsWith('Sesi ')) state.value = null
+      else throw error
     }
-    return true
+    return state.value
   }
 
-  const startLogout = () => {
-    isLoggingOut.value = true
+  const loadDemoAccounts = async () => {
+    try {
+      demoAccounts.value = await request('/demo-accounts')
+    } catch {
+      demoAccounts.value = []
+    }
+  }
+
+  const login = async (email, password, remember = false) => {
+    state.value = await request('/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, remember }),
+    })
+    return state.value
+  }
+
+  const demoLogin = async (account) => {
+    state.value = await request('/demo-login', {
+      method: 'POST',
+      body: JSON.stringify({ account }),
+    })
+    return state.value
+  }
+
+  const selectTenant = async (tenantId) => {
+    state.value = await request('/select-tenant', {
+      method: 'POST',
+      body: JSON.stringify({ tenantId }),
+    })
+    return state.value
+  }
+
+  const logout = async () => {
+    await request('/logout', { method: 'POST', body: '{}' })
+    state.value = null
   }
 
   const finishLogout = () => {
-    isAuthenticated.value = false
-    isLoggingOut.value = false
-    try {
-      sessionStorage.removeItem('digaji_auth')
-    } catch {
-      // ignore
-    }
-    toast.info('Sesi telah berakhir. Kembali ke form masuk.')
-  }
-
-  const logout = () => {
-    startLogout()
+    state.value = null
   }
 
   return {
+    state,
     currentUser,
+    selectedTenant,
     isAuthenticated,
-    isLoggingOut,
+    demoAccounts,
+    restore,
+    loadDemoAccounts,
     login,
-    startLogout,
-    finishLogout,
+    demoLogin,
+    selectTenant,
     logout,
+    finishLogout,
   }
 }

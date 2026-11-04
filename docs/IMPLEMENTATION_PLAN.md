@@ -49,14 +49,14 @@ Butir berikut tidak akan diberi aturan bisnis tersirat saat modulnya dikerjakan:
 - Default frekuensi reminder dan jam tenang; detail payroll yang bertanda `[TERBUKA]`.
 - Kebijakan pelindungan data pribadi dan pemeriksaan hukum.
 
-## Temuan template yang perlu ditangani saat integrasi
+## Temuan template dan progres integrasi
 
-- `useAuth.js` dan login di `AppLayout.vue` masih simulasi: pengguna contoh, sandi contoh, `sessionStorage`, dan animasi yang menganggap login berhasil. Ganti dengan API sesi tanpa menyimpan token sensitif di browser storage.
-- Menu/rute demo (`/template/*`) serta data Gunung/Pesanan belum sesuai produk. Simpan sebagai referensi pola selama transisi; hapus dari navigasi produk setelah menu berbasis permission siap.
-- `EssLayout` belum ada. Admin/Superadmin dapat memakai dua layer dan dual rail; ESS membutuhkan layout mobile dengan bottom navigation maksimal lima item.
-- Build awal berhasil tetapi satu bundle sekitar 640 kB; route lazy loading dilakukan saat rute produk dibangun.
+- Login simulasi sudah diganti API sesi dengan cookie HttpOnly. Form dan tombol demo staging telah dihubungkan ke API; token tidak disimpan di browser storage.
+- Rute demo (`/template/*`) tidak ada lagi di router produk. Source view Gunung/Pesanan tetap tersedia sebagai referensi pola.
+- Panel awal Superadmin, Admin Tenant, dan ESS tersedia. Navigasi ESS mobile, dual rail Admin, dan modul bisnis masih pekerjaan fase berikutnya.
+- Build awal template menghasilkan bundle besar; setelah rute demo dikeluarkan dari produk, bundle utama lebih kecil. Route lazy loading dilakukan saat rute produk bertambah.
 - Dokumen desain berisi beberapa contoh `<input>`/`<button>` mentah, sedangkan `aturan-ui.md` melarangnya bila sudah ada komponen Base. Saat berbeda, ikuti kode dan aturan UI terbaru.
 
 ## Pekerjaan awal pada sesi ini
 
-Fondasi Go/Chi dan evaluasi akses murni dibuat terlebih dahulu. Migrasi inti identitas/akses versi 1 sudah diterapkan ke staging MariaDB 10.11; skema ada di `SCHEMA_CORE.md` dan kontrak health/readiness di `openapi.yaml`. Evaluator ini belum menjadi otorisasi API sampai identitas, membership, registry, entitlement, dan filter SQL tersedia. Endpoint health tidak mengakses data tenant.
+Fondasi Go/Chi dan evaluasi akses murni dibuat terlebih dahulu. Migrasi versi 1 dan 2 telah diterapkan ke staging MariaDB 10.11; skema ada di `SCHEMA_CORE.md`. Login, sesi, tenant selection, dan seed tiga akun demo sudah tersedia. Evaluator permission/scope umum belum menjadi otorisasi endpoint bisnis sampai registry, entitlement, dan filter SQL tersedia. Endpoint health tidak mengakses data tenant.
