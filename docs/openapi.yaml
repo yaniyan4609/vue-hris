@@ -91,6 +91,54 @@ paths:
       operationId: logout
       responses:
         '204': { description: Sesi dicabut }
+  /api/v1/auth/sessions:
+    get:
+      summary: Daftar perangkat dengan sesi akun yang masih aktif
+      operationId: listMySessions
+      responses:
+        '200':
+          description: Maksimal 100 sesi aktif terbaru; sesi ini ditandai current
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, deviceLabel, remember, current, createdAt, lastSeenAt]
+                  properties:
+                    id: { type: string }
+                    deviceLabel: { type: string }
+                    ip: { type: string }
+                    remember: { type: boolean }
+                    current: { type: boolean }
+                    createdAt: { type: string, format: date-time }
+                    lastSeenAt: { type: string, format: date-time }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/auth/logout-all:
+    post:
+      summary: Cabut semua sesi akun ini, termasuk perangkat saat ini
+      operationId: logoutAll
+      responses:
+        '204': { description: Semua sesi dicabut dan cookie dibersihkan }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/auth/change-password:
+    post:
+      summary: Ganti kata sandi dan cabut sesi di perangkat lain
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password, minLength: 8 }
+      responses:
+        '204': { description: Kata sandi berubah; sesi saat ini tetap aktif }
+        '400': { description: Kata sandi lama salah, sama dengan yang baru, atau kata sandi baru terlalu pendek }
+        '401': { description: Sesi tidak sah atau berakhir }
   /api/v1/auth/demo-accounts:
     get:
       summary: Daftar akun demo (hanya staging)

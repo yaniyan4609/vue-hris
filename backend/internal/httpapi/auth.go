@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -38,7 +39,7 @@ func mountAuth(r chi.Router, db *sql.DB, config Options) {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email dan kata sandi wajib diisi"})
 				return
 			}
-			token, state, err := service.Login(req.Context(), body.Email, body.Password, body.Remember)
+			token, state, err := service.Login(req.Context(), body.Email, body.Password, body.Remember, sessionDevice(req))
 			if err != nil {
 				writeAuthError(w, err)
 				return
@@ -66,7 +67,44 @@ func mountAuth(r chi.Router, db *sql.DB, config Options) {
 				writeAuthError(w, err)
 				return
 			}
-			http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Path: "/", MaxAge: -1, HttpOnly: true, Secure: config.CookieSecure, SameSite: http.SameSiteStrictMode})
+			clearSessionCookie(w, config.CookieSecure)
+			w.WriteHeader(http.StatusNoContent)
+		})
+		r.Get("/sessions", func(w http.ResponseWriter, req *http.Request) {
+			items, err := service.ActiveSessions(req.Context(), cookieToken(req))
+			if err != nil {
+				writeAuthError(w, err)
+				return
+			}
+			writeJSON(w, 200, items)
+		})
+		r.With(checkOrigin(config)).Post("/logout-all", func(w http.ResponseWriter, req *http.Request) {
+			if err := service.LogoutAll(req.Context(), cookieToken(req)); err != nil {
+				writeAuthError(w, err)
+				return
+			}
+			clearSessionCookie(w, config.CookieSecure)
+			w.WriteHeader(http.StatusNoContent)
+		})
+		r.With(checkOrigin(config)).Post("/change-password", func(w http.ResponseWriter, req *http.Request) {
+			var body struct {
+				CurrentPassword string `json:"currentPassword"`
+				NewPassword     string `json:"newPassword"`
+			}
+			if !readJSON(w, req, &body) {
+				return
+			}
+			if err := service.ChangePassword(req.Context(), cookieToken(req), body.CurrentPassword, body.NewPassword); err != nil {
+				switch {
+				case errors.Is(err, auth.ErrPasswordPolicy):
+					writeJSON(w, 400, map[string]string{"error": "Kata sandi baru minimal 8 karakter"})
+				case errors.Is(err, auth.ErrInvalidCredentials):
+					writeJSON(w, 400, map[string]string{"error": "Kata sandi saat ini salah atau sama dengan yang baru"})
+				default:
+					writeAuthError(w, err)
+				}
+				return
+			}
 			w.WriteHeader(http.StatusNoContent)
 		})
 		if config.DemoLogin {
@@ -84,7 +122,7 @@ func mountAuth(r chi.Router, db *sql.DB, config Options) {
 				if !readJSON(w, req, &body) {
 					return
 				}
-				token, state, err := service.DemoLogin(req.Context(), body.Account)
+				token, state, err := service.DemoLogin(req.Context(), body.Account, sessionDevice(req))
 				if err != nil {
 					writeAuthError(w, err)
 					return
@@ -94,6 +132,18 @@ func mountAuth(r chi.Router, db *sql.DB, config Options) {
 			})
 		}
 	})
+}
+
+func sessionDevice(req *http.Request) auth.SessionDevice {
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		host = req.RemoteAddr
+	}
+	return auth.SessionDevice{UserAgent: req.UserAgent(), IP: net.ParseIP(host)}
+}
+
+func clearSessionCookie(w http.ResponseWriter, secure bool) {
+	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode})
 }
 
 func cookieToken(req *http.Request) string {

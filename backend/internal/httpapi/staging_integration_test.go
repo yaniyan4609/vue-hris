@@ -50,6 +50,15 @@ func TestStagingOrganizationEmployeeAuditAndTenantBoundary(t *testing.T) {
 	if !grants.Admin || grants.TenantID != tenantID || !grants.Permissions["panel.admin"].Allowed || !grants.Permissions["karyawan.lihat"].Allowed {
 		t.Fatalf("effective access: %#v", grants)
 	}
+	var sessions []auth.SessionInfo
+	doJSON(t, client, "GET", server.URL+"/api/v1/auth/sessions", nil, 200, &sessions)
+	currentSession := false
+	for _, item := range sessions {
+		currentSession = currentSession || item.Current
+	}
+	if !currentSession {
+		t.Fatal("active session list did not mark this device")
+	}
 	qaID, err := ids.New()
 	if err != nil {
 		t.Fatal(err)
@@ -147,6 +156,71 @@ func TestStagingOrganizationEmployeeAuditAndTenantBoundary(t *testing.T) {
 			t.Fatal("foreign tenant region leaked")
 		}
 	}
+}
+
+func TestStagingAccountSessionsAndPasswordChange(t *testing.T) {
+	if os.Getenv("HRIS_INTEGRATION") != "1" {
+		t.Skip("staging integration test is opt-in")
+	}
+	if os.Getenv("APP_ENV") != "staging" || os.Getenv("DB_NAME") != "staging-saas-hris" {
+		t.Fatal("integration test requires the named staging database")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	db, err := database.Open(ctx, database.FromEnv())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	userID, err := ids.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	email := strings.ToLower("qa-" + userID + "@example.invalid")
+	oldPassword, newPassword := "Qa-Old-Password-29", "Qa-New-Password-29"
+	passwordHash, err := auth.HashPassword(oldPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO users (id,email,email_normalized,display_name,password_hash) VALUES (?,?,?,?,?)`, userID, email, email, "QA Session", passwordHash); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := db.Exec(`DELETE FROM sessions WHERE user_id=?`, userID); err != nil {
+			t.Errorf("cleanup sessions: %v", err)
+		}
+		if _, err := db.Exec(`DELETE FROM users WHERE id=?`, userID); err != nil {
+			t.Errorf("cleanup user: %v", err)
+		}
+	}()
+	server := httptest.NewServer(Router(db, Options{CookieSecure: false}))
+	defer server.Close()
+	newClient := func() *http.Client {
+		jar, _ := cookiejar.New(nil)
+		return &http.Client{Jar: jar, Timeout: 10 * time.Second}
+	}
+	first, second := newClient(), newClient()
+	for _, client := range []*http.Client{first, second} {
+		var state auth.State
+		doJSON(t, client, "POST", server.URL+"/api/v1/auth/login", map[string]any{"email": email, "password": oldPassword}, 200, &state)
+		if state.User.ID != userID {
+			t.Fatalf("wrong session user: %s", state.User.ID)
+		}
+	}
+	var sessions []auth.SessionInfo
+	doJSON(t, first, "GET", server.URL+"/api/v1/auth/sessions", nil, 200, &sessions)
+	if len(sessions) != 2 {
+		t.Fatalf("active sessions: got %d, want 2", len(sessions))
+	}
+	doJSON(t, first, "POST", server.URL+"/api/v1/auth/change-password", map[string]string{"currentPassword": oldPassword, "newPassword": newPassword}, 204, nil)
+	doJSON(t, first, "GET", server.URL+"/api/v1/auth/me", nil, 200, nil)
+	doJSON(t, second, "GET", server.URL+"/api/v1/auth/me", nil, 401, nil)
+	doJSON(t, newClient(), "POST", server.URL+"/api/v1/auth/login", map[string]any{"email": email, "password": oldPassword}, 401, nil)
+	third := newClient()
+	doJSON(t, third, "POST", server.URL+"/api/v1/auth/login", map[string]any{"email": email, "password": newPassword}, 200, nil)
+	doJSON(t, first, "POST", server.URL+"/api/v1/auth/logout-all", map[string]string{}, 204, nil)
+	doJSON(t, first, "GET", server.URL+"/api/v1/auth/me", nil, 401, nil)
+	doJSON(t, third, "GET", server.URL+"/api/v1/auth/me", nil, 401, nil)
 }
 
 func doJSON(t *testing.T, client *http.Client, method, url string, input any, want int, output any) {

@@ -7,8 +7,10 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"net"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"digaji.id/hris/internal/ids"
 )
@@ -43,7 +45,12 @@ type State struct {
 
 type Service struct{ DB *sql.DB }
 
-func (s Service) Login(ctx context.Context, email, password string, remember bool) (string, State, error) {
+type SessionDevice struct {
+	UserAgent string
+	IP        net.IP
+}
+
+func (s Service) Login(ctx context.Context, email, password string, remember bool, device SessionDevice) (string, State, error) {
 	var user User
 	var hash sql.NullString
 	err := s.DB.QueryRowContext(ctx, `SELECT id, email, display_name, password_hash FROM users WHERE email_normalized=? AND status='active'`, strings.ToLower(strings.TrimSpace(email))).Scan(&user.ID, &user.Email, &user.Name, &hash)
@@ -53,12 +60,12 @@ func (s Service) Login(ctx context.Context, email, password string, remember boo
 		}
 		return "", State{}, ErrInvalidCredentials
 	}
-	return s.createSession(ctx, user, remember)
+	return s.createSession(ctx, user, remember, device)
 }
 
 // DemoLogin bypasses the password only when the HTTP server enables staging
 // demo mode. It never accepts an arbitrary email from the caller.
-func (s Service) DemoLogin(ctx context.Context, account string) (string, State, error) {
+func (s Service) DemoLogin(ctx context.Context, account string, device SessionDevice) (string, State, error) {
 	emails := map[string]string{
 		"super": "super@digaji.id",
 		"admin": "admin@digaji.id",
@@ -76,10 +83,10 @@ func (s Service) DemoLogin(ctx context.Context, account string) (string, State, 
 		}
 		return "", State{}, err
 	}
-	return s.createSession(ctx, user, false)
+	return s.createSession(ctx, user, false, device)
 }
 
-func (s Service) createSession(ctx context.Context, user User, remember bool) (string, State, error) {
+func (s Service) createSession(ctx context.Context, user User, remember bool, device SessionDevice) (string, State, error) {
 	token, hash, err := newToken()
 	if err != nil {
 		return "", State{}, err
@@ -103,7 +110,16 @@ func (s Service) createSession(ctx context.Context, user User, remember bool) (s
 		}
 		idleMinutes = configured
 	}
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO sessions (id, token_hash, user_id, selected_tenant_id, remember, idle_timeout_minutes, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))`, id, hash[:], user.ID, selected, remember, idleMinutes)
+	userAgent := strings.ToValidUTF8(device.UserAgent, "")
+	for len(userAgent) > 300 {
+		_, size := utf8.DecodeLastRuneInString(userAgent)
+		userAgent = userAgent[:len(userAgent)-size]
+	}
+	var ip any
+	if parsed := device.IP.To16(); parsed != nil {
+		ip = []byte(parsed)
+	}
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO sessions (id, token_hash, user_id, selected_tenant_id, remember, idle_timeout_minutes, last_seen_at, user_agent, ip, device_label) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), ?, ?, ?)`, id, hash[:], user.ID, selected, remember, idleMinutes, userAgent, ip, deviceLabel(userAgent))
 	if err != nil {
 		return "", State{}, err
 	}
@@ -131,7 +147,7 @@ func (s Service) Current(ctx context.Context, token string) (State, error) {
 	}
 	now := time.Now().UTC()
 	if (!remember && now.Sub(lastSeen) > time.Duration(idleMinutes)*time.Minute) || (expires.Valid && now.After(expires.Time)) {
-		_, _ = s.DB.ExecContext(ctx, `UPDATE sessions SET revoked_at=UTC_TIMESTAMP(6) WHERE token_hash=? AND revoked_at IS NULL`, hash[:])
+		_, _ = s.DB.ExecContext(ctx, `UPDATE sessions SET revoked_at=UTC_TIMESTAMP(6), revoked_reason='expired' WHERE token_hash=? AND revoked_at IS NULL`, hash[:])
 		return State{}, ErrUnauthenticated
 	}
 	state, err := s.stateForUser(ctx, user)
@@ -192,7 +208,7 @@ func (s Service) Logout(ctx context.Context, token string) error {
 	if !ok {
 		return nil
 	}
-	_, err := s.DB.ExecContext(ctx, `UPDATE sessions SET revoked_at=UTC_TIMESTAMP(6) WHERE token_hash=? AND revoked_at IS NULL`, hash[:])
+	_, err := s.DB.ExecContext(ctx, `UPDATE sessions SET revoked_at=UTC_TIMESTAMP(6), revoked_reason='logout' WHERE token_hash=? AND revoked_at IS NULL`, hash[:])
 	return err
 }
 
