@@ -10,7 +10,6 @@ import (
 	"net"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"digaji.id/hris/internal/ids"
 )
@@ -54,13 +53,16 @@ func (s Service) Login(ctx context.Context, email, password string, remember boo
 	var user User
 	var hash sql.NullString
 	err := s.DB.QueryRowContext(ctx, `SELECT id, email, display_name, password_hash FROM users WHERE email_normalized=? AND status='active'`, strings.ToLower(strings.TrimSpace(email))).Scan(&user.ID, &user.Email, &user.Name, &hash)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", State{}, err
+	}
 	if err != nil || !hash.Valid || !VerifyPassword(hash.String, password) {
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return "", State{}, err
+		if eventErr := logLoginEvent(ctx, s.DB, user.ID, "", "login_failure", device); eventErr != nil {
+			return "", State{}, eventErr
 		}
 		return "", State{}, ErrInvalidCredentials
 	}
-	return s.createSession(ctx, user, remember, device)
+	return s.createSession(ctx, user, remember, device, "login_success")
 }
 
 // DemoLogin bypasses the password only when the HTTP server enables staging
@@ -83,10 +85,10 @@ func (s Service) DemoLogin(ctx context.Context, account string, device SessionDe
 		}
 		return "", State{}, err
 	}
-	return s.createSession(ctx, user, false, device)
+	return s.createSession(ctx, user, false, device, "demo_login")
 }
 
-func (s Service) createSession(ctx context.Context, user User, remember bool, device SessionDevice) (string, State, error) {
+func (s Service) createSession(ctx context.Context, user User, remember bool, device SessionDevice, event string) (string, State, error) {
 	token, hash, err := newToken()
 	if err != nil {
 		return "", State{}, err
@@ -110,17 +112,20 @@ func (s Service) createSession(ctx context.Context, user User, remember bool, de
 		}
 		idleMinutes = configured
 	}
-	userAgent := strings.ToValidUTF8(device.UserAgent, "")
-	for len(userAgent) > 300 {
-		_, size := utf8.DecodeLastRuneInString(userAgent)
-		userAgent = userAgent[:len(userAgent)-size]
-	}
-	var ip any
-	if parsed := device.IP.To16(); parsed != nil {
-		ip = []byte(parsed)
-	}
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO sessions (id, token_hash, user_id, selected_tenant_id, remember, idle_timeout_minutes, last_seen_at, user_agent, ip, device_label) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), ?, ?, ?)`, id, hash[:], user.ID, selected, remember, idleMinutes, userAgent, ip, deviceLabel(userAgent))
+	userAgent := safeUserAgent(device.UserAgent)
+	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
+		return "", State{}, err
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx, `INSERT INTO sessions (id, token_hash, user_id, selected_tenant_id, remember, idle_timeout_minutes, last_seen_at, user_agent, ip, device_label) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), ?, ?, ?)`, id, hash[:], user.ID, selected, remember, idleMinutes, userAgent, deviceIP(device), deviceLabel(userAgent))
+	if err != nil {
+		return "", State{}, err
+	}
+	if err := logLoginEvent(ctx, tx, user.ID, state.SelectedTenantID, event, device); err != nil {
+		return "", State{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return "", State{}, err
 	}
 	state.Remember = remember
@@ -167,7 +172,7 @@ func (s Service) Current(ctx context.Context, token string) (State, error) {
 	return state, err
 }
 
-func (s Service) SelectTenant(ctx context.Context, token, tenantID string) (string, State, error) {
+func (s Service) SelectTenant(ctx context.Context, token, tenantID string, device SessionDevice) (string, State, error) {
 	state, err := s.Current(ctx, token)
 	if err != nil {
 		return "", State{}, err
@@ -191,13 +196,24 @@ func (s Service) SelectTenant(ctx context.Context, token, tenantID string) (stri
 	if err := s.DB.QueryRowContext(ctx, `SELECT idle_timeout_minutes FROM tenants WHERE id=?`, tenantID).Scan(&idle); err != nil {
 		return "", State{}, err
 	}
-	result, err := s.DB.ExecContext(ctx, `UPDATE sessions SET selected_tenant_id=?, token_hash=?, idle_timeout_minutes=?, rotated_at=UTC_TIMESTAMP(6) WHERE token_hash=? AND revoked_at IS NULL`, tenantID, newHash[:], idle, oldHash[:])
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return "", State{}, err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `UPDATE sessions SET selected_tenant_id=?, token_hash=?, idle_timeout_minutes=?, rotated_at=UTC_TIMESTAMP(6) WHERE token_hash=? AND revoked_at IS NULL`, tenantID, newHash[:], idle, oldHash[:])
 	if err != nil {
 		return "", State{}, err
 	}
 	changed, err := result.RowsAffected()
 	if err != nil || changed != 1 {
 		return "", State{}, ErrUnauthenticated
+	}
+	if err := logLoginEvent(ctx, tx, state.User.ID, tenantID, "tenant_selected", device); err != nil {
+		return "", State{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", State{}, err
 	}
 	state.SelectedTenantID = tenantID
 	return newRaw, state, nil

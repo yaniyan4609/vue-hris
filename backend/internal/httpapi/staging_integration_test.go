@@ -186,6 +186,9 @@ func TestStagingAccountSessionsAndPasswordChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
+		if _, err := db.Exec(`DELETE FROM login_events WHERE user_id=?`, userID); err != nil {
+			t.Errorf("cleanup login events: %v", err)
+		}
 		if _, err := db.Exec(`DELETE FROM sessions WHERE user_id=?`, userID); err != nil {
 			t.Errorf("cleanup sessions: %v", err)
 		}
@@ -218,6 +221,13 @@ func TestStagingAccountSessionsAndPasswordChange(t *testing.T) {
 	doJSON(t, newClient(), "POST", server.URL+"/api/v1/auth/login", map[string]any{"email": email, "password": oldPassword}, 401, nil)
 	third := newClient()
 	doJSON(t, third, "POST", server.URL+"/api/v1/auth/login", map[string]any{"email": email, "password": newPassword}, 200, nil)
+	var successCount, failureCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM login_events WHERE user_id=? AND event='login_success'`, userID).Scan(&successCount); err != nil || successCount != 3 {
+		t.Fatalf("login success events=%d err=%v", successCount, err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM login_events WHERE user_id=? AND event='login_failure'`, userID).Scan(&failureCount); err != nil || failureCount != 1 {
+		t.Fatalf("login failure events=%d err=%v", failureCount, err)
+	}
 	doJSON(t, first, "POST", server.URL+"/api/v1/auth/logout-all", map[string]string{}, 204, nil)
 	doJSON(t, first, "GET", server.URL+"/api/v1/auth/me", nil, 401, nil)
 	doJSON(t, third, "GET", server.URL+"/api/v1/auth/me", nil, 401, nil)

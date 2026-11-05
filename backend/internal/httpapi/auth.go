@@ -54,7 +54,7 @@ func mountAuth(r chi.Router, db *sql.DB, config Options) {
 			if !readJSON(w, req, &body) {
 				return
 			}
-			token, state, err := service.SelectTenant(req.Context(), cookieToken(req), body.TenantID)
+			token, state, err := service.SelectTenant(req.Context(), cookieToken(req), body.TenantID, sessionDevice(req))
 			if err != nil {
 				writeAuthError(w, err)
 				return

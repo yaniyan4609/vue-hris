@@ -1,6 +1,6 @@
 # Skema inti identitas dan akses
 
-Migrasi `backend/migrations/00001_core_identity_access.sql`, `00002_platform_org_employee.sql`, `00003_admin_access_audit.sql`, dan `00004_session_devices.sql` telah diterapkan pada database staging MariaDB 10.11 di server Product Owner. Versi Goose: 4. Migrasi kedua menambah role platform, struktur organisasi, dan karyawan. Migrasi ketiga menambah permission organisasi/karyawan, audit write, dan riwayat penugasan awal. Migrasi keempat menambah user agent, IP, label perangkat, dan alasan pencabutan sesi. Seed demo membuat satu tenant, tiga user, role, membership, dan satu data karyawan ESS.
+Migrasi `backend/migrations/00001_core_identity_access.sql` hingga `00005_login_events.sql` telah diterapkan pada database staging MariaDB 10.11 di server Product Owner. Versi Goose: 5. Migrasi kedua menambah role platform, struktur organisasi, dan karyawan. Migrasi ketiga menambah permission organisasi/karyawan, audit write, dan riwayat penugasan awal. Migrasi keempat menambah user agent, IP, label perangkat, dan alasan pencabutan sesi. Migrasi kelima menambah log autentikasi append-only tanpa kata sandi atau token. Seed demo membuat satu tenant, tiga user, role, membership, dan satu data karyawan ESS.
 
 ## Relasi utama
 
