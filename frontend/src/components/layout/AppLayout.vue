@@ -91,7 +91,7 @@ async function morphIntoPanel(message) {
     await router.replace(panelRoute.value)
     later(() => { dashboardMounted.value = true }, 420)
     later(() => { stage.value = 'authenticated'; busy.value = false; toast.success(message) }, 720)
-  }, 1650)
+  }, 900)
 }
 
 async function submitLogin() {
@@ -181,7 +181,7 @@ provide('requestLogout', submitLogout)
           <div v-else class="flex-1 flex flex-col items-center justify-center"><div class="relative w-36 h-36 flex items-center justify-center"><svg class="w-full h-full -rotate-90 animate-spin" style="animation-duration:1.4s" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" class="text-neutral-200 dark:text-[var(--theme-surface-muted)]" stroke-width="2" /><circle cx="60" cy="60" r="50" fill="none" stroke="var(--theme-primary)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="220 94" /></svg><span class="absolute text-xs font-bold tracking-[0.28em] text-neutral-800 dark:text-neutral-200 font-mono">LOADING</span></div></div>
           <div class="shrink-0 pt-3">
             <BaseButton v-if="stage === 'form' || stage === 'collapsing'" size="lg" class="w-full h-11" :disabled="busy || !loginForm.email || !loginForm.password" @click="submitLogin">Masuk</BaseButton>
-            <div v-else class="w-full h-11 rounded-xl relative overflow-hidden flex items-center justify-center border border-neutral-300 dark:border-[var(--theme-border-strong)] bg-neutral-100 dark:bg-[var(--theme-surface-raised)]"><div class="absolute inset-y-0 left-0 bg-[var(--theme-primary)] transition-[width] ease-[cubic-bezier(0.25,1,0.5,1)]" :class="timelineActive ? 'w-full duration-[1600ms]' : 'w-0 duration-0'" /><span class="relative z-10 text-sm font-semibold" :class="timelineActive ? 'text-[var(--theme-primary-text)]' : 'text-neutral-700 dark:text-neutral-200'">Masuk</span></div>
+            <div v-else class="w-full h-11 rounded-xl relative overflow-hidden flex items-center justify-center border border-neutral-300 dark:border-[var(--theme-border-strong)] bg-neutral-100 dark:bg-[var(--theme-surface-raised)]"><div class="absolute inset-y-0 left-0 bg-[var(--theme-primary)] transition-[width] ease-[cubic-bezier(0.25,1,0.5,1)]" :class="timelineActive ? 'w-full duration-[850ms]' : 'w-0 duration-0'" /><span class="relative z-10 text-sm font-semibold" :class="timelineActive ? 'text-[var(--theme-primary-text)]' : 'text-neutral-700 dark:text-neutral-200'">Masuk</span></div>
           </div>
         </div>
 

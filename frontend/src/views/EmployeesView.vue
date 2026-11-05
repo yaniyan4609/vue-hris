@@ -25,6 +25,7 @@ const open = ref(false)
 const editingId = ref('')
 const search = ref('')
 const form = ref({ employeeNumber: '', displayName: '', status: 'active', baseOfficeId: '', positionId: '', reportsToId: '' })
+let loadVersion = 0
 const statusOptions = [
   { label: 'Aktif', value: 'active' }, { label: 'Masa percobaan', value: 'probation' },
   { label: 'Cuti', value: 'leave' },
@@ -35,18 +36,32 @@ const managerOptions = computed(() => [{ label: 'Tanpa atasan langsung', value: 
 function statusLabel(value) { return statusOptions.find((item) => item.value === value)?.label || value }
 function statusVariant(value) { return value === 'active' ? 'success' : value === 'probation' ? 'info' : value === 'leave' ? 'warning' : 'neutral' }
 
+let referencesPromise
+async function ensureReferences() {
+  if (referencesPromise) return referencesPromise
+  referencesPromise = Promise.all([
+    apiRequest('/admin/organization/offices?pageSize=100'),
+    apiRequest('/admin/organization/positions?pageSize=100'),
+  ]).then(([officeList, positionList]) => {
+    offices.value = officeList.items
+    positions.value = positionList.items
+  }).catch((error) => {
+    referencesPromise = null
+    toast.error(error.message, 'Gagal memuat pilihan kantor dan jabatan')
+  })
+  return referencesPromise
+}
+
 async function load() {
+  const version = ++loadVersion
   loading.value = true
   try {
     const query = new URLSearchParams({ page: String(page.value), pageSize: String(pageSize.value), q: search.value })
-    const [employees, officeList, positionList] = await Promise.all([
-      apiRequest(`/admin/employees?${query}`),
-      apiRequest('/admin/organization/offices?pageSize=100'),
-      apiRequest('/admin/organization/positions?pageSize=100'),
-    ])
-    items.value = employees.items; total.value = employees.total; offices.value = officeList.items; positions.value = positionList.items
-  } catch (error) { items.value = []; total.value = 0; toast.error(error.message, 'Gagal memuat karyawan') }
-  finally { loading.value = false }
+    const employees = await apiRequest(`/admin/employees?${query}`)
+    if (version !== loadVersion) return
+    items.value = employees.items; total.value = employees.total
+  } catch (error) { if (version === loadVersion) { items.value = []; total.value = 0; toast.error(error.message, 'Gagal memuat karyawan') } }
+  finally { if (version === loadVersion) loading.value = false }
 }
 onMounted(load)
 watch([page, pageSize], load)
@@ -59,8 +74,8 @@ watch(search, () => {
   }, 250)
 })
 onUnmounted(() => clearTimeout(searchTimer))
-function startCreate() { editingId.value = ''; form.value = { employeeNumber: '', displayName: '', status: 'active', baseOfficeId: '', positionId: '', reportsToId: '' }; open.value = true }
-function startEdit(item) { editingId.value = item.id; form.value = { employeeNumber: item.employeeNumber, displayName: item.displayName, status: item.status, baseOfficeId: item.baseOfficeId, positionId: item.positionId, reportsToId: item.reportsToId || '' }; open.value = true }
+function startCreate() { editingId.value = ''; form.value = { employeeNumber: '', displayName: '', status: 'active', baseOfficeId: '', positionId: '', reportsToId: '' }; open.value = true; ensureReferences() }
+function startEdit(item) { editingId.value = item.id; form.value = { employeeNumber: item.employeeNumber, displayName: item.displayName, status: item.status, baseOfficeId: item.baseOfficeId, positionId: item.positionId, reportsToId: item.reportsToId || '' }; open.value = true; ensureReferences() }
 async function save() {
   if (saving.value) return
   saving.value = true

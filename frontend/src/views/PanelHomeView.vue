@@ -18,7 +18,7 @@ const error = ref(false)
 const counts = ref({ tenants: 0, employees: 0, offices: 0, regions: 0 })
 const platform = computed(() => route.path.startsWith('/platform'))
 async function load() {
-  if (!state.value?.user || route.path === '/') return
+  if (!state.value?.user || (route.path !== '/admin' && route.path !== '/platform')) return
   loading.value = true; error.value = false
   try {
     if (platform.value) {

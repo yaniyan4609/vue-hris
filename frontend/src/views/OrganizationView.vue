@@ -35,28 +35,44 @@ const saving = ref(false)
 const open = ref(false)
 const editingId = ref('')
 const form = ref({ code: '', name: '', parentId: '', timezone: 'Asia/Jakarta' })
+let loadVersion = 0
+let parentsVersion = 0
 
 async function load() {
+  const version = ++loadVersion
   loading.value = true
   try {
     const query = new URLSearchParams({ page: String(page.value), pageSize: String(pageSize.value), q: search.value })
-    const [data, parentData] = await Promise.all([
-      apiRequest(`/admin/organization/${kind.value}?${query}`),
-      config.value.parent ? apiRequest(`/admin/organization/${config.value.parent}?pageSize=100`) : Promise.resolve({ items: [] }),
-    ])
+    const data = await apiRequest(`/admin/organization/${kind.value}?${query}`)
+    if (version !== loadVersion) return
     items.value = data.items
     total.value = data.total
-    parents.value = parentData.items
   } catch (error) {
+    if (version !== loadVersion) return
     items.value = []
     total.value = 0
     toast.error(error.message, 'Gagal memuat organisasi')
-  } finally { loading.value = false }
+  } finally { if (version === loadVersion) loading.value = false }
 }
-watch(kind, () => { page.value = 1; search.value = ''; load() }, { immediate: true })
-watch([page, pageSize], load)
+async function loadParents() {
+  const version = ++parentsVersion
+  if (!config.value.parent) { parents.value = []; return }
+  try {
+    const data = await apiRequest(`/admin/organization/${config.value.parent}?pageSize=100`)
+    if (version === parentsVersion) parents.value = data.items
+  } catch (error) { if (version === parentsVersion) { parents.value = []; toast.error(error.message, 'Gagal memuat struktur induk') } }
+}
 let searchTimer
+let resettingSearch = false
+watch(kind, () => {
+  clearTimeout(searchTimer)
+  page.value = 1
+  if (search.value) { resettingSearch = true; search.value = '' }
+  loadParents()
+}, { immediate: true })
+watch([kind, page, pageSize], load, { immediate: true })
 watch(search, () => {
+  if (resettingSearch) { resettingSearch = false; return }
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     if (page.value === 1) load()
