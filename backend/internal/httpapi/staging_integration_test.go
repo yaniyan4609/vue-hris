@@ -97,6 +97,7 @@ func TestStagingOrganizationEmployeeAuditAndTenantBoundary(t *testing.T) {
 	defer func() {
 		for _, query := range []string{
 			`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='employees' AND entity_id=?`,
+			`DELETE FROM employee_assignments WHERE tenant_id=? AND employee_id=?`,
 			`DELETE FROM employee_assignment_history WHERE tenant_id=? AND employee_id=?`,
 			`DELETE FROM employees WHERE tenant_id=? AND id=?`,
 		} {
@@ -125,6 +126,9 @@ func TestStagingOrganizationEmployeeAuditAndTenantBoundary(t *testing.T) {
 	var assignmentCount int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM employee_assignment_history WHERE tenant_id=? AND employee_id=?`, tenantID, createdEmployee.ID).Scan(&assignmentCount); err != nil || assignmentCount != 1 {
 		t.Fatalf("assignment history=%d err=%v", assignmentCount, err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM employee_assignments WHERE tenant_id=? AND employee_id=? AND current_flag=1`, tenantID, createdEmployee.ID).Scan(&assignmentCount); err != nil || assignmentCount != 1 {
+		t.Fatalf("current assignment=%d err=%v", assignmentCount, err)
 	}
 
 	foreignTenantID, err := ids.New()

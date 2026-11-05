@@ -1,8 +1,8 @@
 # Inventaris dan rencana migrasi database digaji.id
 
-**Draf diskusi, 5 November 2026. Belum ada migrasi baru yang dijalankan berdasarkan dokumen ini.** Sumber: `full-docs/Desain Database digaji.id.md` (draft [USULAN], 4 November 2026), PRD v2.3, Matriks Menu/Role/Fungsional, migrasi `00001`–`00010`, dan `information_schema` pada MariaDB staging `192.168.11.85/staging-saas-hris`. Daftar pada bagian berikut berisi **seluruh field yang benar-benar ada** di staging. Daftar target setelahnya mengikuti **kolom penting** pada dokumen desain; tipe, nullability, constraint, dan field audit final masih harus ditetapkan per migrasi.
+**Rancangan dan catatan pelaksanaan, 5 November 2026.** Migrasi aditif `00011`–`00023` telah diterapkan pada MariaDB staging `192.168.11.85/staging-saas-hris`. Sumber: `full-docs/Desain Database digaji.id.md` (draft [USULAN], 4 November 2026), PRD v2.3, Matriks Menu/Role/Fungsional, migrasi `00001`–`00023`, dan `information_schema`. Inventaris bagian 1 adalah **baseline sebelum `00011`**, bukan seluruh kolom saat ini. Daftar target setelahnya menjelaskan cakupan domain; DDL yang berlaku ada di file migrasi.
 
-## 1. Skema staging saat ini — 35 tabel aplikasi
+## 1. Baseline sebelum migrasi baru — 35 tabel aplikasi
 
 Semua ID utama memakai string `CHAR(26)`; generator Go saat ini meng-encode **128 bit acak** dengan alfabet Crockford Base32. Bentuknya mirip ULID, tetapi tidak memiliki prefiks timestamp ULID. Waktu yang sudah ada memakai `DATETIME(6)`. `tenant_id` menjadi bagian dari PK/FK komposit pada tabel bisnis yang sudah ada. Tabel internal Goose tidak dihitung.
 
@@ -62,7 +62,7 @@ Semua ID utama memakai string `CHAR(26)`; generator Go saat ini meng-encode **12
 
 ## 3. Daftar tabel/field target dari desain (belum final)
 
-Tipe PK tabel baru ditetapkan setelah kajian D-03; tabel lama tetap memakai ID 26 karakter selama studi. Semua tabel bisnis baru akan mendapat `tenant_id` bila datanya milik tenant, timestamp UTC, FK komposit `(tenant_id, parent_id)`, dan indeks dari query nyata. Daftar di bawah menampilkan **field domain yang tertulis di desain**, sehingga belum menjanjikan semua field teknis/audit. Tabel yang sudah ada pada bagian 1 **diperluas**, bukan dibuat ulang. Istilah `request_id`, `file_id`, dan sejenisnya mengacu ke tabel induknya di domain terkait.
+Migrasi aditif memakai ID 26 karakter agar kompatibel dengan FK dan API yang berjalan; kajian D-03 tentang konversi ke `BIGINT` tetap terpisah. Tabel bisnis baru mendapat `tenant_id` bila datanya milik tenant, waktu UTC, FK komposit `(tenant_id, parent_id)`, dan indeks dari query nyata. Daftar di bawah menampilkan **field domain yang tertulis di desain**; tipe, nullability, constraint, dan field teknis aktual ada pada migrasi `00011`–`00023`. Tabel yang sudah ada pada bagian 1 **diperluas**, bukan dibuat ulang.
 
 ### Platform, paket, dan identitas
 
@@ -194,9 +194,9 @@ Tipe PK tabel baru ditetapkan setelah kajian D-03; tabel lama tetap memakai ID 2
 | `webhooks` [BERTAHAP] | Belum dirinci dalam dokumen | DDL menunggu kontrak event, signature, dan retry. |
 | Tabel talenta [BERTAHAP] | Belum dirinci dalam dokumen | Kinerja, rekrutmen, pelatihan ditentukan di Fase 5; tidak mengarang field final. |
 
-## 4. Urutan migrasi aditif yang diusulkan
+## 4. Urutan migrasi aditif dan status pelaksanaan
 
-Nomor di bawah adalah **kelompok kerja**, bukan file SQL yang sudah dibuat. Tiap kelompok dipecah menjadi beberapa migrasi Goose berurutan mulai `00011`; DDL dibekukan setelah keputusan terkait. Jangan mengubah migrasi `00001`–`00010` atau membuat ulang database staging.
+Nomor di bawah adalah **kelompok kerja**. Struktur tabel telah dibuat secara aditif pada migrasi Goose `00011`–`00023`, tetapi API, worker, dan UI domain belum otomatis aktif. Baca/scope assignment karyawan sudah cutover setelah uji paritas. Jangan mengubah migrasi lama atau membuat ulang database staging.
 
 | Urutan | Perubahan | Backfill/cutover | Gerbang verifikasi |
 | --- | --- | --- | --- |
@@ -213,21 +213,36 @@ Nomor di bawah adalah **kelompok kerja**, bukan file SQL yang sudah dibuat. Tiap
 
 Setiap migrasi: (1) tambah tabel/kolom/FK/index tanpa menghapus field yang dipakai API; (2) backfill batch idempotent; (3) dual-read/dual-write bila mengganti sumber data; (4) uji jumlah baris, FK dan query tenant; (5) alihkan API; (6) baru bersihkan kolom lama di migrasi terpisah setelah masa observasi. Untuk operasi DDL MariaDB yang tidak atomik, rollback berarti migrasi kompensasi dan restore yang sudah diuji, bukan mengandalkan `Down` saja.
 
-## 5. Keputusan dan tambahan yang perlu dibahas sebelum SQL baru
+### Migrasi yang telah diterapkan pada staging
+
+| Migrasi | Cakupan struktur | Aktivasi aplikasi |
+| --- | --- | --- |
+| `00011`–`00012` | Fondasi paket, settings, berkas, profil organisasi, assignment dan backfill karyawan. | CRUD karyawan dual-write ke history dan assignment baru; baca/scope aktif memakai assignment setelah uji paritas staging. Scope historis D-02 tetap belum diputuskan. |
+| `00013` | Requests, approval flow/task/action, outbox, inbox. | Mesin approval dan worker belum diaktifkan. |
+| `00014` | Geofence JSON, master shift, pola/slot, roster, instance, event presensi, face attempt, rekap, libur. | Fungsi perhitungan pola dan jendela tersedia; API shift/presensi serta provider face belum diaktifkan. |
+| `00015`–`00016` | SDM/dokumen/impor-ekspor, koreksi, swap, cuti/lembur, kasbon dan klaim. | Penyimpanan dan alur bisnis domain belum diaktifkan. |
+| `00017`–`00019` | Payroll inti, notifikasi/komunikasi, periode langganan, billing, support, access review. | Kalkulasi, pembayaran, delivery, dan support session belum diaktifkan. |
+| `00020`–`00023` | Key per tenant, field ciphertext, aturan pajak/BPJS tenant, satu legal profile, search key, cursor inbox, revisi roster, konteks audit, constraint waktu shift. | Kunci master persisten dan alur rotasi perlu disiapkan sebelum data sensitif boleh ditulis. |
+
+Migrasi ini **tidak memiliki `Down` destruktif** karena tabel berisi calon bukti presensi, keuangan, dan key material. Pemulihan memakai migrasi kompensasi yang ditinjau serta backup/restore teruji. Backup dan uji restore terpisah masih merupakan gerbang sebelum produksi; penerapan staging tidak boleh dianggap sebagai pemenuhan gerbang tersebut.
+
+Pemeriksaan setelah `00023`: **124 tabel aplikasi** (125 termasuk `goose_db_version`). Data demo inti tetap 1 tenant, 3 user, 2 membership, 1 karyawan, dan 9 role; tabel domain baru belum diisi contoh. Uji integrasi CRUD lama, paritas assignment, unique roster per karyawan/tanggal, dan FK slot pola lintas tenant lulus.
+
+## 5. Keputusan dan gerbang aktivasi domain
 
 | Topik | Rekomendasi awal | Perlu keputusan |
 | --- | --- | --- |
-| D-03 identitas | **Diputuskan: kajian `BIGINT` terpisah** di `docs/BIGINT_PK_FEASIBILITY.md`. ID 26 karakter yang ada tetap dipakai selama studi; hasil kajian menentukan PK tabel baru dan perlu/tidaknya migrasi legacy. | Belum ada persetujuan untuk mengubah PK/FK. |
-| Model langganan | Pakai `tenant_subscriptions` sebagai pointer aktif; tambah histori periode/langganan bila billing dibangun. | Nama dan sumber status utama sebelum invoice/payment. |
+| D-03 identitas | Kajian `BIGINT` tetap terpisah di `docs/BIGINT_PK_FEASIBILITY.md`. Migrasi aditif memakai ID 26 karakter agar FK/API lama tetap kompatibel. | Perubahan PK/FK lama belum disetujui; benchmark diperlukan bila konversi kelak dipilih. |
+| Model langganan | `tenant_subscriptions` tetap pointer aktif; `subscription_periods` menyimpan periode historis. | Aturan transisi dan gateway sebelum billing diaktifkan. |
 | D-06 approval | **Disetujui:** mesin approval dasar sebelum mutasi/terminasi aktif. | Urutan implementasi terkunci; detail flow/fallback masih perlu spesifikasi. |
-| D-08 geofence | Uji spatial MariaDB dan JSON+Go pada polygon nyata sebelum DDL. | Pilihan penyimpanan dan validasi final. |
-| D-04 data sensitif | Tambah field terenkripsi hanya setelah kunci, rotasi, backup, dan hak baca disepakati. | Pengelolaan kunci per tenant. |
+| D-08 geofence | Skema sementara memakai `polygon_json` per kantor. | Validator polygon server, uji koordinat/tepi, dan keputusan spasial produksi sebelum presensi lokasi aktif. |
+| D-04 data sensitif | **Disetujui:** kunci data per tenant berversi, dibungkus master key server. Tabel ciphertext/search key dan fungsi kriptografi tersedia. | Penyimpanan master key persisten, rotasi operasional, backup/restore, serta izin baca sebelum API sensitif aktif. |
 | D-01/D-02 | **D-01 disetujui:** satu shift per karyawan per `work_date`. Scope historis menurut penugasan saat ini masih usulan D-02. | D-02 ditetapkan sebelum query historis attendance. |
-| D-05/D-09 | Aturan pajak/BPJS global dan kemungkinan legal entity belum diputuskan. | Tetapkan sebelum payroll. |
+| D-05/D-09 | **Disetujui:** aturan pajak/BPJS berversi per tenant; satu badan hukum per tenant pada versi awal. | Formula dan tarif harus diverifikasi sebelum kalkulasi payroll aktif. |
 | Tambahan tenant ID | **Disetujui:** tambah `tenant_id` pada kuitansi, preferensi notifikasi, dan error impor agar FK komposit bisa ditegakkan. | Masukkan saat migrasi tabel terkait. |
-| Cursor notifikasi | ID publik 26 karakter + nomor urut database untuk cursor sinkronisasi (usulan). | Pilih setelah kajian D-03 dan uji konsistensi cursor. |
+| Cursor notifikasi | ID publik 26 karakter + `sequence_no BIGINT AUTO_INCREMENT` sudah dibuat pada `notifications`. | Worker inbox memakai cursor ini saat diaktifkan. |
 | Retensi D-07 | Belum menetapkan angka retensi pada tabel event/audit/inbox. | Tentukan sebelum produksi, bukan prasyarat struktur awal. |
 
 **Revisi shift/roster 5 November 2026:** detail field, perilaku jendela, pola, pin, warna, serta persiapan face recognition ada pada `docs/SHIFT_ROSTER_SCHEMA_REVISION.md`. Keputusan pola bulanan W1–W5 dan pengulangan W5 pada baris kalender keenam sudah diberikan Product Owner.
 
-**Belum dikerjakan:** tidak ada SQL/migrasi `00011+` dalam draf ini; tidak ada perubahan data staging. Tabel talenta, API key, dan webhook belum memiliki field final di desain, sehingga bagian itu memerlukan spesifikasi produk sebelum DDL.
+**Belum dikerjakan:** API/worker/UI untuk sebagian besar tabel baru; penyiapan master key; uji backup/restore; kontrak provider face recognition. `api_keys` dan webhook keluar belum memiliki kontrak final, sehingga DDL-nya menunggu spesifikasi produk. Tabel talenta juga menunggu rincian domain. Migrasi tidak mengisi data contoh baru dan tidak mengubah akun demo.

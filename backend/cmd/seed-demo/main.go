@@ -314,8 +314,37 @@ func ensureEmployee(ctx context.Context, tx *sql.Tx, tenantID, userID, officeID,
 		if err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO employee_assignment_history (tenant_id,id,employee_id,base_office_id,position_id,valid_from) SELECT tenant_id,?,id,base_office_id,position_id,UTC_TIMESTAMP(6) FROM employees WHERE tenant_id=? AND id=?`, historyID, tenantID, id)
+		if _, err = tx.ExecContext(ctx, `INSERT INTO employee_assignment_history (tenant_id,id,employee_id,base_office_id,position_id,valid_from) SELECT tenant_id,?,id,base_office_id,position_id,UTC_TIMESTAMP(6) FROM employees WHERE tenant_id=? AND id=?`, historyID, tenantID, id); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE tenant_memberships SET employee_id=? WHERE tenant_id=? AND user_id=?`, id, tenantID, userID); err != nil {
 		return err
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM employee_assignments WHERE tenant_id=? AND employee_id=? AND current_flag=1`, tenantID, id).Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		assignmentID, err := ids.New()
+		if err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(ctx, `INSERT INTO employee_assignments (tenant_id,id,employee_id,region_id,office_id,division_id,department_id,position_id,reports_to_employee_id,grade,valid_from,current_flag,source_history_id)
+			SELECT h.tenant_id,?,h.employee_id,o.region_id,h.base_office_id,d.division_id,p.department_id,h.position_id,h.reports_to_id,p.grade,h.valid_from,1,h.id
+			FROM employee_assignment_history h JOIN offices o ON o.tenant_id=h.tenant_id AND o.id=h.base_office_id
+			JOIN positions p ON p.tenant_id=h.tenant_id AND p.id=h.position_id
+			JOIN departments d ON d.tenant_id=p.tenant_id AND d.id=p.department_id
+			WHERE h.tenant_id=? AND h.employee_id=? AND h.valid_until IS NULL ORDER BY h.valid_from DESC LIMIT 1`, assignmentID, tenantID, id)
+		if err != nil {
+			return err
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows != 1 {
+			return errors.New("penempatan demo aktif tidak tersedia")
+		}
 	}
 	return nil
 }

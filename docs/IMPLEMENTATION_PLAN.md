@@ -10,6 +10,16 @@ Katalog frontend tunggal menghubungkan 8 halaman platform dan 51 halaman Admin d
 
 Verifikasi pada slice ini: `go test ./...`, `npm run build`, tes integrasi staging untuk role/delegasi/scope/tenant platform, serta pemeriksaan visual Admin, Superadmin, mobile, dan tema gelap. Tes pencarian tenant platform mencakup kasus staf yang hanya ditugaskan pada satu tenant agar filter pencarian tidak melampaui penugasan.
 
+## Pelaksanaan skema database dan revisi shift — 5 November 2026
+
+Rencana migrasi penuh di `DATABASE_SCHEMA_MIGRATION_DRAFT.md` kini digabung dengan keputusan shift/roster di `SHIFT_ROSTER_SCHEMA_REVISION.md`. Migrasi aditif `00011`–`00023` telah diterapkan pada staging MariaDB yang sama. Semua tabel domain yang sudah mempunyai field rancangan dibuat dengan ID 26 karakter agar API/FK lama tetap kompatibel; kajian `BIGINT` tetap terpisah. `api_keys`, webhook keluar, dan tabel talenta menunggu kontrak produk yang belum tersedia.
+
+Shift menyimpan jam terjadwal dan empat batas jendela presensi terpisah, wajib selfie/face, urutan pin, dan warna. Pola mingguan memiliki tujuh slot; pola bulanan W1–W5 × Senin–Minggu dan baris kalender ke-6 memakai W5. Constraint roster serta instance membatasi **satu shift per karyawan per `work_date`**. Fungsi Go menghitung slot dan waktu UTC untuk shift lintas hari. Struktur face recognition siap, tetapi panggilan provider belum aktif.
+
+Skema approval dibuat sebelum mengaktifkan mutasi/terminasi. Karyawan baru dan perubahan penempatan saat ini dual-write ke history lama serta `employee_assignments` baru dalam transaksi yang sama. Setelah uji paritas staging, baca karyawan dan filter scope aktif sudah memakai assignment baru. Data sensitif memakai rancangan kunci data per tenant dengan versi dan master key pembungkus; aturan pajak/BPJS berversi per tenant; satu profil badan hukum per tenant. Angka aturan dan kunci master belum diisi.
+
+**Gerbang API domain berikutnya:** implementasi approval/outbox; API shift, pola, roster, dan presensi; validasi polygon JSON; penyimpanan master key persisten dan rotasi; lalu cuti/payroll/billing. Skema yang sudah tersedia tidak membuat formulir pratinjau menjadi CRUD aktif. Uji staging untuk migrasi, paritas assignment, CRUD lama, FK tenant, dan satu shift per hari telah lulus; backup/restore terpisah masih perlu diuji sebelum produksi.
+
 Status: rencana kelanjutan proyek, 5 November 2026. Acuan produk adalah tiga dokumen di `full-docs/` (PRD v2.3, Matriks Menu/Role/Fungsional, dan Desain Database), serta `frontend/aturan-ui.md` dan `frontend/desain-ui.md`. Database tetap memakai server milik Product Owner di `192.168.11.85`, database `staging-saas-hris` (MariaDB 10.11, protokol MySQL); tidak memindahkannya ke server lain. Rancangan database berlabel **[USULAN]**; bagian **[TERBUKA]** belum menjadi keputusan implementasi. Saat dokumentasi dan kode berbeda, inventarisasi kondisi kode terlebih dahulu, lalu putuskan migrasi tambahan. Migrasi yang sudah diterapkan tidak diubah atau dijalankan ulang dari nol.
 
 ## Kemajuan 5 November 2026

@@ -30,6 +30,6 @@ Perbandingan ukuran **nilai kunci**, bukan estimasi ukuran tabel: `BIGINT` = 8 b
 
 ## Rekomendasi sementara
 
-**Tahan perubahan PK/FK legacy dan jangan mengunci tipe PK tabel transaksi baru sampai benchmark selesai.** Pekerjaan skema yang tidak bergantung pada D-03 (misalnya field non-ID pada tabel lama atau desain approval) boleh dirancang, tetapi migrasi `00011+` yang membuat FK lintas domain harus memakai satu strategi ID yang disepakati. Opsi B dan C layak diuji sebelum mempertimbangkan konversi penuh D.
+**Tahan perubahan PK/FK legacy.** Untuk menjalankan migrasi aditif `00011`–`00023` tanpa mengubah kontrak API, tabel baru memakai ID acak 26 karakter yang sama dengan tabel lama. Ini keputusan kompatibilitas tahap ini, bukan keputusan akhir menolak `BIGINT`. Opsi B dan C tetap layak diuji sebelum mempertimbangkan konversi penuh D; hasil benchmark diperlukan sebelum merancang migrasi PK/FK lain.
 
 Keputusan akhir masih milik Product Owner setelah hasil benchmark, estimasi migrasi, dan batas downtime ditinjau bersama.

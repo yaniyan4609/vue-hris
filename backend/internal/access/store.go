@@ -162,7 +162,7 @@ func (s Store) loadScopes(ctx context.Context, source, tenantID, ownerID, code s
 }
 
 // EmployeeWhere returns only parameterized predicates for a query that joins
-// employees e, offices o, positions p, and departments d within one tenant.
+// employees e and their current employee_assignments a within one tenant.
 func EmployeeWhere(subject Subject, effective Effective) (string, []any) {
 	if !effective.Allowed || len(effective.Scopes) == 0 {
 		return "1=0", nil
@@ -179,7 +179,7 @@ func EmployeeWhere(subject Subject, effective Effective) (string, []any) {
 			continue
 		}
 		if rule.DirectReports {
-			alternatives = append(alternatives, "e.reports_to_id=?")
+			alternatives = append(alternatives, "a.reports_to_employee_id=?")
 			args = append(args, subject.EmployeeID)
 			continue
 		}
@@ -188,7 +188,7 @@ func EmployeeWhere(subject Subject, effective Effective) (string, []any) {
 			values []string
 			column string
 		}{
-			{rule.Regions, "o.region_id"}, {rule.Offices, "e.base_office_id"}, {rule.Divisions, "d.division_id"}, {rule.Departments, "p.department_id"}, {rule.Positions, "e.position_id"},
+			{rule.Regions, "a.region_id"}, {rule.Offices, "a.office_id"}, {rule.Divisions, "a.division_id"}, {rule.Departments, "a.department_id"}, {rule.Positions, "a.position_id"},
 		} {
 			if len(item.values) == 0 {
 				continue

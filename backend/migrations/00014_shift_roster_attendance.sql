@@ -1,0 +1,235 @@
+-- +goose NO TRANSACTION
+-- +goose Up
+CREATE TABLE office_geofences (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  office_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  polygon_json JSON NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (tenant_id,id),
+  KEY idx_geofence_office (tenant_id,office_id,is_active),
+  CONSTRAINT fk_geofence_office FOREIGN KEY (tenant_id,office_id) REFERENCES offices (tenant_id,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE shift_templates (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  code VARCHAR(48) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  crosses_midnight BOOLEAN NOT NULL DEFAULT FALSE,
+  clock_in_window_start_time TIME NOT NULL,
+  clock_in_window_start_day_offset TINYINT NOT NULL DEFAULT 0,
+  clock_in_window_end_time TIME NOT NULL,
+  clock_in_window_end_day_offset TINYINT NOT NULL DEFAULT 0,
+  clock_out_window_start_time TIME NOT NULL,
+  clock_out_window_start_day_offset TINYINT NOT NULL DEFAULT 0,
+  clock_out_window_end_time TIME NOT NULL,
+  clock_out_window_end_day_offset TINYINT NOT NULL DEFAULT 0,
+  late_tolerance_min SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  break_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  target_work_minutes SMALLINT UNSIGNED NULL,
+  flex_time BOOLEAN NOT NULL DEFAULT FALSE,
+  flex_location BOOLEAN NOT NULL DEFAULT FALSE,
+  require_location BOOLEAN NOT NULL DEFAULT FALSE,
+  require_selfie BOOLEAN NOT NULL DEFAULT FALSE,
+  require_face_recognition BOOLEAN NOT NULL DEFAULT FALSE,
+  is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  pin_order SMALLINT UNSIGNED NULL,
+  color_hex CHAR(7) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '#3B82F6',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (tenant_id,id),
+  UNIQUE KEY uq_shift_code (tenant_id,code),
+  UNIQUE KEY uq_shift_pin_order (tenant_id,pin_order),
+  CONSTRAINT fk_shift_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id),
+  CONSTRAINT ck_shift_pin CHECK ((is_pinned=TRUE AND pin_order IS NOT NULL) OR (is_pinned=FALSE AND pin_order IS NULL)),
+  CONSTRAINT ck_shift_color CHECK (color_hex REGEXP '^#[0-9A-Fa-f]{6}$'),
+  CONSTRAINT ck_shift_offsets CHECK (clock_in_window_start_day_offset BETWEEN -1 AND 2 AND clock_in_window_end_day_offset BETWEEN -1 AND 2 AND clock_out_window_start_day_offset BETWEEN -1 AND 2 AND clock_out_window_end_day_offset BETWEEN -1 AND 2)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE schedule_patterns (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  code VARCHAR(48) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  pattern_type VARCHAR(12) NOT NULL,
+  version INT UNSIGNED NOT NULL DEFAULT 1,
+  is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  pin_order SMALLINT UNSIGNED NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (tenant_id,id),
+  UNIQUE KEY uq_pattern_code (tenant_id,code),
+  UNIQUE KEY uq_pattern_pin_order (tenant_id,pattern_type,pin_order),
+  CONSTRAINT fk_pattern_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id),
+  CONSTRAINT ck_pattern_type CHECK (pattern_type IN ('weekly','monthly')),
+  CONSTRAINT ck_pattern_pin CHECK ((is_pinned=TRUE AND pin_order IS NOT NULL) OR (is_pinned=FALSE AND pin_order IS NULL))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE schedule_pattern_slots (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  pattern_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  week_no TINYINT UNSIGNED NOT NULL,
+  weekday TINYINT UNSIGNED NOT NULL,
+  day_type VARCHAR(8) NOT NULL,
+  shift_template_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  PRIMARY KEY (tenant_id,id),
+  UNIQUE KEY uq_pattern_slot (tenant_id,pattern_id,week_no,weekday),
+  CONSTRAINT fk_pattern_slot_pattern FOREIGN KEY (tenant_id,pattern_id) REFERENCES schedule_patterns (tenant_id,id),
+  CONSTRAINT fk_pattern_slot_shift FOREIGN KEY (tenant_id,shift_template_id) REFERENCES shift_templates (tenant_id,id),
+  CONSTRAINT ck_pattern_slot_week CHECK (week_no BETWEEN 1 AND 5 AND weekday BETWEEN 1 AND 7),
+  CONSTRAINT ck_pattern_slot_type CHECK ((day_type='off' AND shift_template_id IS NULL) OR (day_type='shift' AND shift_template_id IS NOT NULL))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE work_schedules (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  employee_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  work_date DATE NOT NULL,
+  shift_template_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  day_type VARCHAR(8) NOT NULL,
+  office_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  source_pattern_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  source_pattern_version INT UNSIGNED NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  created_by CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  published_at DATETIME(6) NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (tenant_id,id),
+  UNIQUE KEY uq_roster_employee_day (tenant_id,employee_id,work_date),
+  KEY idx_roster_office_day (tenant_id,office_id,work_date),
+  CONSTRAINT fk_roster_employee FOREIGN KEY (tenant_id,employee_id) REFERENCES employees (tenant_id,id),
+  CONSTRAINT fk_roster_shift FOREIGN KEY (tenant_id,shift_template_id) REFERENCES shift_templates (tenant_id,id),
+  CONSTRAINT fk_roster_office FOREIGN KEY (tenant_id,office_id) REFERENCES offices (tenant_id,id),
+  CONSTRAINT fk_roster_pattern FOREIGN KEY (tenant_id,source_pattern_id) REFERENCES schedule_patterns (tenant_id,id),
+  CONSTRAINT fk_roster_actor FOREIGN KEY (tenant_id,created_by) REFERENCES tenant_memberships (tenant_id,user_id),
+  CONSTRAINT ck_roster_day CHECK ((day_type='off' AND shift_template_id IS NULL) OR (day_type='shift' AND shift_template_id IS NOT NULL AND office_id IS NOT NULL)),
+  CONSTRAINT ck_roster_status CHECK (status IN ('draft','published','cancelled')),
+  CONSTRAINT ck_roster_pattern_version CHECK ((source_pattern_id IS NULL AND source_pattern_version IS NULL) OR (source_pattern_id IS NOT NULL AND source_pattern_version IS NOT NULL))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE shift_instances (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  employee_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  work_schedule_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  shift_template_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  office_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  work_date DATE NOT NULL,
+  timezone VARCHAR(64) NOT NULL,
+  expected_start DATETIME(6) NOT NULL,
+  expected_end DATETIME(6) NOT NULL,
+  clock_in_window_start_at DATETIME(6) NOT NULL,
+  clock_in_window_end_at DATETIME(6) NOT NULL,
+  clock_out_window_start_at DATETIME(6) NOT NULL,
+  clock_out_window_end_at DATETIME(6) NOT NULL,
+  rule_snapshot JSON NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'scheduled',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (tenant_id,id),
+  UNIQUE KEY uq_instance_employee_day (tenant_id,employee_id,work_date),
+  UNIQUE KEY uq_instance_roster (tenant_id,work_schedule_id),
+  KEY idx_instance_office_start (tenant_id,office_id,expected_start),
+  CONSTRAINT fk_instance_employee FOREIGN KEY (tenant_id,employee_id) REFERENCES employees (tenant_id,id),
+  CONSTRAINT fk_instance_roster FOREIGN KEY (tenant_id,work_schedule_id) REFERENCES work_schedules (tenant_id,id),
+  CONSTRAINT fk_instance_shift FOREIGN KEY (tenant_id,shift_template_id) REFERENCES shift_templates (tenant_id,id),
+  CONSTRAINT fk_instance_office FOREIGN KEY (tenant_id,office_id) REFERENCES offices (tenant_id,id),
+  CONSTRAINT ck_instance_time CHECK (expected_end > expected_start AND clock_in_window_end_at >= clock_in_window_start_at AND clock_out_window_end_at >= clock_out_window_start_at),
+  CONSTRAINT ck_instance_status CHECK (status IN ('scheduled','open','completed','cancelled'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE attendance_verification_attempts (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  employee_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  shift_instance_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  event_type VARCHAR(12) NOT NULL,
+  client_event_id VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  result VARCHAR(16) NOT NULL,
+  provider_ref VARCHAR(160) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  error_code VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  checked_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (tenant_id,id),
+  UNIQUE KEY uq_face_attempt_client (tenant_id,employee_id,client_event_id),
+  CONSTRAINT fk_face_attempt_employee FOREIGN KEY (tenant_id,employee_id) REFERENCES employees (tenant_id,id),
+  CONSTRAINT fk_face_attempt_instance FOREIGN KEY (tenant_id,shift_instance_id) REFERENCES shift_instances (tenant_id,id),
+  CONSTRAINT ck_face_attempt_result CHECK (result IN ('passed','failed','unavailable')),
+  CONSTRAINT ck_face_attempt_type CHECK (event_type IN ('clock_in','clock_out'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE attendance_events (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  employee_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  shift_instance_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  event_type VARCHAR(16) NOT NULL,
+  occurred_at DATETIME(6) NOT NULL,
+  device_time DATETIME(6) NULL,
+  latitude DECIMAL(10,7) NULL,
+  longitude DECIMAL(10,7) NULL,
+  accuracy_m DECIMAL(8,2) NULL,
+  office_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  geofence_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  location_status VARCHAR(16) NULL,
+  timing_status VARCHAR(16) NULL,
+  selfie_file_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  face_verification_attempt_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  source VARCHAR(24) NOT NULL,
+  client_event_id VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (tenant_id,id),
+  UNIQUE KEY uq_attendance_client_event (tenant_id,employee_id,client_event_id),
+  KEY idx_attendance_instance (tenant_id,shift_instance_id,occurred_at),
+  CONSTRAINT fk_attendance_employee FOREIGN KEY (tenant_id,employee_id) REFERENCES employees (tenant_id,id),
+  CONSTRAINT fk_attendance_instance FOREIGN KEY (tenant_id,shift_instance_id) REFERENCES shift_instances (tenant_id,id),
+  CONSTRAINT fk_attendance_office FOREIGN KEY (tenant_id,office_id) REFERENCES offices (tenant_id,id),
+  CONSTRAINT fk_attendance_geofence FOREIGN KEY (tenant_id,geofence_id) REFERENCES office_geofences (tenant_id,id),
+  CONSTRAINT fk_attendance_selfie FOREIGN KEY (tenant_id,selfie_file_id) REFERENCES files (tenant_id,id),
+  CONSTRAINT fk_attendance_face FOREIGN KEY (tenant_id,face_verification_attempt_id) REFERENCES attendance_verification_attempts (tenant_id,id),
+  CONSTRAINT ck_attendance_type CHECK (event_type IN ('clock_in','clock_out','correction_in','correction_out')),
+  CONSTRAINT ck_attendance_lat CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+  CONSTRAINT ck_attendance_lng CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE attendance_daily (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  employee_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  work_date DATE NOT NULL,
+  shift_instance_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  first_in DATETIME(6) NULL,
+  last_out DATETIME(6) NULL,
+  worked_minutes INT UNSIGNED NOT NULL DEFAULT 0,
+  late_minutes INT UNSIGNED NOT NULL DEFAULT 0,
+  status VARCHAR(24) NOT NULL,
+  computed_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (tenant_id,employee_id,work_date),
+  CONSTRAINT fk_attendance_daily_employee FOREIGN KEY (tenant_id,employee_id) REFERENCES employees (tenant_id,id),
+  CONSTRAINT fk_attendance_daily_instance FOREIGN KEY (tenant_id,shift_instance_id) REFERENCES shift_instances (tenant_id,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE holidays (
+  tenant_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  holiday_date DATE NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  holiday_type VARCHAR(24) NOT NULL,
+  region_id CHAR(26) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  PRIMARY KEY (tenant_id,id),
+  KEY idx_holidays_date (tenant_id,holiday_date,region_id),
+  CONSTRAINT fk_holiday_tenant FOREIGN KEY (tenant_id) REFERENCES tenants (id),
+  CONSTRAINT fk_holiday_region FOREIGN KEY (tenant_id,region_id) REFERENCES regions (tenant_id,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- +goose Down
+-- Attendance evidence is append-only. A destructive rollback requires an
+-- explicit reviewed migration and data export.
+SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Use a reviewed compensating migration for 00014';

@@ -26,8 +26,8 @@ type employee struct {
 	UserID         string `json:"userId,omitempty"`
 }
 
-const employeeFrom = ` FROM employees e JOIN offices o ON o.tenant_id=e.tenant_id AND o.id=e.base_office_id JOIN positions p ON p.tenant_id=e.tenant_id AND p.id=e.position_id JOIN departments d ON d.tenant_id=p.tenant_id AND d.id=p.department_id`
-const employeeSelect = `SELECT e.id,e.employee_number,e.display_name,e.status,e.base_office_id,o.name,e.position_id,p.name,COALESCE(e.reports_to_id,''),COALESCE(e.user_id,'')` + employeeFrom
+const employeeFrom = ` FROM employees e JOIN employee_assignments a ON a.tenant_id=e.tenant_id AND a.employee_id=e.id AND a.current_flag=1 JOIN offices o ON o.tenant_id=a.tenant_id AND o.id=a.office_id JOIN positions p ON p.tenant_id=a.tenant_id AND p.id=a.position_id`
+const employeeSelect = `SELECT e.id,e.employee_number,e.display_name,e.status,a.office_id,o.name,a.position_id,p.name,COALESCE(a.reports_to_employee_id,''),COALESCE(e.user_id,'')` + employeeFrom
 
 func scanEmployee(row interface{ Scan(...any) error }) (employee, error) {
 	var e employee
@@ -84,7 +84,7 @@ func (a adminAPI) listEmployees(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 400, map[string]string{"error": "Filter kantor tidak valid"})
 			return
 		}
-		where += " AND e.base_office_id=?"
+		where += " AND a.office_id=?"
 		params = append(params, officeID)
 	}
 	var total int
@@ -211,6 +211,12 @@ func (a adminAPI) createEmployee(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "Nomor karyawan duplikat atau referensi tidak tersedia"})
 		return
 	}
+	if e.UserID != "" {
+		if _, err = tx.ExecContext(r.Context(), `UPDATE tenant_memberships SET employee_id=? WHERE tenant_id=? AND user_id=?`, id, c.tenant.ID, e.UserID); err != nil {
+			writeJSON(w, 400, map[string]string{"error": "Akun karyawan sudah tertaut atau tidak tersedia"})
+			return
+		}
+	}
 	if err = insertAssignment(r.Context(), tx, c.tenant.ID, e); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "Gagal mencatat penempatan"})
 		return
@@ -288,6 +294,10 @@ func (a adminAPI) updateEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if old.BaseOfficeID != next.BaseOfficeID || old.PositionID != next.PositionID || old.ReportsToID != next.ReportsToID {
+		if _, err = tx.ExecContext(r.Context(), `UPDATE employee_assignments SET valid_to=UTC_TIMESTAMP(6),current_flag=NULL WHERE tenant_id=? AND employee_id=? AND current_flag=1`, c.tenant.ID, id); err != nil {
+			writeJSON(w, 500, map[string]string{"error": "Gagal menutup penempatan lama"})
+			return
+		}
 		if _, err = tx.ExecContext(r.Context(), `UPDATE employee_assignment_history SET valid_until=UTC_TIMESTAMP(6) WHERE tenant_id=? AND employee_id=? AND valid_until IS NULL`, c.tenant.ID, id); err != nil {
 			writeJSON(w, 500, map[string]string{"error": "Gagal menutup penempatan lama"})
 			return
@@ -316,12 +326,34 @@ func nullID(value string) any {
 }
 
 func insertAssignment(ctx context.Context, tx *sql.Tx, tenantID string, e employee) error {
-	id, err := ids.New()
+	historyID, err := ids.New()
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO employee_assignment_history (tenant_id,id,employee_id,base_office_id,position_id,reports_to_id,valid_from) VALUES (?,?,?,?,?,?,UTC_TIMESTAMP(6))`, tenantID, id, e.ID, e.BaseOfficeID, e.PositionID, nullID(e.ReportsToID))
-	return err
+	assignmentID, err := ids.New()
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO employee_assignment_history (tenant_id,id,employee_id,base_office_id,position_id,reports_to_id,valid_from) VALUES (?,?,?,?,?,?,UTC_TIMESTAMP(6))`, tenantID, historyID, e.ID, e.BaseOfficeID, e.PositionID, nullID(e.ReportsToID))
+	if err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO employee_assignments (tenant_id,id,employee_id,region_id,office_id,division_id,department_id,position_id,reports_to_employee_id,grade,valid_from,current_flag,source_history_id)
+		SELECT ?,?,?,o.region_id,o.id,d.division_id,p.department_id,p.id,?,p.grade,h.valid_from,1,?
+		FROM offices o JOIN positions p ON p.tenant_id=o.tenant_id AND p.id=? JOIN departments d ON d.tenant_id=p.tenant_id AND d.id=p.department_id
+		JOIN employee_assignment_history h ON h.tenant_id=o.tenant_id AND h.id=?
+		WHERE o.tenant_id=? AND o.id=?`, tenantID, assignmentID, e.ID, nullID(e.ReportsToID), historyID, e.PositionID, historyID, tenantID, e.BaseOfficeID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return errors.New("penempatan tidak dapat dipetakan")
+	}
+	return nil
 }
 
 func mountESS(r chi.Router, db *sql.DB) {

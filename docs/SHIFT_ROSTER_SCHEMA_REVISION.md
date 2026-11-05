@@ -1,6 +1,6 @@
 # Revisi rancangan shift, pola jadwal, dan roster
 
-**Keputusan Product Owner, 5 November 2026.** Dokumen ini memperinci fase Jadwal dan Kehadiran pada `DATABASE_SCHEMA_MIGRATION_DRAFT.md`. Belum ada migrasi SQL atau integrasi endpoint face recognition yang dijalankan.
+**Keputusan Product Owner, 5 November 2026.** Dokumen ini memperinci fase Jadwal dan Kehadiran pada `DATABASE_SCHEMA_MIGRATION_DRAFT.md`. Struktur SQL sudah diterapkan melalui migrasi `00014`, `00022`, dan `00023`; fungsi pola serta materialisasi waktu ada di `backend/internal/schedule`. API presensi dan integrasi endpoint face recognition belum diaktifkan.
 
 ## 1. Aturan yang disepakati
 
@@ -43,6 +43,6 @@ Shift lintas hari **22:00–06:00** memakai `work_date` hari masuk. Contoh jende
 
 ## 5. Urutan implementasi dan tes
 
-Setelah keputusan tipe PK D-03, migrasi aditif Jadwal membuat master shift → pola/slot → roster → instance → event/attempt. D-01 sudah diputuskan satu shift per karyawan per `work_date`. Field face recognition boleh dibuat dengan default `false`; pemanggilan endpoint tetap modul tahap lanjut sampai kontrak provider diberikan. Tidak ada data biometrik mentah dalam migrasi awal.
+Migrasi aditif Jadwal telah membuat master shift → pola/slot → roster → instance → event/attempt dengan ID 26 karakter yang kompatibel dengan tabel lama. D-01 sudah diputuskan satu shift per karyawan per `work_date`. Field face recognition dibuat dengan default `false`; pemanggilan endpoint tetap modul tahap lanjut sampai kontrak provider diberikan. Tidak ada data biometrik mentah dalam migrasi awal.
 
 Tes wajib: jendela masuk/pulang tepat pada batas dan di luarnya; terlambat masih dalam jendela; shift lintas hari dan zona waktu kantor; pin dan urutannya; warna valid; pola mingguan 7 hari; pola bulanan untuk bulan 4/5/6 baris kalender termasuk pengulangan W5; hari off; edit pola setelah roster terbit; tenant FK; retry presensi; selfie wajib; face wajib/gagal/provider tidak tersedia setelah integrasi.

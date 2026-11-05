@@ -13,7 +13,7 @@ func TestEmployeeWhereCombinesScopeWithoutLosingTenantFilter(t *testing.T) {
 		{DirectReports: true},
 	}}
 	where, args := EmployeeWhere(subject, decision)
-	if !strings.Contains(where, "e.base_office_id IN (?,?) AND p.department_id IN (?)") || !strings.Contains(where, " OR e.reports_to_id=?") {
+	if !strings.Contains(where, "a.office_id IN (?,?) AND a.department_id IN (?)") || !strings.Contains(where, " OR a.reports_to_employee_id=?") {
 		t.Fatalf("unexpected predicate: %s", where)
 	}
 	if !reflect.DeepEqual(args, []any{"office-a", "office-b", "department-a", "employee-a"}) {
