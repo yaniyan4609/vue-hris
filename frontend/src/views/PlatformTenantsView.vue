@@ -1,13 +1,14 @@
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { Building2, RefreshCw } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Building2, Plus, RefreshCw } from 'lucide-vue-next'
 import { apiRequest } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
-import BaseButton from '../components/ui/BaseButton.vue'
 import BaseBadge from '../components/ui/BaseBadge.vue'
-import BaseEmptyState from '../components/ui/BaseEmptyState.vue'
+import BaseButton from '../components/ui/BaseButton.vue'
+import BaseDataTable from '../components/ui/BaseDataTable.vue'
 import BaseInput from '../components/ui/BaseInput.vue'
-import BasePagination from '../components/ui/BasePagination.vue'
+import BaseModal from '../components/ui/BaseModal.vue'
+import BaseSearchableSelect from '../components/ui/BaseSearchableSelect.vue'
 
 const toast = useToast()
 const tenants = ref([])
@@ -15,35 +16,69 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(15)
 const search = ref('')
+const status = ref('all')
 const loading = ref(false)
+const selected = ref(null)
+const formOpen = ref(false)
+const columns = [
+  { key: 'name', label: 'Perusahaan', sortable: true },
+  { key: 'slug', label: 'Slug' },
+  { key: 'status', label: 'Status' },
+]
+const statusOptions = [
+  { label: 'Semua status', value: 'all' },
+  { label: 'Aktif', value: 'active' },
+  { label: 'Trial', value: 'trial' },
+  { label: 'Verifikasi', value: 'pending_verification' },
+  { label: 'Grace', value: 'grace' },
+  { label: 'Ditangguhkan', value: 'suspended' },
+  { label: 'Berhenti', value: 'stopped' },
+]
+const stats = computed(() => [
+  { label: 'Total sesuai filter', value: total.value },
+  { label: 'Aktif di halaman', value: tenants.value.filter((t) => t.status === 'active').length },
+  { label: 'Trial di halaman', value: tenants.value.filter((t) => t.status === 'trial').length },
+  { label: 'Lainnya di halaman', value: tenants.value.filter((t) => !['active', 'trial'].includes(t.status)).length },
+])
+let searchTimer
+
 async function load() {
   loading.value = true
   try {
     const query = new URLSearchParams({ page: String(page.value), pageSize: String(pageSize.value), q: search.value })
+    if (status.value !== 'all') query.set('status', status.value)
     const result = await apiRequest(`/platform/tenants?${query}`)
-    tenants.value = result.items
-    total.value = result.total
-  } catch (error) { tenants.value = []; total.value = 0; toast.error(error.message, 'Gagal memuat perusahaan') }
-  finally { loading.value = false }
+    tenants.value = result.items || []
+    total.value = result.total || 0
+  } catch (error) {
+    tenants.value = []
+    total.value = 0
+    toast.error(error.message, 'Gagal memuat perusahaan')
+  } finally { loading.value = false }
 }
 onMounted(load)
+onUnmounted(() => clearTimeout(searchTimer))
 watch([page, pageSize], load)
-let searchTimer
+watch(status, () => { if (page.value === 1) load(); else page.value = 1 })
 watch(search, () => {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    if (page.value === 1) load()
-    else page.value = 1
-  }, 250)
+  searchTimer = setTimeout(() => { if (page.value === 1) load(); else page.value = 1 }, 250)
 })
-onUnmounted(() => clearTimeout(searchTimer))
 </script>
 
 <template>
   <div class="h-full flex flex-col min-h-0 overflow-hidden gap-2.5 w-full max-w-7xl mx-auto select-none relative">
-    <div class="shrink-0 flex items-center justify-between gap-3"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded-xl bg-[var(--theme-primary-soft)] text-[var(--theme-primary)] flex items-center justify-center"><Building2 class="w-4 h-4" /></div><div><h1 class="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white">Perusahaan</h1><p class="text-xs text-neutral-500 dark:text-neutral-400">Tenant platform</p></div><BaseBadge variant="neutral">{{ total }}</BaseBadge></div><BaseButton variant="outline" size="sm" title="Muat ulang" aria-label="Muat ulang" :disabled="loading" @click="load"><RefreshCw class="w-4 h-4" /></BaseButton></div>
-    <div class="shrink-0 rounded-2xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)] p-3"><BaseInput v-model="search" size="sm" placeholder="Cari perusahaan atau slug" clearable /></div>
-    <div class="hidden md:flex flex-1 min-h-0 flex-col rounded-2xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)] overflow-hidden"><div class="flex-1 min-h-0 overflow-auto"><table class="w-full text-xs text-left"><thead class="sticky top-0 bg-neutral-50 dark:bg-[var(--theme-surface-raised)] border-b border-neutral-200 dark:border-[var(--theme-border)] text-neutral-500"><tr><th class="p-3">Perusahaan</th><th class="p-3">Slug</th><th class="p-3">Status</th></tr></thead><tbody><tr v-for="tenant in tenants" :key="tenant.id" class="border-b border-neutral-100 dark:border-[var(--theme-border)]"><td class="p-3 font-semibold text-neutral-900 dark:text-white">{{ tenant.name }}</td><td class="p-3 font-mono">{{ tenant.slug }}</td><td class="p-3"><BaseBadge :variant="tenant.status === 'active' ? 'success' : 'warning'">{{ tenant.status }}</BaseBadge></td></tr></tbody></table><BaseEmptyState v-if="!loading && !tenants.length" title="Belum ada perusahaan" compact /></div><div class="shrink-0 border-t border-neutral-200 dark:border-[var(--theme-border)] p-2"><BasePagination v-model:current-page="page" v-model:items-per-page="pageSize" :total-items="total" :per-page-options="[15, 30, 50, 100]" /></div></div>
-    <div class="md:hidden flex-1 min-h-0 flex flex-col overflow-hidden"><div class="flex-1 min-h-0 overflow-y-auto space-y-2.5"><div v-for="tenant in tenants" :key="tenant.id" class="rounded-2xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)] p-3"><p class="text-xs font-semibold text-neutral-900 dark:text-white">{{ tenant.name }}</p><div class="flex items-center justify-between gap-2 mt-2"><span class="text-[11px] text-neutral-500">{{ tenant.slug }}</span><BaseBadge :variant="tenant.status === 'active' ? 'success' : 'warning'">{{ tenant.status }}</BaseBadge></div></div><BaseEmptyState v-if="!loading && !tenants.length" title="Belum ada perusahaan" compact /></div><div class="shrink-0 pt-2"><BasePagination v-model:current-page="page" v-model:items-per-page="pageSize" :total-items="total" :per-page-options="[15, 30, 50, 100]" compact /></div></div>
+    <div class="shrink-0 flex items-center justify-between gap-3 pb-2 border-b border-neutral-200 dark:border-[var(--theme-border)]">
+      <div class="flex items-center gap-2 min-w-0"><Building2 class="w-5 h-5 text-[var(--theme-primary)]" /><h1 class="text-lg font-bold text-neutral-900 dark:text-white">Perusahaan</h1><BaseBadge variant="neutral">{{ total }}</BaseBadge></div>
+      <div class="flex gap-2"><BaseButton variant="outline" size="sm" title="Muat ulang" aria-label="Muat ulang" :disabled="loading" @click="load"><RefreshCw class="w-4 h-4" /></BaseButton><BaseButton size="sm" @click="formOpen = true"><Plus class="w-4 h-4" /><span class="hidden sm:inline">Tambah</span></BaseButton></div>
+    </div>
+    <div class="shrink-0 flex flex-col sm:flex-row gap-2"><BaseInput v-model="search" placeholder="Cari perusahaan atau slug" clearable class="flex-1" /><BaseSearchableSelect v-model="status" :options="statusOptions" :searchable="false" class="sm:w-52" /></div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0"><div v-for="stat in stats" :key="stat.label" class="h-9 flex items-center justify-between gap-2 px-2.5 rounded-xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)]"><span class="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400 truncate">{{ stat.label }}</span><span class="text-xs font-bold text-neutral-900 dark:text-white">{{ stat.value }}</span></div></div>
+    <BaseDataTable :columns="columns" :rows="tenants" :total-items="total" server-side :loading="loading" :current-page="page" :items-per-page="pageSize" empty-title="Belum ada perusahaan" empty-description="Data perusahaan sesuai izin platform akan tampil di sini." @update:current-page="page = $event" @update:items-per-page="pageSize = $event" @row-click="selected = $event">
+      <template #cell-status="{ row }"><BaseBadge :variant="row.status === 'active' ? 'success' : 'warning'">{{ statusOptions.find((option) => option.value === row.status)?.label || row.status }}</BaseBadge></template>
+      <template #actions="{ row }"><BaseButton variant="outline" size="sm" @click.stop="selected = row">Lihat detail</BaseButton></template>
+    </BaseDataTable>
+    <BaseModal :model-value="Boolean(selected)" title="Detail Perusahaan" @update:model-value="(open) => { if (!open) selected = null }"><div v-if="selected" class="space-y-3 text-sm"><div><p class="text-xs text-neutral-500">Nama perusahaan</p><p class="font-semibold text-neutral-900 dark:text-white">{{ selected.name }}</p></div><div><p class="text-xs text-neutral-500">Slug</p><p>{{ selected.slug }}</p></div><div><p class="text-xs text-neutral-500">Status</p><BaseBadge :variant="selected.status === 'active' ? 'success' : 'warning'">{{ selected.status }}</BaseBadge></div><p class="text-xs text-neutral-500">Pengelolaan perusahaan tersedia setelah API dan aturan bisnis modul selesai.</p></div></BaseModal>
+    <BaseModal v-model="formOpen" title="Tambah Perusahaan" subtitle="Pratinjau formulir"><div class="space-y-3"><BaseInput label="Nama perusahaan" disabled /><BaseInput label="Slug" disabled /><p class="text-xs text-neutral-500">Formulir ini belum menyimpan data.</p></div><template #footer><BaseButton variant="outline" size="sm" @click="formOpen = false">Tutup</BaseButton><BaseButton size="sm" disabled>Simpan · Dalam pengembangan</BaseButton></template></BaseModal>
   </div>
 </template>

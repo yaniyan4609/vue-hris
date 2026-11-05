@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -48,12 +49,22 @@ type userPermission struct {
 	Override      string             `json:"override"`
 	Sources       []string           `json:"sources,omitempty"`
 	Scopes        []access.ScopeRule `json:"scopes,omitempty"`
+	ScopeOverride bool               `json:"scopeOverride"`
 }
 
 type accessUserDetail struct {
 	User        accessUser       `json:"user"`
 	Roles       []userRole       `json:"roles"`
 	Permissions []userPermission `json:"permissions"`
+	History     []accessHistory  `json:"history"`
+}
+
+type accessHistory struct {
+	Action string          `json:"action"`
+	Actor  string          `json:"actor"`
+	At     string          `json:"at"`
+	Before json.RawMessage `json:"before,omitempty"`
+	After  json.RawMessage `json:"after,omitempty"`
 }
 
 func (a adminAPI) listAccessUsers(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +85,14 @@ func (a adminAPI) listAccessUsers(w http.ResponseWriter, r *http.Request) {
 	if q != "" {
 		where += " AND (LOCATE(LOWER(?),LOWER(u.display_name))>0 OR LOCATE(LOWER(?),LOWER(u.email))>0)"
 		args = append(args, q, q)
+	}
+	if status := r.URL.Query().Get("status"); status != "" {
+		if status != "active" && status != "disabled" {
+			writeJSON(w, 400, map[string]string{"error": "Filter status tidak valid"})
+			return
+		}
+		where += " AND u.status=?"
+		args = append(args, status)
 	}
 	location, err := time.LoadLocation(c.tenant.Timezone)
 	if err != nil {
@@ -190,7 +209,7 @@ func (a adminAPI) getAccessUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows.Close()
-	rows, err = a.db.QueryContext(r.Context(), `SELECT p.code,p.requires_scope,COALESCE(o.decision,'inherit') FROM permission_registry p LEFT JOIN user_permission_overrides o ON o.tenant_id=? AND o.user_id=? AND o.permission_code=p.code ORDER BY p.code`, c.tenant.ID, userID)
+	rows, err = a.db.QueryContext(r.Context(), `SELECT p.code,p.requires_scope,COALESCE(o.decision,'inherit'),s.user_id IS NOT NULL FROM permission_registry p LEFT JOIN user_permission_overrides o ON o.tenant_id=? AND o.user_id=? AND o.permission_code=p.code LEFT JOIN user_scope_overrides s ON s.tenant_id=? AND s.user_id=? AND s.permission_code=p.code ORDER BY p.code`, c.tenant.ID, userID, c.tenant.ID, userID)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "Gagal membaca izin pengguna"})
 		return
@@ -198,11 +217,12 @@ func (a adminAPI) getAccessUser(w http.ResponseWriter, r *http.Request) {
 	type overrideItem struct {
 		code, decision string
 		requiresScope  bool
+		scopeOverride  bool
 	}
 	var overrides []overrideItem
 	for rows.Next() {
 		var item overrideItem
-		if err := rows.Scan(&item.code, &item.requiresScope, &item.decision); err != nil {
+		if err := rows.Scan(&item.code, &item.requiresScope, &item.decision, &item.scopeOverride); err != nil {
 			rows.Close()
 			writeJSON(w, 500, map[string]string{"error": "Gagal membaca izin pengguna"})
 			return
@@ -216,14 +236,43 @@ func (a adminAPI) getAccessUser(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close()
 	detail.Permissions = []userPermission{}
+	decisions, _, err := a.access.DecideAll(r.Context(), c.tenant.ID, userID, c.tenant.Timezone)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "Gagal membaca izin pengguna"})
+		return
+	}
 	for _, item := range overrides {
-		_, decision, err := a.access.Decide(r.Context(), c.tenant.ID, userID, c.tenant.Timezone, item.code)
-		if err != nil {
-			writeJSON(w, 500, map[string]string{"error": "Gagal membaca izin pengguna"})
+		decision := decisions[item.code]
+		detail.Permissions = append(detail.Permissions, userPermission{Code: item.code, RequiresScope: item.requiresScope, Allowed: decision.Allowed, Reason: decision.Reason, Override: item.decision, Sources: decision.Sources, Scopes: decision.Scopes, ScopeOverride: item.scopeOverride})
+	}
+	detail.History = []accessHistory{}
+	rows, err = a.db.QueryContext(r.Context(), `SELECT a.action,u.display_name,DATE_FORMAT(a.created_at,'%Y-%m-%d %H:%i:%s'),a.before_json,a.after_json FROM audit_logs a JOIN users u ON u.id=a.actor_user_id WHERE a.tenant_id=? AND a.entity_id=? AND a.action LIKE 'pengguna.%' ORDER BY a.created_at DESC LIMIT 30`, c.tenant.ID, userID)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "Gagal membaca riwayat akses"})
+		return
+	}
+	for rows.Next() {
+		var item accessHistory
+		var before, after sql.NullString
+		if err := rows.Scan(&item.Action, &item.Actor, &item.At, &before, &after); err != nil {
+			rows.Close()
+			writeJSON(w, 500, map[string]string{"error": "Gagal membaca riwayat akses"})
 			return
 		}
-		detail.Permissions = append(detail.Permissions, userPermission{Code: item.code, RequiresScope: item.requiresScope, Allowed: decision.Allowed, Reason: decision.Reason, Override: item.decision, Sources: decision.Sources, Scopes: decision.Scopes})
+		if before.Valid {
+			item.Before = json.RawMessage(before.String)
+		}
+		if after.Valid {
+			item.After = json.RawMessage(after.String)
+		}
+		detail.History = append(detail.History, item)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		writeJSON(w, 500, map[string]string{"error": "Gagal membaca riwayat akses"})
+		return
+	}
+	rows.Close()
 	writeJSON(w, 200, detail)
 }
 
@@ -550,8 +599,11 @@ func (a adminAPI) updateUserPermission(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if body.Decision == "allow" {
-			writeJSON(w, 400, map[string]string{"error": "Izin ini memerlukan scope. Atur scope sebelum memberi izin khusus"})
-			return
+			var scopeCount int
+			if err := tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM user_scope_rules WHERE tenant_id=? AND user_id=? AND permission_code=?`, c.tenant.ID, targetID, code).Scan(&scopeCount); err != nil || scopeCount == 0 {
+				writeJSON(w, 400, map[string]string{"error": "Atur scope pengguna sebelum memberi izin khusus"})
+				return
+			}
 		}
 	}
 	var previous sql.NullString

@@ -61,6 +61,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  unavailable: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const iconBoxClasses = computed(() => {
@@ -126,7 +130,8 @@ const iconBoxClasses = computed(() => {
             tone === 'rose' ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-white',
           ]"
         >
-          <BaseCountUp :to="value" :prefix="prefix" :suffix="suffix" :decimals="decimals" />
+          <span v-if="unavailable">—</span>
+          <BaseCountUp v-else :to="value" :prefix="prefix" :suffix="suffix" :decimals="decimals" />
           <template v-if="secondaryValue !== '' && secondaryValue !== null && secondaryValue !== undefined">
             {{ secondaryValue }}
           </template>

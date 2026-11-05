@@ -42,9 +42,13 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 		r.Get("/access/users", a.listAccessUsers)
 		r.Get("/access/users/{id}", a.getAccessUser)
 		r.Get("/access/roles", a.listAccessRoles)
+		r.Get("/access/scope-options", a.listScopeOptions)
 		r.With(checkOrigin(config)).Post("/access/users/{id}/roles", a.assignUserRole)
 		r.With(checkOrigin(config)).Delete("/access/users/{id}/roles/{assignmentId}", a.revokeUserRole)
 		r.With(checkOrigin(config)).Put("/access/users/{id}/permissions/{code}", a.updateUserPermission)
+		r.With(checkOrigin(config)).Put("/access/users/{id}/scopes/{code}", a.updateUserScope)
+		r.With(checkOrigin(config)).Delete("/access/users/{id}/scopes/{code}", a.clearUserScope)
+		r.With(checkOrigin(config)).Post("/access/preview", a.previewUserAccess)
 	})
 }
 
@@ -178,6 +182,14 @@ func (a adminAPI) listOrganization(w http.ResponseWriter, r *http.Request) {
 	if q != "" {
 		where += " AND (LOCATE(LOWER(?), LOWER(code))>0 OR LOCATE(LOWER(?), LOWER(name))>0)"
 		args = append(args, q, q)
+	}
+	if parentID := r.URL.Query().Get("parentId"); parentID != "" {
+		if kind.parentColumn == "" || len(parentID) != 26 {
+			writeJSON(w, 400, map[string]string{"error": "Filter induk tidak valid"})
+			return
+		}
+		where += " AND " + kind.parentColumn + "=?"
+		args = append(args, parentID)
 	}
 	var total int
 	if err := a.db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM "+kind.table+" WHERE "+where, args...).Scan(&total); err != nil {

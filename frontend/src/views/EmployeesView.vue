@@ -24,12 +24,25 @@ const saving = ref(false)
 const open = ref(false)
 const editingId = ref('')
 const search = ref('')
+const statusFilter = ref('all')
+const officeFilter = ref('all')
 const form = ref({ employeeNumber: '', displayName: '', status: 'active', baseOfficeId: '', positionId: '', reportsToId: '' })
 let loadVersion = 0
 const statusOptions = [
   { label: 'Aktif', value: 'active' }, { label: 'Masa percobaan', value: 'probation' },
   { label: 'Cuti', value: 'leave' },
 ]
+const filterStatusOptions = [
+  { label: 'Semua status', value: 'all' }, ...statusOptions,
+  { label: 'Resign', value: 'resigned' }, { label: 'Terminasi', value: 'terminated' },
+]
+const filterOfficeOptions = computed(() => [{ label: 'Semua kantor', value: 'all' }, ...offices.value.map((item) => ({ label: item.name, value: item.id }))])
+const stats = computed(() => [
+  { label: 'Total sesuai filter', value: total.value },
+  { label: 'Aktif di halaman', value: items.value.filter((item) => item.status === 'active').length },
+  { label: 'Percobaan di halaman', value: items.value.filter((item) => item.status === 'probation').length },
+  { label: 'Lainnya di halaman', value: items.value.filter((item) => !['active', 'probation'].includes(item.status)).length },
+])
 const officeOptions = computed(() => offices.value.map((item) => ({ label: item.name, value: item.id })))
 const positionOptions = computed(() => positions.value.map((item) => ({ label: item.name, value: item.id })))
 const managerOptions = computed(() => [{ label: 'Tanpa atasan langsung', value: '' }, ...items.value.filter((item) => item.id !== editingId.value).map((item) => ({ label: item.displayName, value: item.id }))])
@@ -57,14 +70,17 @@ async function load() {
   loading.value = true
   try {
     const query = new URLSearchParams({ page: String(page.value), pageSize: String(pageSize.value), q: search.value })
+    if (statusFilter.value !== 'all') query.set('status', statusFilter.value)
+    if (officeFilter.value !== 'all') query.set('officeId', officeFilter.value)
     const employees = await apiRequest(`/admin/employees?${query}`)
     if (version !== loadVersion) return
     items.value = employees.items; total.value = employees.total
   } catch (error) { if (version === loadVersion) { items.value = []; total.value = 0; toast.error(error.message, 'Gagal memuat karyawan') } }
   finally { if (version === loadVersion) loading.value = false }
 }
-onMounted(load)
+onMounted(() => { load(); if (adminCapabilities.value['organisasi.lihat']) ensureReferences() })
 watch([page, pageSize], load)
+watch([statusFilter, officeFilter], () => { if (page.value === 1) load(); else page.value = 1 })
 let searchTimer
 watch(search, () => {
   clearTimeout(searchTimer)
@@ -95,7 +111,8 @@ async function save() {
       <div class="flex items-center gap-2.5 min-w-0"><div class="w-8 h-8 rounded-xl bg-[var(--theme-primary-soft)] text-[var(--theme-primary)] flex items-center justify-center"><Users class="w-4 h-4" /></div><div><h1 class="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white">Direktori Karyawan</h1><p class="text-xs text-neutral-500 dark:text-neutral-400">Data karyawan perusahaan</p></div><BaseBadge variant="neutral">{{ total }}</BaseBadge></div>
       <div class="flex gap-2"><BaseButton variant="outline" size="sm" :disabled="loading" title="Muat ulang" aria-label="Muat ulang" @click="load"><RefreshCw class="w-4 h-4" /></BaseButton><BaseButton v-if="adminCapabilities['karyawan.buat']" size="sm" @click="startCreate"><Plus class="w-4 h-4" /><span class="hidden sm:inline">Tambah</span></BaseButton></div>
     </div>
-    <div class="shrink-0 rounded-2xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)] p-3"><BaseInput v-model="search" size="sm" placeholder="Cari nama atau nomor karyawan" clearable /></div>
+    <div class="shrink-0 flex flex-col sm:flex-row gap-2"><BaseInput v-model="search" size="sm" placeholder="Cari nama atau nomor karyawan" clearable class="flex-1" /><BaseSearchableSelect v-model="statusFilter" :options="filterStatusOptions" :searchable="false" size="sm" class="sm:w-44" /><BaseSearchableSelect v-if="adminCapabilities['organisasi.lihat']" v-model="officeFilter" :options="filterOfficeOptions" size="sm" class="sm:w-48" /></div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0"><div v-for="stat in stats" :key="stat.label" class="h-9 flex items-center justify-between gap-2 px-2.5 rounded-xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)]"><span class="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400 truncate">{{ stat.label }}</span><span class="text-xs font-bold text-neutral-900 dark:text-white">{{ stat.value }}</span></div></div>
     <div class="hidden md:flex flex-1 min-h-0 flex-col rounded-2xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)] overflow-hidden">
       <div class="flex-1 min-h-0 overflow-auto"><table class="w-full text-xs text-left"><thead class="sticky top-0 z-10 bg-neutral-50 dark:bg-[var(--theme-surface-raised)] border-b border-neutral-200 dark:border-[var(--theme-border)] text-neutral-500 dark:text-neutral-400"><tr><th class="p-3">No. Karyawan</th><th class="p-3">Nama</th><th class="p-3">Kantor</th><th class="p-3">Jabatan</th><th class="p-3">Status</th><th class="p-3 text-right">Aksi</th></tr></thead><tbody><tr v-for="item in items" :key="item.id" class="border-b border-neutral-100 dark:border-[var(--theme-border)]"><td class="p-3 font-mono">{{ item.employeeNumber }}</td><td class="p-3 font-semibold text-neutral-900 dark:text-white">{{ item.displayName }}</td><td class="p-3">{{ item.officeName }}</td><td class="p-3">{{ item.positionName }}</td><td class="p-3"><BaseBadge :variant="statusVariant(item.status)">{{ statusLabel(item.status) }}</BaseBadge></td><td class="p-3 text-right"><BaseButton v-if="adminCapabilities['karyawan.ubah']" variant="outline" size="sm" @click="startEdit(item)">Ubah</BaseButton></td></tr></tbody></table><BaseEmptyState v-if="!loading && !items.length" title="Karyawan tidak ditemukan" :description="search ? 'Coba kata kunci lain.' : 'Tambahkan karyawan pertama untuk memulai direktori.'" compact /></div>
       <div class="shrink-0 border-t border-neutral-200 dark:border-[var(--theme-border)] p-2"><BasePagination v-model:current-page="page" v-model:items-per-page="pageSize" :total-items="total" :per-page-options="[15, 30, 50, 100]" /></div>

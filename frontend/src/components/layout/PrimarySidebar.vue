@@ -109,7 +109,7 @@ const handlePinSubmenu = (item) => {
     </div>
 
     <!-- Menu Items: Beranda, Template -->
-    <nav class="w-full flex flex-col items-center gap-2 px-1">
+    <nav class="w-full flex-1 min-h-0 overflow-y-auto flex flex-col items-center gap-2 px-1 pb-2">
       <div
         v-for="item in items"
         :key="item.id"

@@ -232,7 +232,7 @@ func (s Service) stateForUser(ctx context.Context, user User) (State, error) {
 	state := State{User: user, Tenants: []Tenant{}}
 	platformDate := time.Now().In(mustLocation("Asia/Jakarta")).Format("2006-01-02")
 	var platformCount int
-	err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM platform_user_roles pur JOIN platform_roles pr ON pr.id=pur.role_id WHERE pur.user_id=? AND pr.code='SUPERADMIN' AND pur.valid_from<=? AND (pur.valid_until IS NULL OR pur.valid_until>=?)`, user.ID, platformDate, platformDate).Scan(&platformCount)
+	err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM platform_user_roles pur JOIN platform_roles pr ON pr.id=pur.role_id WHERE pur.user_id=? AND pur.valid_from<=? AND (pur.valid_until IS NULL OR pur.valid_until>=?)`, user.ID, platformDate, platformDate).Scan(&platformCount)
 	if err != nil {
 		return State{}, err
 	}

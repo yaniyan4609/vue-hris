@@ -126,6 +126,14 @@ func Evaluate(now time.Time, tenantID string, subject Subject, registry Registry
 	return result
 }
 
+func EvaluateNow(timezone, tenantID string, subject Subject, permission Permission) Effective {
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		location = time.UTC
+	}
+	return Evaluate(time.Now().In(location), tenantID, subject, Registry{permission.Code: permission}, permission.Code)
+}
+
 func roleActive(now time.Time, role Role) bool {
 	date := now.Format("2006-01-02")
 	if !role.ValidFrom.IsZero() && date < role.ValidFrom.Format("2006-01-02") {

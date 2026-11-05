@@ -44,8 +44,12 @@ func (s Store) Decide(ctx context.Context, tenantID, userID, timezone, code stri
 	}
 	_ = s.DB.QueryRowContext(ctx, `SELECT id FROM employees WHERE tenant_id=? AND user_id=? AND status IN ('active','probation','leave')`, tenantID, userID).Scan(&subject.EmployeeID)
 	if permission.Entitlement != "" {
-		// Entitlements are not seeded yet; a dependent permission fails closed.
-		subject.Entitlements[permission.Entitlement] = false
+		var enabled int
+		err = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM tenant_subscriptions ts JOIN plan_entitlements pe ON pe.plan_id=ts.plan_id WHERE ts.tenant_id=? AND ts.status='active' AND pe.entitlement_code=?`, tenantID, permission.Entitlement).Scan(&enabled)
+		if err != nil {
+			return Subject{}, Effective{}, err
+		}
+		subject.Entitlements[permission.Entitlement] = enabled > 0
 	}
 	location, err := time.LoadLocation(timezone)
 	if err != nil {

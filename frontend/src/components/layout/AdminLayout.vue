@@ -4,8 +4,8 @@ import { useRoute } from 'vue-router'
 import { ChevronRight } from 'lucide-vue-next'
 import { useAuth } from '../../composables/useAuth'
 import { useToast } from '../../composables/useToast'
-import { adminCapabilities, refreshAdminCapabilities } from '../../composables/useCapabilities'
-import { platformMenus, visibleAdminMenus } from '../../data/menuData'
+import { adminCapabilities, platformCapabilities, activeEntitlements, refreshAdminCapabilities } from '../../composables/useCapabilities'
+import { menuByPath, pageByPath, visibleAdminMenus, visiblePlatformMenus } from '../../data/menuData'
 import BaseButton from '../ui/BaseButton.vue'
 import PrimarySidebar from './PrimarySidebar.vue'
 import SubmenuSidebar from './SubmenuSidebar.vue'
@@ -16,24 +16,33 @@ const route = useRoute()
 const toast = useToast()
 const { state, selectedTenant } = useAuth()
 const submenuCollapsed = ref(true)
-const menus = computed(() => state.value?.platform ? platformMenus : visibleAdminMenus(adminCapabilities.value))
-const activeMenuId = computed(() => route.path.startsWith('/admin/settings') ? 'pengaturan' : route.path.startsWith('/admin/organization') || route.path.startsWith('/admin/employees') ? 'sdm' : route.path.startsWith('/platform/tenants') ? 'perusahaan' : 'beranda')
+const accessReady = ref(false)
+const menus = computed(() => state.value?.platform ? visiblePlatformMenus(platformCapabilities.value) : visibleAdminMenus(adminCapabilities.value, activeEntitlements.value))
+const activeMenuId = computed(() => menuByPath(route.path)?.id || 'beranda')
 const currentMenu = computed(() => menus.value.find((item) => item.id === activeMenuId.value) || menus.value[0])
+const authorized = computed(() => {
+  const item = pageByPath(route.path)
+  if (!item) return false
+  if (state.value?.platform) return Boolean(platformCapabilities.value[item.permission])
+  return Boolean(adminCapabilities.value[item.menuPermission] && adminCapabilities.value[item.permission] && (!item.entitlement || activeEntitlements.value[item.entitlement]))
+})
 
 async function loadCapabilities() {
-  if (state.value?.platform || !selectedTenant.value?.admin) return
+  if (!state.value?.platform && !selectedTenant.value?.admin) return
+  accessReady.value = false
   try {
     await refreshAdminCapabilities()
   } catch (error) {
     adminCapabilities.value = {}
+    platformCapabilities.value = {}
     toast.error(error.message, 'Gagal memuat menu')
-  }
+  } finally { accessReady.value = true }
 }
 
 onMounted(loadCapabilities)
-watch(() => selectedTenant.value?.id, loadCapabilities)
+watch([() => selectedTenant.value?.id, () => state.value?.platform], loadCapabilities)
 watch(() => route.path, () => emit('close-drawer'))
-function selectMenu(id) { if (id === 'sdm') submenuCollapsed.value = false; emit('close-drawer') }
+function selectMenu(id) { submenuCollapsed.value = false; emit('close-drawer') }
 </script>
 
 <template>
@@ -42,7 +51,8 @@ function selectMenu(id) { if (id === 'sdm') submenuCollapsed.value = false; emit
     <SubmenuSidebar v-if="currentMenu?.submenus?.length" :submenus="currentMenu.submenus" :menu-title="currentMenu.label" :collapsed="submenuCollapsed" class="hidden lg:flex" @toggle-collapse="submenuCollapsed = !submenuCollapsed" />
     <BaseButton v-if="submenuCollapsed && currentMenu?.submenus?.length" variant="outline" size="sm" class="hidden lg:flex absolute left-18 top-6 z-30 !rounded-full !p-1" title="Buka submenu" aria-label="Buka submenu" @click="submenuCollapsed = false"><ChevronRight class="w-4 h-4" /></BaseButton>
     <main class="flex-1 min-h-0 flex flex-col p-3.5 sm:p-5 lg:p-6 bg-neutral-50/60 dark:bg-[var(--theme-layer-main)] text-neutral-800 dark:text-[var(--theme-text-primary)]" :class="route.meta.fixedHeight ? 'overflow-hidden' : 'overflow-y-auto'">
-      <slot />
+      <slot v-if="accessReady && authorized" />
+      <div v-else-if="accessReady" class="w-full max-w-xl mx-auto mt-8 rounded-2xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)] p-6 text-center"><h1 class="font-semibold text-neutral-900 dark:text-white">Akses tidak tersedia</h1><p class="text-sm text-neutral-500 dark:text-neutral-400 mt-2">Menu ini tidak termasuk izin dan paket akun Anda.</p></div>
     </main>
 
     <Transition enter-active-class="transition-opacity duration-300" enter-from-class="opacity-0" leave-active-class="transition-opacity duration-200" leave-to-class="opacity-0">

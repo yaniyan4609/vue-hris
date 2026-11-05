@@ -29,12 +29,19 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(15)
 const search = ref('')
+const parentFilter = ref('all')
 const parents = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const open = ref(false)
 const editingId = ref('')
 const form = ref({ code: '', name: '', parentId: '', timezone: 'Asia/Jakarta' })
+const stats = computed(() => [
+  { label: 'Total sesuai filter', value: total.value },
+  { label: 'Ditampilkan', value: items.value.length },
+  { label: 'Jumlah halaman', value: Math.max(1, Math.ceil(total.value / pageSize.value)) },
+  { label: 'Halaman aktif', value: page.value },
+])
 let loadVersion = 0
 let parentsVersion = 0
 
@@ -43,6 +50,7 @@ async function load() {
   loading.value = true
   try {
     const query = new URLSearchParams({ page: String(page.value), pageSize: String(pageSize.value), q: search.value })
+    if (config.value.parent && parentFilter.value !== 'all') query.set('parentId', parentFilter.value)
     const data = await apiRequest(`/admin/organization/${kind.value}?${query}`)
     if (version !== loadVersion) return
     items.value = data.items
@@ -67,10 +75,12 @@ let resettingSearch = false
 watch(kind, () => {
   clearTimeout(searchTimer)
   page.value = 1
+  parentFilter.value = 'all'
   if (search.value) { resettingSearch = true; search.value = '' }
   loadParents()
 }, { immediate: true })
 watch([kind, page, pageSize], load, { immediate: true })
+watch(parentFilter, () => { if (page.value === 1) load(); else page.value = 1 })
 watch(search, () => {
   if (resettingSearch) { resettingSearch = false; return }
   clearTimeout(searchTimer)
@@ -81,6 +91,7 @@ watch(search, () => {
 })
 onUnmounted(() => clearTimeout(searchTimer))
 const parentOptions = computed(() => parents.value.map((item) => ({ label: item.name, value: item.id })))
+const parentFilterOptions = computed(() => [{ label: `Semua ${config.value.parentLabel || 'induk'}`, value: 'all' }, ...parentOptions.value])
 function parentName(id) { return parents.value.find((item) => item.id === id)?.name || '—' }
 function startCreate() { editingId.value = ''; form.value = { code: '', name: '', parentId: '', timezone: 'Asia/Jakarta' }; open.value = true }
 function startEdit(item) { editingId.value = item.id; form.value = { code: item.code, name: item.name, parentId: item.parentId || '', timezone: item.timezone || 'Asia/Jakarta' }; open.value = true }
@@ -111,7 +122,8 @@ async function save() {
         <BaseButton v-if="adminCapabilities['organisasi.buat']" size="sm" @click="startCreate"><Plus class="w-4 h-4" /><span class="hidden sm:inline">Tambah</span></BaseButton>
       </div>
     </div>
-    <div class="shrink-0 rounded-2xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)] p-3"><BaseInput v-model="search" size="sm" :placeholder="`Cari kode atau nama ${config.label.toLowerCase()}`" clearable /></div>
+    <div class="shrink-0 flex flex-col sm:flex-row gap-2"><BaseInput v-model="search" size="sm" :placeholder="`Cari kode atau nama ${config.label.toLowerCase()}`" clearable class="flex-1" /><BaseSearchableSelect v-if="config.parent" v-model="parentFilter" :options="parentFilterOptions" size="sm" class="sm:w-52" /></div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0"><div v-for="stat in stats" :key="stat.label" class="h-9 flex items-center justify-between gap-2 px-2.5 rounded-xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)]"><span class="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400 truncate">{{ stat.label }}</span><span class="text-xs font-bold text-neutral-900 dark:text-white">{{ stat.value }}</span></div></div>
     <div class="hidden md:flex flex-1 min-h-0 flex-col rounded-2xl border border-neutral-200 dark:border-[var(--theme-border)] bg-white dark:bg-[var(--theme-surface)] overflow-hidden">
       <div class="flex-1 min-h-0 overflow-auto">
         <table class="w-full text-left text-xs">

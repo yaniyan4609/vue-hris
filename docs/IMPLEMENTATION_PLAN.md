@@ -1,5 +1,15 @@
 # Rencana implementasi digaji.id — revisi setelah PRD lengkap
 
+## Implementasi menu Superadmin dan Admin — 5 November 2026
+
+Pekerjaan ini melanjutkan fondasi yang sudah ada. Migrasi aditif `00007`–`00010` telah diterapkan pada MariaDB staging `staging-saas-hris`. Registry izin, preset role tenant, izin baca per submenu, entitlement paket, empat role platform, override staf, penugasan tenant staf, dan audit perubahan akses tersedia. Preset sensitif yang semula terlalu luas telah dibatasi; akses lihat HR Staff pada kebijakan cuti/notifikasi/pengaturan tidak memberi hak kelola. Tenant demo memiliki seluruh entitlement aktif. Evaluasi `GET /api/v1/me/access` sekarang membatch keputusan akses dan menambahkan `platformPermissions`, `platformSuperadmin`, serta `entitlements` tanpa menghapus field lama.
+
+Katalog frontend tunggal menghubungkan 8 halaman platform dan 51 halaman Admin dengan menu, rute, permission, entitlement, dan status. Halaman yang belum mempunyai API menampilkan daftar kosong, pencarian/filter, statistik kosong, tabel/kartu mobile, pagination, dan formulir pratinjau dengan tombol simpan nonaktif. Dashboard memakai angka yang berasal dari API serta empty state untuk grafik dan aktivitas yang belum tersedia. Halaman organisasi dan karyawan tetap memakai API CRUD yang ada. Halaman Pengguna & Hak Akses mendukung role, override, editor scope, pratinjau akses efektif, dan riwayat audit. ESS tetap pada implementasi sebelumnya.
+
+**Batas saat ini:** CRUD modul baru, grafik domain, paket/billing, dan pengaturan yang belum memiliki API tetap dalam status **Dalam pengembangan**. Alur bisnis bertanda **[TERBUKA]** di PRD menunggu keputusan Product Owner. Status ini tidak boleh diganti menjadi berhasil menyimpan hanya karena formulir UI sudah terlihat.
+
+Verifikasi pada slice ini: `go test ./...`, `npm run build`, tes integrasi staging untuk role/delegasi/scope/tenant platform, serta pemeriksaan visual Admin, Superadmin, mobile, dan tema gelap. Tes pencarian tenant platform mencakup kasus staf yang hanya ditugaskan pada satu tenant agar filter pencarian tidak melampaui penugasan.
+
 Status: rencana kelanjutan proyek, 5 November 2026. Acuan produk adalah tiga dokumen di `full-docs/` (PRD v2.3, Matriks Menu/Role/Fungsional, dan Desain Database), serta `frontend/aturan-ui.md` dan `frontend/desain-ui.md`. Database tetap memakai server milik Product Owner di `192.168.11.85`, database `staging-saas-hris` (MariaDB 10.11, protokol MySQL); tidak memindahkannya ke server lain. Rancangan database berlabel **[USULAN]**; bagian **[TERBUKA]** belum menjadi keputusan implementasi. Saat dokumentasi dan kode berbeda, inventarisasi kondisi kode terlebih dahulu, lalu putuskan migrasi tambahan. Migrasi yang sudah diterapkan tidak diubah atau dijalankan ulang dari nol.
 
 ## Kemajuan 5 November 2026

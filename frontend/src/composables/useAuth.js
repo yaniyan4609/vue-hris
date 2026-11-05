@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { effectiveAccess } from './useCapabilities'
 
 const state = ref(null)
 const isAuthenticated = computed(() => Boolean(state.value?.user))
@@ -7,7 +8,7 @@ const selectedTenant = computed(() => state.value?.tenants?.find((tenant) => ten
 const currentUser = computed(() => ({
   name: state.value?.user?.name || '',
   email: state.value?.user?.email || '',
-  role: state.value?.platform ? 'Superadmin' : selectedTenant.value?.admin ? 'Admin Tenant' : 'Karyawan',
+  role: state.value?.platform ? (effectiveAccess.value?.platformSuperadmin ? 'Superadmin' : 'Staf Platform') : selectedTenant.value?.admin ? 'Admin Tenant' : 'Karyawan',
   company: selectedTenant.value?.name || 'Digaji.id',
   avatar: '',
 }))

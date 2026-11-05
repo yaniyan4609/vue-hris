@@ -71,6 +71,22 @@ func (a adminAPI) listEmployees(w http.ResponseWriter, r *http.Request) {
 		where += " AND (LOCATE(LOWER(?), LOWER(e.employee_number))>0 OR LOCATE(LOWER(?), LOWER(e.display_name))>0)"
 		params = append(params, q, q)
 	}
+	if status := r.URL.Query().Get("status"); status != "" {
+		if status != "active" && status != "probation" && status != "leave" && status != "resigned" && status != "terminated" {
+			writeJSON(w, 400, map[string]string{"error": "Filter status tidak valid"})
+			return
+		}
+		where += " AND e.status=?"
+		params = append(params, status)
+	}
+	if officeID := r.URL.Query().Get("officeId"); officeID != "" {
+		if len(officeID) != 26 {
+			writeJSON(w, 400, map[string]string{"error": "Filter kantor tidak valid"})
+			return
+		}
+		where += " AND e.base_office_id=?"
+		params = append(params, officeID)
+	}
 	var total int
 	if err := a.db.QueryRowContext(r.Context(), "SELECT COUNT(*)"+employeeFrom+" WHERE "+where, params...).Scan(&total); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "Gagal membaca jumlah karyawan"})

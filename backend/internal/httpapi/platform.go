@@ -6,12 +6,18 @@ import (
 	"strings"
 
 	"digaji.id/hris/internal/auth"
+	"github.com/go-chi/chi/v5"
 )
 
-func mountPlatform(r interface {
-	Get(string, http.HandlerFunc)
-}, db *sql.DB) {
+func mountPlatform(r chi.Router, db *sql.DB, config Options) {
 	service := auth.Service{DB: db}
+	r.Get("/api/v1/platform/staff", func(w http.ResponseWriter, req *http.Request) { listPlatformStaff(w, req, db) })
+	r.Get("/api/v1/platform/staff/roles", func(w http.ResponseWriter, req *http.Request) { listPlatformRoles(w, req, db) })
+	r.Get("/api/v1/platform/staff/{id}", func(w http.ResponseWriter, req *http.Request) { getPlatformStaff(w, req, db) })
+	r.With(checkOrigin(config)).Post("/api/v1/platform/staff/roles", func(w http.ResponseWriter, req *http.Request) { assignPlatformRole(w, req, db) })
+	r.With(checkOrigin(config)).Delete("/api/v1/platform/staff/{id}/roles/{code}", func(w http.ResponseWriter, req *http.Request) { revokePlatformRole(w, req, db) })
+	r.With(checkOrigin(config)).Put("/api/v1/platform/staff/{id}/permissions/{code}", func(w http.ResponseWriter, req *http.Request) { updatePlatformOverride(w, req, db) })
+	r.With(checkOrigin(config)).Put("/api/v1/platform/staff/{id}/tenants", func(w http.ResponseWriter, req *http.Request) { updatePlatformTenants(w, req, db) })
 	r.Get("/api/v1/platform/tenants", func(w http.ResponseWriter, req *http.Request) {
 		state, err := service.Current(req.Context(), cookieToken(req))
 		if err != nil {
@@ -20,6 +26,15 @@ func mountPlatform(r interface {
 		}
 		if !state.Platform {
 			writeJSON(w, 403, map[string]string{"error": "Akses platform tidak diizinkan"})
+			return
+		}
+		grants, superadmin, err := platformAccess(req.Context(), db, state.User.ID)
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "Gagal memeriksa akses"})
+			return
+		}
+		if !grants["platform.perusahaan.lihat"].Allowed {
+			writeJSON(w, 403, map[string]string{"error": "Akses perusahaan tidak diizinkan"})
 			return
 		}
 		page, ok := readPage(w, req)
@@ -32,8 +47,12 @@ func mountPlatform(r interface {
 		}
 		where := "1=1"
 		args := []any{}
+		if !superadmin {
+			where = "EXISTS (SELECT 1 FROM platform_user_tenants put WHERE put.tenant_id=tenants.id AND put.user_id=?)"
+			args = append(args, state.User.ID)
+		}
 		if q != "" {
-			where = "(LOCATE(LOWER(?), LOWER(name))>0 OR LOCATE(LOWER(?), LOWER(slug))>0)"
+			where += " AND (LOCATE(LOWER(?), LOWER(name))>0 OR LOCATE(LOWER(?), LOWER(slug))>0)"
 			args = append(args, q, q)
 		}
 		status := strings.TrimSpace(req.URL.Query().Get("status"))

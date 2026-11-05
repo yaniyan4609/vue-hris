@@ -8,6 +8,9 @@ import AccessUsersView from '../views/AccessUsersView.vue'
 import EssHomeView from '../views/EssHomeView.vue'
 import EssFeatureView from '../views/EssFeatureView.vue'
 import EssMoreView from '../views/EssMoreView.vue'
+import ModulePreviewView from '../views/ModulePreviewView.vue'
+import PlatformStaffView from '../views/PlatformStaffView.vue'
+import { allPages } from '../data/menuData'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -15,6 +18,7 @@ const router = createRouter({
     { path: '/', name: 'Masuk', component: PanelHomeView },
     { path: '/platform', name: 'Platform', component: PanelHomeView },
     { path: '/platform/tenants', name: 'PlatformTenants', component: PlatformTenantsView, meta: { fixedHeight: true } },
+    { path: '/platform/staff', name: 'PlatformStaff', component: PlatformStaffView, meta: { fixedHeight: true } },
     { path: '/admin', name: 'AdminTenant', component: PanelHomeView },
     { path: '/admin/employees', name: 'Employees', component: EmployeesView, meta: { fixedHeight: true } },
     { path: '/admin/settings/users', name: 'AccessUsers', component: AccessUsersView, meta: { fixedHeight: true } },
@@ -26,6 +30,7 @@ const router = createRouter({
     { path: '/ess/lainnya', name: 'EssLainnya', component: EssMoreView },
     { path: '/ess/fitur/:feature', name: 'EssFeature', component: EssFeatureView },
     { path: '/pilih-perusahaan', name: 'PilihPerusahaan', component: TenantSelectView },
+    ...allPages.filter((item) => !['/admin', '/platform', '/platform/tenants', '/platform/staff', '/admin/employees', '/admin/settings/users'].includes(item.route) && !item.route.startsWith('/admin/organization/')).map((item) => ({ path: item.route, name: `Module_${item.id}`, component: ModulePreviewView, meta: { fixedHeight: item.kind === 'data', permission: item.permission, entitlement: item.entitlement } })),
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

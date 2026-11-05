@@ -47,6 +47,10 @@ func TestStagingRoleDelegationAuditAndTenantBoundary(t *testing.T) {
 			args  []any
 		}{
 			{`DELETE FROM audit_logs WHERE tenant_id=? AND actor_user_id=?`, []any{tenantID, actorID}},
+			{`DELETE v FROM user_scope_values v JOIN user_scope_rules sr ON sr.tenant_id=v.tenant_id AND sr.id=v.rule_id WHERE sr.tenant_id=? AND sr.user_id=?`, []any{tenantID, targetID}},
+			{`DELETE FROM user_scope_rules WHERE tenant_id=? AND user_id=?`, []any{tenantID, targetID}},
+			{`DELETE FROM user_scope_overrides WHERE tenant_id=? AND user_id=?`, []any{tenantID, targetID}},
+			{`DELETE FROM user_permission_overrides WHERE tenant_id=? AND user_id=?`, []any{tenantID, targetID}},
 			{`DELETE FROM login_events WHERE user_id IN (?,?,?)`, []any{actorID, targetID, foreignID}},
 			{`DELETE FROM sessions WHERE user_id IN (?,?,?)`, []any{actorID, targetID, foreignID}},
 			{`DELETE FROM user_roles WHERE tenant_id=? AND user_id IN (?,?)`, []any{tenantID, actorID, targetID}},
@@ -176,4 +180,19 @@ func TestStagingRoleDelegationAuditAndTenantBoundary(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM audit_logs WHERE tenant_id=? AND actor_user_id=? AND (LOCATE(?,COALESCE(before_json,''))>0 OR LOCATE(?,COALESCE(after_json,''))>0)`, tenantID, actorID, password, password).Scan(&passwordLeak); err != nil || passwordLeak != 0 {
 		t.Fatalf("password in audit=%d err=%v", passwordLeak, err)
 	}
+	scopeURL := base + targetID + "/scopes/karyawan.lihat"
+	doJSON(t, actor, "PUT", base+actorID+"/scopes/karyawan.lihat", map[string]any{"rules": []map[string]bool{{"allTenant": true}}, "currentPassword": password}, 403, nil)
+	doJSON(t, actor, "PUT", scopeURL, map[string]any{"rules": []map[string]bool{{"allTenant": true}}, "currentPassword": password}, 204, nil)
+	doJSON(t, actor, "PUT", base+targetID+"/permissions/karyawan.lihat", map[string]string{"decision": "allow", "currentPassword": password}, 204, nil)
+	var targetAccess accessState
+	doJSON(t, target, "GET", server.URL+"/api/v1/me/access", nil, 200, &targetAccess)
+	if !targetAccess.Permissions["karyawan.lihat"].Allowed || len(targetAccess.Permissions["karyawan.lihat"].Scopes) != 1 {
+		t.Fatal("scope override and allow did not take effect")
+	}
+	doJSON(t, actor, "DELETE", scopeURL, map[string]string{"currentPassword": password}, 204, nil)
+	doJSON(t, target, "GET", server.URL+"/api/v1/me/access", nil, 200, &targetAccess)
+	if targetAccess.Permissions["karyawan.lihat"].Allowed {
+		t.Fatal("cleared scope left scoped permission open")
+	}
+	doJSON(t, actor, "PUT", base+targetID+"/permissions/karyawan.lihat", map[string]string{"decision": "inherit", "currentPassword": password}, 204, nil)
 }

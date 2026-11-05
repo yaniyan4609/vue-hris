@@ -2,6 +2,8 @@ import { ref } from 'vue'
 import { apiRequest } from './useApi'
 
 export const adminCapabilities = ref({})
+export const platformCapabilities = ref({})
+export const activeEntitlements = ref({})
 export const effectiveAccess = ref(null)
 
 export async function refreshAdminCapabilities() {
@@ -9,5 +11,9 @@ export async function refreshAdminCapabilities() {
   adminCapabilities.value = Object.fromEntries(
     Object.entries(effectiveAccess.value.permissions || {}).map(([code, entry]) => [code, entry.allowed])
   )
+  platformCapabilities.value = Object.fromEntries(
+    Object.entries(effectiveAccess.value.platformPermissions || {}).map(([code, entry]) => [code, entry.allowed])
+  )
+  activeEntitlements.value = effectiveAccess.value.entitlements || {}
   return adminCapabilities.value
 }

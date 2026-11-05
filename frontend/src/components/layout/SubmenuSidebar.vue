@@ -191,6 +191,7 @@ onUnmounted(() => {
           :key="sub.id"
           :ref="(el) => setItemRef(el, idx)"
           type="button"
+          :title="sub.status === 'preview' ? `${sub.label} · Dalam pengembangan` : sub.label"
           @click="handleNavigate(sub.route)"
           class="relative z-10 w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors duration-200 text-left cursor-pointer"
           :class="[
@@ -212,6 +213,7 @@ onUnmounted(() => {
             <span class="truncate">{{ sub.label }}</span>
           </div>
 
+          <span v-if="sub.status === 'preview'" class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" aria-label="Dalam pengembangan" />
           <ChevronRight
             class="w-3.5 h-3.5 transition-all duration-200"
             :class="
