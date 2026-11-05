@@ -17,7 +17,7 @@ const toast = useToast()
 const { state, selectedTenant } = useAuth()
 const submenuCollapsed = ref(true)
 const menus = computed(() => state.value?.platform ? platformMenus : visibleAdminMenus(adminCapabilities.value))
-const activeMenuId = computed(() => route.path.startsWith('/admin/organization') || route.path.startsWith('/admin/employees') ? 'sdm' : route.path.startsWith('/platform/tenants') ? 'perusahaan' : 'beranda')
+const activeMenuId = computed(() => route.path.startsWith('/admin/settings') ? 'pengaturan' : route.path.startsWith('/admin/organization') || route.path.startsWith('/admin/employees') ? 'sdm' : route.path.startsWith('/platform/tenants') ? 'perusahaan' : 'beranda')
 const currentMenu = computed(() => menus.value.find((item) => item.id === activeMenuId.value) || menus.value[0])
 
 async function loadCapabilities() {

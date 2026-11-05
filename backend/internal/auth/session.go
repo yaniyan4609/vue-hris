@@ -264,7 +264,7 @@ func (s Service) stateForUser(ctx context.Context, user User) (State, error) {
 			tenant.Admin = true
 		} else if !override.Valid || override.String != "deny" {
 			var count int
-			err = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_roles ur JOIN role_permissions rp ON rp.tenant_id=ur.tenant_id AND rp.role_id=ur.role_id WHERE ur.tenant_id=? AND ur.user_id=? AND rp.permission_code='panel.admin' AND ur.valid_from<=? AND (ur.valid_until IS NULL OR ur.valid_until>=?)`, tenant.ID, user.ID, date, date).Scan(&count)
+			err = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_roles ur JOIN role_permissions rp ON rp.tenant_id=ur.tenant_id AND rp.role_id=ur.role_id WHERE ur.tenant_id=? AND ur.user_id=? AND ur.revoked_at IS NULL AND rp.permission_code='panel.admin' AND ur.valid_from<=? AND (ur.valid_until IS NULL OR ur.valid_until>=?)`, tenant.ID, user.ID, date, date).Scan(&count)
 			if err != nil {
 				return State{}, err
 			}

@@ -4,6 +4,7 @@ import TenantSelectView from '../views/TenantSelectView.vue'
 import PlatformTenantsView from '../views/PlatformTenantsView.vue'
 import OrganizationView from '../views/OrganizationView.vue'
 import EmployeesView from '../views/EmployeesView.vue'
+import AccessUsersView from '../views/AccessUsersView.vue'
 import EssHomeView from '../views/EssHomeView.vue'
 import EssFeatureView from '../views/EssFeatureView.vue'
 import EssMoreView from '../views/EssMoreView.vue'
@@ -16,6 +17,7 @@ const router = createRouter({
     { path: '/platform/tenants', name: 'PlatformTenants', component: PlatformTenantsView, meta: { fixedHeight: true } },
     { path: '/admin', name: 'AdminTenant', component: PanelHomeView },
     { path: '/admin/employees', name: 'Employees', component: EmployeesView, meta: { fixedHeight: true } },
+    { path: '/admin/settings/users', name: 'AccessUsers', component: AccessUsersView, meta: { fixedHeight: true } },
     { path: '/admin/organization/:kind', name: 'Organization', component: OrganizationView, meta: { fixedHeight: true } },
     { path: '/ess', name: 'KaryawanESS', component: EssHomeView },
     { path: '/ess/absensi', name: 'EssAbsensi', component: EssFeatureView },

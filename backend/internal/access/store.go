@@ -10,8 +10,13 @@ import (
 )
 
 // Store reloads access on each request so role and override changes take effect
-// without a new login. Queries are always bound to a selected tenant.
-type Store struct{ DB *sql.DB }
+// without a new login. A transaction can be supplied for access mutations.
+type Store struct {
+	DB interface {
+		QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+		QueryRowContext(context.Context, string, ...any) *sql.Row
+	}
+}
 
 func (s Store) Decide(ctx context.Context, tenantID, userID, timezone, code string) (Subject, Effective, error) {
 	var permission Permission
@@ -48,35 +53,41 @@ func (s Store) Decide(ctx context.Context, tenantID, userID, timezone, code stri
 	}
 	now := time.Now().In(location)
 	date := now.Format("2006-01-02")
-	rows, err := s.DB.QueryContext(ctx, `SELECT r.id, r.code, ur.valid_from, ur.valid_until FROM user_roles ur JOIN roles r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id JOIN role_permissions rp ON rp.tenant_id=ur.tenant_id AND rp.role_id=ur.role_id WHERE ur.tenant_id=? AND ur.user_id=? AND rp.permission_code=? AND ur.valid_from<=? AND (ur.valid_until IS NULL OR ur.valid_until>=?)`, tenantID, userID, code, date, date)
+	rows, err := s.DB.QueryContext(ctx, `SELECT r.id, r.code, ur.valid_from, ur.valid_until FROM user_roles ur JOIN roles r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id JOIN role_permissions rp ON rp.tenant_id=ur.tenant_id AND rp.role_id=ur.role_id WHERE ur.tenant_id=? AND ur.user_id=? AND ur.revoked_at IS NULL AND rp.permission_code=? AND ur.valid_from<=? AND (ur.valid_until IS NULL OR ur.valid_until>=?)`, tenantID, userID, code, date, date)
 	if err != nil {
 		return Subject{}, Effective{}, err
 	}
+	type roleRow struct {
+		id, code string
+		from     time.Time
+		until    sql.NullTime
+	}
+	var roleRows []roleRow
 	for rows.Next() {
-		var roleID, roleCode string
-		var from time.Time
-		var until sql.NullTime
-		if err := rows.Scan(&roleID, &roleCode, &from, &until); err != nil {
+		var item roleRow
+		if err := rows.Scan(&item.id, &item.code, &item.from, &item.until); err != nil {
 			rows.Close()
 			return Subject{}, Effective{}, err
 		}
-		role := Role{TenantID: tenantID, Code: roleCode, ValidFrom: from}
-		if until.Valid {
-			role.ValidUntil = &until.Time
-		}
-		scopes, err := s.loadScopes(ctx, "role", tenantID, roleID, code)
-		if err != nil {
-			rows.Close()
-			return Subject{}, Effective{}, err
-		}
-		role.Grants = []Grant{{Permission: code, Scopes: scopes}}
-		subject.Roles = append(subject.Roles, role)
+		roleRows = append(roleRows, item)
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
 		return Subject{}, Effective{}, err
 	}
 	rows.Close()
+	for _, item := range roleRows {
+		role := Role{TenantID: tenantID, Code: item.code, ValidFrom: item.from}
+		if item.until.Valid {
+			role.ValidUntil = &item.until.Time
+		}
+		scopes, err := s.loadScopes(ctx, "role", tenantID, item.id, code)
+		if err != nil {
+			return Subject{}, Effective{}, err
+		}
+		role.Grants = []Grant{{Permission: code, Scopes: scopes}}
+		subject.Roles = append(subject.Roles, role)
+	}
 	var decision string
 	err = s.DB.QueryRowContext(ctx, `SELECT decision FROM user_permission_overrides WHERE tenant_id=? AND user_id=? AND permission_code=?`, tenantID, userID, code).Scan(&decision)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {

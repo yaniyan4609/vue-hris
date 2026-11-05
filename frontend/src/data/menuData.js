@@ -1,4 +1,4 @@
-import { Bell, Building2, Home, MapPinned, Network, UserRound, Users, BriefcaseBusiness, CalendarDays, History, Wallet, HandCoins, Receipt, Megaphone } from 'lucide-vue-next'
+import { Bell, Building2, Home, MapPinned, Network, UserRound, Users, BriefcaseBusiness, CalendarDays, History, Wallet, HandCoins, Receipt, Megaphone, Settings } from 'lucide-vue-next'
 
 // Definisi visual tetap di frontend; izin efektif datang dari API.
 export const platformMenus = [
@@ -17,6 +17,12 @@ export const adminMenus = [
       { id: 'divisions', label: 'Divisi', icon: Network, route: '/admin/organization/divisions', permission: 'organisasi.lihat' },
       { id: 'departments', label: 'Departemen', icon: BriefcaseBusiness, route: '/admin/organization/departments', permission: 'organisasi.lihat' },
       { id: 'positions', label: 'Jabatan', icon: BriefcaseBusiness, route: '/admin/organization/positions', permission: 'organisasi.lihat' },
+    ],
+  },
+  {
+    id: 'pengaturan', label: 'Pengaturan', icon: Settings, route: '/admin/settings/users',
+    submenus: [
+      { id: 'users-access', label: 'Pengguna & Hak Akses', icon: Users, route: '/admin/settings/users', permission: 'pengguna.lihat' },
     ],
   },
 ]

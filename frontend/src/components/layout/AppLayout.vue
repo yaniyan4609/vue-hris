@@ -30,6 +30,8 @@ const timelineActive = ref(false)
 const mobileDrawerOpen = ref(false)
 const loginForm = ref({ email: '', password: '', remember: false })
 const timers = new Set()
+let lastSessionRefresh = 0
+let sessionRefreshPromise
 const isEssPanel = computed(() => route.path.startsWith('/ess'))
 const isTenantChoice = computed(() => route.path === '/pilih-perusahaan')
 const showTopbar = computed(() => stage.value !== 'authenticated' || !isEssPanel.value)
@@ -58,10 +60,24 @@ function allowedPath(path) {
 watch([state, () => route.path], () => {
   if (!ready.value || stage.value !== 'authenticated') return
   if (isAuthenticated.value && !allowedPath(route.path)) router.replace(panelRoute.value)
-  if (!isAuthenticated.value && route.path !== '/') router.replace('/')
+  if (!isAuthenticated.value) {
+    dashboardMounted.value = false
+    expanded.value = false
+    stage.value = 'form'
+    if (route.path !== '/') router.replace('/')
+  }
 })
 
+function refreshSessionOnFocus() {
+  if (!ready.value || !isAuthenticated.value || document.visibilityState !== 'visible') return
+  if (sessionRefreshPromise || Date.now() - lastSessionRefresh < 3000) return
+  lastSessionRefresh = Date.now()
+  sessionRefreshPromise = restore().catch(() => {}).finally(() => { sessionRefreshPromise = null })
+}
+
 onMounted(async () => {
+  window.addEventListener('focus', refreshSessionOnFocus)
+  document.addEventListener('visibilitychange', refreshSessionOnFocus)
   initBackground()
   loginForm.value.remember = window.matchMedia('(display-mode: standalone)').matches
   try {
@@ -78,7 +94,12 @@ onMounted(async () => {
   ready.value = true
   await loadDemoAccounts()
 })
-onUnmounted(() => { for (const timer of timers) clearTimeout(timer); timers.clear() })
+onUnmounted(() => {
+  window.removeEventListener('focus', refreshSessionOnFocus)
+  document.removeEventListener('visibilitychange', refreshSessionOnFocus)
+  for (const timer of timers) clearTimeout(timer)
+  timers.clear()
+})
 
 async function morphIntoPanel(message) {
   stage.value = 'loading'

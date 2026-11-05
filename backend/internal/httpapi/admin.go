@@ -39,6 +39,12 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 		r.Get("/employees/{id}", a.getEmployee)
 		r.With(checkOrigin(config)).Post("/employees", a.createEmployee)
 		r.With(checkOrigin(config)).Patch("/employees/{id}", a.updateEmployee)
+		r.Get("/access/users", a.listAccessUsers)
+		r.Get("/access/users/{id}", a.getAccessUser)
+		r.Get("/access/roles", a.listAccessRoles)
+		r.With(checkOrigin(config)).Post("/access/users/{id}/roles", a.assignUserRole)
+		r.With(checkOrigin(config)).Delete("/access/users/{id}/roles/{assignmentId}", a.revokeUserRole)
+		r.With(checkOrigin(config)).Put("/access/users/{id}/permissions/{code}", a.updateUserPermission)
 	})
 }
 

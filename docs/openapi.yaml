@@ -222,6 +222,130 @@ paths:
                           type: array
                           items: { type: object }
         '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/admin/access/users:
+    get:
+      summary: Daftar anggota aktif tenant terpilih
+      operationId: listAccessUsers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Halaman pengguna dengan jumlah role aktif dan versi akses
+          content:
+            application/json:
+              schema: { type: object, required: [items, total, page, pageSize] }
+        '403': { description: Izin pengguna.lihat tidak ada }
+  /api/v1/admin/access/roles:
+    get:
+      summary: Role tenant dan permission yang diberikan oleh tiap role
+      operationId: listAccessRoles
+      responses:
+        '200':
+          description: Role yang tersedia untuk dipilih
+          content:
+            application/json:
+              schema: { type: array, items: { type: object } }
+        '403': { description: Izin pengguna.lihat tidak ada }
+  /api/v1/admin/access/users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    get:
+      summary: Detail anggota, riwayat role, dan izin efektif per permission
+      operationId: getAccessUser
+      responses:
+        '200':
+          description: Detail izin dengan sumber, scope, dan override
+          content:
+            application/json:
+              schema: { type: object, required: [user, roles, permissions] }
+        '403': { description: Izin pengguna.lihat tidak ada }
+        '404': { description: Pengguna bukan anggota aktif tenant terpilih }
+  /api/v1/admin/access/users/{id}/roles:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    post:
+      summary: Berikan role dalam batas delegasi Admin
+      operationId: assignUserRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleId, currentPassword]
+              properties:
+                roleId: { type: string }
+                validFrom: { type: string, format: date }
+                validUntil: { type: string, format: date }
+                currentPassword: { type: string, format: password }
+      responses:
+        '201': { description: Role diberikan, diaudit, dan versi akses naik }
+        '403': { description: Diri sendiri, kata sandi salah, atau melebihi hak delegasi }
+        '404': { description: Pengguna/role bukan milik tenant terpilih }
+        '409': { description: Periode role bertabrakan }
+  /api/v1/admin/access/users/{id}/roles/{assignmentId}:
+    delete:
+      summary: Cabut penugasan role segera dengan riwayat tetap tersimpan
+      operationId: revokeUserRole
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: assignmentId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+      responses:
+        '204': { description: Role dicabut, diaudit, dan versi akses naik }
+        '403': { description: Diri sendiri atau re-autentikasi gagal }
+        '404': { description: Penugasan tidak ditemukan di tenant terpilih }
+  /api/v1/admin/access/users/{id}/permissions/{code}:
+    put:
+      summary: Atur override izin per pengguna
+      operationId: updateUserPermission
+      description: Izin berscope hanya menerima inherit atau deny sampai editor scope tersedia. Aktor harus memiliki izin yang didelegasikan, dan scope seluruh tenant untuk izin berscope.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: code
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, currentPassword]
+              properties:
+                decision: { type: string, enum: [inherit, allow, deny] }
+                currentPassword: { type: string, format: password }
+      responses:
+        '204': { description: Override berubah, diaudit, dan versi akses naik }
+        '400': { description: Izin berscope memerlukan editor scope sebelum Allow }
+        '403': { description: Diri sendiri, re-autentikasi gagal, atau delegasi ditolak }
+        '404': { description: Pengguna atau permission tidak ditemukan }
   /api/v1/admin/organization/{kind}:
     parameters:
       - in: path

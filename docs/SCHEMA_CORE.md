@@ -1,6 +1,8 @@
 # Skema inti identitas dan akses
 
-Migrasi `backend/migrations/00001_core_identity_access.sql` hingga `00005_login_events.sql` telah diterapkan pada database staging MariaDB 10.11 di server Product Owner. Versi Goose: 5. Migrasi kedua menambah role platform, struktur organisasi, dan karyawan. Migrasi ketiga menambah permission organisasi/karyawan, audit write, dan riwayat penugasan awal. Migrasi keempat menambah user agent, IP, label perangkat, dan alasan pencabutan sesi. Migrasi kelima menambah log autentikasi append-only tanpa kata sandi atau token. Seed demo membuat satu tenant, tiga user, role, membership, dan satu data karyawan ESS.
+Migrasi `backend/migrations/00001_core_identity_access.sql` hingga `00006_user_access.sql` telah diterapkan pada database staging MariaDB 10.11 di server Product Owner. Versi Goose: 6. Migrasi kedua menambah role platform, struktur organisasi, dan karyawan. Migrasi ketiga menambah permission organisasi/karyawan, audit write, dan riwayat penugasan awal. Migrasi keempat menambah user agent, IP, label perangkat, dan alasan pencabutan sesi. Migrasi kelima menambah log autentikasi append-only tanpa kata sandi atau token. Migrasi keenam menambah `access_version` per membership, pencabutan penugasan role tanpa menghapus riwayat, dan izin `pengguna.lihat`/`pengguna.kelola_akses` untuk role Admin Tenant yang sudah ada. Seed demo membuat satu tenant, tiga user, role, membership, dan satu data karyawan ESS.
+
+Perubahan role/override izin memerlukan kata sandi Admin dan transaksi yang mencatat audit serta menaikkan `access_version`. Backend menolak pengubahan hak diri sendiri dan pemberian role di luar hak aktor. Pemberian izin khusus yang memerlukan scope masih ditutup sampai editor scope tersedia; pilihan Ikuti Role/Tolak tetap bisa digunakan oleh Admin dengan scope seluruh tenant pada izin itu.
 
 ## Relasi utama
 

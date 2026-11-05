@@ -50,4 +50,4 @@ go vet ./...
 
 Database staging bernama `staging-saas-hris` pada server MariaDB 10.11 milik Product Owner di `192.168.11.85`. Kredensial hanya diberikan melalui konfigurasi lokal yang tidak di-commit.
 
-Migrasi 00001–00005 sudah diterapkan ke staging. Migrasi keempat menambah metadata perangkat sesi; migrasi kelima mencatat keberhasilan dan kegagalan login serta pemilihan tenant tanpa menyimpan kata sandi atau token. Struktur inti dan batas implementasinya dijelaskan di `docs/SCHEMA_CORE.md`. Jangan menyimpan `DB_PASSWORD` di file proyek atau commit.
+Migrasi 00001–00006 sudah diterapkan ke staging. Migrasi keempat menambah metadata perangkat sesi; migrasi kelima mencatat login dan pemilihan tenant; migrasi keenam menambah versi akses, riwayat pencabutan role, serta permission Pengguna & Hak Akses. Admin dapat membuka `/admin/settings/users` untuk melihat akses efektif dan mengelola role serta override izin terbatas. Struktur inti dan batas implementasinya dijelaskan di `docs/SCHEMA_CORE.md`. Jangan menyimpan `DB_PASSWORD` di file proyek atau commit.

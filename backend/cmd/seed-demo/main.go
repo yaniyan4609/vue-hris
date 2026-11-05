@@ -243,7 +243,7 @@ func ensureTenantRole(ctx context.Context, tx *sql.Tx, tenantID, code, name stri
 
 func ensureUserRole(ctx context.Context, tx *sql.Tx, tenantID, userID, roleID string) error {
 	var count int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_roles WHERE tenant_id=? AND user_id=? AND role_id=? AND (valid_until IS NULL OR valid_until>=CURRENT_DATE())`, tenantID, userID, roleID).Scan(&count); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_roles WHERE tenant_id=? AND user_id=? AND role_id=? AND revoked_at IS NULL AND (valid_until IS NULL OR valid_until>=CURRENT_DATE())`, tenantID, userID, roleID).Scan(&count); err != nil {
 		return err
 	}
 	if count > 0 {
