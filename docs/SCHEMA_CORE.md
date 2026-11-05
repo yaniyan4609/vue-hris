@@ -1,6 +1,6 @@
 # Skema inti identitas dan akses
 
-Migrasi `backend/migrations/00001_core_identity_access.sql` dan `00002_platform_org_employee.sql` telah diterapkan pada database staging MariaDB 10.11 pada 4 November 2026. Versi Goose: 2. Migrasi kedua menambah role platform, struktur organisasi, dan karyawan. Seed demo membuat satu tenant, tiga user, role, membership, dan satu data karyawan ESS.
+Migrasi `backend/migrations/00001_core_identity_access.sql`, `00002_platform_org_employee.sql`, dan `00003_admin_access_audit.sql` telah diterapkan pada database staging MariaDB 10.11 di server Product Owner. Versi Goose: 3. Migrasi kedua menambah role platform, struktur organisasi, dan karyawan. Migrasi ketiga menambah permission organisasi/karyawan, audit write, dan riwayat penugasan awal. Seed demo membuat satu tenant, tiga user, role, membership, dan satu data karyawan ESS.
 
 ## Relasi utama
 
@@ -21,9 +21,11 @@ users ──< tenant_memberships >── tenants
 - Satu baris `user_scope_overrides` berarti scope role diganti. Bila belum ada aturan di bawahnya, akses scoped gagal tertutup; menghapus header mengembalikan scope role.
 - Aturan scope dihubungkan dengan OR. Nilai di satu dimensi beroperasi OR, beberapa dimensi dalam satu aturan beroperasi AND. `kind` khusus: seluruh tenant, diri sendiri, bawahan langsung, atau filter organisasi.
 - Nilai node organisasi pada `*_scope_values` belum memiliki foreign key ke region/office/division/department/position. Tabel organisasinya sudah tersedia, tetapi layanan penulisan scope tetap wajib memvalidasi node dan tenant; pembacaan daftar wajib menerjemahkan scope ke SQL berfilter tenant.
+- Endpoint Admin untuk organisasi dan karyawan memakai evaluator permission saat request, `tenant_id` dari sesi, filter SQL pada daftar/detail karyawan, serta audit dalam transaksi perubahan. Daftar memakai paginasi server dan batas maksimal 100 item per halaman.
+- `employee_assignment_history` merekam penempatan awal dan perubahan kantor/jabatan/atasan. Model ini masih lebih sempit dari usulan `employee_assignments` bertanggal dalam dokumen database lengkap; penyelarasan dilakukan melalui migrasi aditif. Status resign/terminasi belum bisa diubah langsung karena belum ada alur tanggal efektif dan pencabutan sesi/role.
 
 ## Batas pada tahap ini
 
-Login dan sesi sudah tersedia di API, termasuk pilihan tenant dan logout. `panel.admin` sudah ada di registry dan diperiksa saat membentuk state sesi, sedangkan akses ESS mensyaratkan karyawan aktif. Belum tersedia penegakan permission/scope umum di seluruh HTTP API, entitlement paket, audit log, atau filter SQL untuk endpoint bisnis. Evaluator akses di Go sudah memiliki pengujian unit, tetapi belum dihubungkan ke data MariaDB. Endpoint bisnis tidak boleh dibuka sebelum lapisan tersebut siap.
+Login dan sesi sudah tersedia di API, termasuk pilihan tenant dan logout. `panel.admin` sudah ada di registry dan diperiksa saat membentuk state sesi, sedangkan akses ESS mensyaratkan karyawan aktif. Penegakan permission/scope sudah terhubung untuk endpoint bisnis awal, tetapi registry masih parsial dan entitlement paket belum tersedia. Audit baru mencatat perubahan organisasi/karyawan. Role/permission/scope belum memiliki UI manajemen dan audit perubahan. Fitur bisnis baru harus menambahkan permission registry, tenant context, scope, entitlement, dan audit sesuai PRD sebelum endpoint-nya dibuka.
 
 Kredensial tidak tersimpan dalam repo. `cmd/migrate` menerima konfigurasi `DB_ADDR`, `DB_USER`, `DB_NAME`, opsional `DB_TLS`, dan membaca kata sandi secara tersembunyi dari terminal bila `DB_PASSWORD` belum diberikan.

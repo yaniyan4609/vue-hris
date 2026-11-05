@@ -4,6 +4,8 @@ Dokumen ini adalah **pedoman resmi dan panduan implementasi teknis** untuk selur
 
 > **Cara membaca dokumen ini.** File ini adalah **katalog template dan contoh kode**. Aturan ringkas, alur keputusan, dan checklist ada di [`aturan-ui.md`](./aturan-ui.md). Semua contoh kode di sini sudah divalidasi terhadap `defineProps` komponen di `src/components/ui/`. Contoh ditulis untuk file di `src/views/`, sehingga impornya **relatif** (`../components/ui/...`). Jika kode dan dokumen berbeda, **kode yang benar**.
 
+> **Adaptasi HRIS:** contoh data Gunung, Pesanan, Invoice, dan menu `/template/*` di bawah ini adalah referensi visual/teknis. Menu produk, data, serta perilaku Admin/ESS mengikuti dokumen lengkap di `../full-docs/` dan implementasi terbaru di `src/`.
+
 ---
 
 ## 1. Filosofi Arsitektur: 2-Layer Layout (Dasar Pertama & Dasar Kedua)

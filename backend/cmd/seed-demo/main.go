@@ -109,6 +109,26 @@ func seed(ctx context.Context, db *sql.DB, password string) error {
 	if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO role_permissions (tenant_id, role_id, permission_code) VALUES (?, ?, 'panel.admin')`, tenantID, adminRoleID); err != nil {
 		return err
 	}
+	for _, code := range []string{"organisasi.lihat", "organisasi.buat", "organisasi.ubah", "karyawan.lihat", "karyawan.buat", "karyawan.ubah"} {
+		if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO role_permissions (tenant_id, role_id, permission_code) VALUES (?, ?, ?)`, tenantID, adminRoleID, code); err != nil {
+			return err
+		}
+		if strings.HasPrefix(code, "karyawan.") {
+			var count int
+			if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM role_scope_rules WHERE tenant_id=? AND role_id=? AND permission_code=? AND kind='all_tenant'`, tenantID, adminRoleID, code).Scan(&count); err != nil {
+				return err
+			}
+			if count == 0 {
+				id, err := ids.New()
+				if err != nil {
+					return err
+				}
+				if _, err := tx.ExecContext(ctx, `INSERT INTO role_scope_rules (tenant_id, id, role_id, permission_code, kind) VALUES (?, ?, ?, ?, 'all_tenant')`, tenantID, id, adminRoleID, code); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	for _, assignment := range [][2]string{{adminID, adminRoleID}, {essID, employeeRoleID}} {
 		if err := ensureUserRole(ctx, tx, tenantID, assignment[0], assignment[1]); err != nil {
 			return err
@@ -273,16 +293,29 @@ func ensureNode(ctx context.Context, tx *sql.Tx, table, parentColumn, tenantID, 
 func ensureEmployee(ctx context.Context, tx *sql.Tx, tenantID, userID, officeID, positionID string) error {
 	var id string
 	err := tx.QueryRowContext(ctx, `SELECT id FROM employees WHERE tenant_id=? AND user_id=?`, tenantID, userID).Scan(&id)
-	if err == nil {
-		return nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	id, err = ids.New()
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
+		id, err = ids.New()
+		if err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO employees (tenant_id, id, user_id, employee_number, display_name, status, base_office_id, position_id) VALUES (?, ?, ?, 'DEMO-001', 'Karyawan Demo', 'active', ?, ?)`, tenantID, id, userID, officeID, positionID); err != nil {
+			return err
+		}
+	}
+	var count int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM employee_assignment_history WHERE tenant_id=? AND employee_id=?`, tenantID, id).Scan(&count); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO employees (tenant_id, id, user_id, employee_number, display_name, status, base_office_id, position_id) VALUES (?, ?, ?, 'DEMO-001', 'Karyawan Demo', 'active', ?, ?)`, tenantID, id, userID, officeID, positionID)
-	return err
+	if count == 0 {
+		historyID, err := ids.New()
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO employee_assignment_history (tenant_id,id,employee_id,base_office_id,position_id,valid_from) SELECT tenant_id,?,id,base_office_id,position_id,UTC_TIMESTAMP(6) FROM employees WHERE tenant_id=? AND id=?`, historyID, tenantID, id)
+		return err
+	}
+	return nil
 }

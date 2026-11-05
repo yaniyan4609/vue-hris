@@ -77,7 +77,6 @@ export function useAuth() {
 
   const logout = async () => {
     await request('/logout', { method: 'POST', body: '{}' })
-    state.value = null
   }
 
   const finishLogout = () => {

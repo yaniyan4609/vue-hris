@@ -5,6 +5,8 @@ Template kode lengkap ada di [`desain-ui.md`](./desain-ui.md). Dokumen ini menje
 
 Seluruh isi dokumen ini sudah dicocokkan dengan kode di `src/` (props dibaca dari `defineProps`, token dari `style.css`, pola dari `views/` dan `AppLayout.vue`).
 
+**Adaptasi proyek HRIS:** template telah diintegrasikan ke produk berdasarkan `../full-docs/`. Contoh view Template tetap tersedia sebagai referensi pola, tetapi tidak menjadi menu produk. `AdminLayout.vue` dan `EssLayout.vue` sudah ada; periksa implementasi keduanya saat mengubah panel.
+
 > **Kebenaran tertinggi adalah kode.** Jika dokumen ini atau `desain-ui.md` berbeda dengan file `.vue` / `.css` / `.js`, ikuti kode, lalu laporkan perbedaannya.
 
 ---
@@ -28,10 +30,10 @@ Seluruh isi dokumen ini sudah dicocokkan dengan kode di `src/` (props dibaca dar
 | Ikon | **`lucide-vue-next`** (satu-satunya library selain `vue` dan `vue-router`) |
 | Gaya impor | **Relatif**, mis. `import BaseButton from '../components/ui/BaseButton.vue'`. Contoh di `desain-ui.md` memakai alias `@/`, tetapi kode yang ada tidak memakainya. Gunakan impor relatif kecuali `vite.config.js` jelas mengatur alias `@` |
 | Komponen dasar | `src/components/ui/*.vue`, prefix `Base`, tanpa library UI luar |
-| Layout | `src/components/layout/`: `AppLayout`, `Header`, `PrimarySidebar`, `SubmenuSidebar` |
-| Composable | `src/composables/`: `useAuth`, `useBackground`, `useIsMobile`, `useTheme`, `useThemeColor`, `useToast` |
-| Data contoh | `src/data/` (`karyawanData`, `dashboardData`, `gunungJawaData`, `menuData`) |
-| Menu & rute | Menu di `src/data/menuData.js` (saat ini: **Beranda** dan **Template** dengan sub: Contoh Kanban, Contoh Data 1, Contoh Data 2, dan 5 sub pengaturan), rute di `src/router/index.js` (`/template/*`; rute lama `/pesanan`, `/data`, `/setting` hanya redirect). Halaman baru perlu didaftarkan di **keduanya**. Halaman data/tabel wajib `meta: { fixedHeight: true }` |
+| Layout | `src/components/layout/`: `AppLayout`, `AdminLayout`, `EssLayout`, `PrimarySidebar`, `SubmenuSidebar`; `Header` lama menjadi referensi template |
+| Composable | `src/composables/`: `useAuth`, `useApi`, `useCapabilities`, `useBackground`, `useIsMobile`, `useTheme`, `useThemeColor`, `useToast` |
+| Data contoh | `src/data/` memiliki contoh template; `menuData.js` sekarang definisi menu produk |
+| Menu & rute | Menu produk di `src/data/menuData.js`, rute di `src/router/index.js` (`/platform/*`, `/admin/*`, `/ess/*`). Halaman baru perlu didaftarkan di **keduanya** setelah API/permission siap. Halaman data/tabel wajib `meta: { fixedHeight: true }` |
 | Helper format | `src/utils/format.js` mengekspor `formatRupiah` (Intl `id-ID`, IDR, tanpa desimal). Impor relatif, mis. `../utils/format.js`. Lihat bagian 8 (temuan) |
 | Bahasa UI | Indonesia (label, placeholder, pesan, tooltip) |
 | Perintah | `npm run dev`, `npm run build` |
@@ -261,7 +263,7 @@ Kode sudah berjalan dan tidak diubah oleh dokumen ini. Tujuannya agar agent tida
 2. **Hex hardcode** untuk permukaan dark sudah diganti token tema di layout, `components/ui/`, dan `views/`. Jangan menulis hex zinc baru (`dark:bg-[#141417]` dan sejenisnya); pakai `dark:bg-[var(--theme-surface)]`. Hex yang sah hanya swatch palet di `SettingView`, warna logo, dan CSS cetak invoice.
 3. **`formatRupiah` sebagian dibagi.** `DataKaryawanView` sudah memakai `src/utils/format.js`. `BaseInvoiceModal` (`formatRp`) dan `BaseInput` (`formatCurrencyString`) sengaja **belum** diganti karena outputnya berbeda (spasi biasa vs NBSP, format angka negatif, desimal; `BaseInput` hanya mengembalikan digit bertitik tanpa `Rp`). Jangan menambah salinan baru. Tanyakan dulu sebelum menyeragamkannya.
 4. **Tema non-default di dark mode sudah memakai token.** Layer: `--theme-bg` (Dasar Pertama) < `--theme-layer-main` (`<main>`) < `--theme-layer-2` (Dasar Kedua) < `--theme-surface` (card) < `--theme-surface-raised` < `--theme-surface-muted` (hover). Nilai dark pink/blue/terracotta di `style.css` adalah turunan yang perlu dinilai visual; ubah di `style.css`, bukan di komponen. Mode terang non-default masih memakai kelas netral Tailwind (belum ditokenkan).
-5. **`EssLayout.vue` tidak ada.** Bagian ESS di dokumen lama belum punya implementasi. Jika tugas menyangkut ESS, konfirmasi dulu.
+5. **`EssLayout.vue` sudah ada di produk.** Ia mobile-first, memakai bottom navigation. Contoh halaman Template dalam dokumen ini tetap menjadi referensi komponen, sedangkan perilaku ESS mengikuti PRD lengkap dan kode produk.
 
 ---
 

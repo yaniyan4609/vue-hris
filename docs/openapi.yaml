@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.1.0
-  description: Kontrak awal API. Endpoint bisnis ditambahkan bersama otorisasi tenant dan scope.
+  version: 0.2.0
+  description: Kontrak endpoint yang sudah tersedia. Tenant bisnis selalu berasal dari sesi, bukan dari body atau URL.
 paths:
   /api/v1/health:
     get:
@@ -129,8 +129,290 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AuthState' }
         '404': { description: Mode demo tidak aktif }
+  /api/v1/admin/capabilities:
+    get:
+      summary: Izin Admin efektif untuk fitur yang sudah tersedia
+      operationId: getAdminCapabilities
+      responses:
+        '200':
+          description: Peta kode permission ke status izin efektif
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: boolean }
+        '403': { description: Panel Admin tidak tersedia }
+  /api/v1/me/access:
+    get:
+      summary: Hak akses efektif akun untuk tenant terpilih
+      operationId: getEffectiveAccess
+      responses:
+        '200':
+          description: Panel dan keputusan permission terkini; perubahan role atau override berlaku pada request berikutnya
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [admin, ess, platform, permissions]
+                properties:
+                  tenantId: { type: string }
+                  admin: { type: boolean }
+                  ess: { type: boolean }
+                  platform: { type: boolean }
+                  permissions:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [allowed, reason]
+                      properties:
+                        allowed: { type: boolean }
+                        reason: { type: string }
+                        sources:
+                          type: array
+                          items: { type: string }
+                        scopes:
+                          type: array
+                          items: { type: object }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/admin/organization/{kind}:
+    parameters:
+      - in: path
+        name: kind
+        required: true
+        schema: { type: string, enum: [regions, offices, divisions, departments, positions] }
+    get:
+      summary: Daftar node organisasi tenant terpilih
+      operationId: listOrganization
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: sort
+          schema: { type: string, enum: [name, code], default: name }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: asc }
+      responses:
+        '200':
+          description: Halaman node organisasi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationPage' }
+        '403': { description: Permission organisasi.lihat tidak ada }
+    post:
+      summary: Tambah node organisasi
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrganizationNode' }
+      responses:
+        '201':
+          description: Node dibuat dan diaudit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationNode' }
+        '403': { description: Permission organisasi.buat tidak ada }
+  /api/v1/admin/organization/{kind}/{id}:
+    parameters:
+      - in: path
+        name: kind
+        required: true
+        schema: { type: string, enum: [regions, offices, divisions, departments, positions] }
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    patch:
+      summary: Ubah node organisasi
+      operationId: updateOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrganizationNode' }
+      responses:
+        '200':
+          description: Node diubah dan diaudit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationNode' }
+        '403': { description: Permission organisasi.ubah dan lihat diperlukan }
+  /api/v1/admin/employees:
+    get:
+      summary: Daftar karyawan sesuai tenant dan scope
+      operationId: listEmployees
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: sort
+          schema: { type: string, enum: [name, number, status], default: name }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: asc }
+      responses:
+        '200':
+          description: Halaman karyawan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmployeePage' }
+        '403': { description: Permission karyawan.lihat atau scope tidak ada }
+    post:
+      summary: Tambah karyawan pada penempatan dalam scope
+      operationId: createEmployee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Employee' }
+      responses:
+        '201':
+          description: Karyawan dibuat dengan riwayat dan audit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employee' }
+        '403': { description: Permission atau scope tidak mencakup penempatan }
+  /api/v1/admin/employees/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    get:
+      summary: Detail karyawan dalam scope
+      operationId: getEmployee
+      responses:
+        '200':
+          description: Detail karyawan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employee' }
+        '404': { description: Tidak ditemukan atau di luar scope }
+    patch:
+      summary: Ubah karyawan dalam scope dan catat audit
+      operationId: updateEmployee
+      description: Status resigned/terminated belum tersedia; gunakan alur terminasi bertanggal ketika sudah diimplementasikan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Employee' }
+      responses:
+        '200':
+          description: Karyawan diubah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employee' }
+        '403': { description: Permission atau scope tidak mencakup data }
+  /api/v1/ess/me/employee:
+    get:
+      summary: Profil karyawan milik sesi ESS
+      operationId: getMyEmployee
+      responses:
+        '200':
+          description: Profil milik sendiri
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employee' }
+        '403': { description: Akun tidak terhubung ke karyawan aktif }
+  /api/v1/platform/tenants:
+    get:
+      summary: Daftar tenant untuk Superadmin
+      operationId: listPlatformTenants
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200':
+          description: Halaman tenant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformTenantPage' }
+        '403': { description: Akses platform tidak tersedia }
 components:
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 15 }
+    Search:
+      in: query
+      name: q
+      schema: { type: string, maxLength: 100 }
   schemas:
+    OrganizationNode:
+      type: object
+      required: [code, name]
+      properties:
+        id: { type: string, readOnly: true }
+        code: { type: string }
+        name: { type: string }
+        parentId: { type: string, description: Diperlukan untuk kantor, departemen, dan jabatan }
+        timezone: { type: string, description: Khusus kantor }
+    OrganizationPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrganizationNode' }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+    Employee:
+      type: object
+      required: [employeeNumber, displayName, status, baseOfficeId, positionId]
+      properties:
+        id: { type: string, readOnly: true }
+        employeeNumber: { type: string }
+        displayName: { type: string }
+        status: { type: string, description: Penulisan langsung hanya menerima active, probation, atau leave }
+        baseOfficeId: { type: string }
+        officeName: { type: string, readOnly: true }
+        positionId: { type: string }
+        positionName: { type: string, readOnly: true }
+        reportsToId: { type: string }
+        userId: { type: string, description: Opsional saat membuat; tidak dapat diubah lewat PATCH }
+    EmployeePage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Employee' }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+    PlatformTenant:
+      type: object
+      required: [id, slug, name, status]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        status: { type: string }
+    PlatformTenantPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PlatformTenant' }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
     Status:
       type: object
       required: [status]

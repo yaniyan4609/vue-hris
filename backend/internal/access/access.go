@@ -1,5 +1,5 @@
-// Package access evaluates tenant permissions and scope rules without depending
-// on HTTP or storage. Persistence and SQL scope filters are added in phase 1.
+// Package access evaluates tenant permissions and scope rules. Store loads the
+// current database grants, and EmployeeWhere compiles scope into SQL filters.
 package access
 
 import "time"
@@ -21,14 +21,14 @@ type Permission struct {
 type Registry map[string]Permission
 
 type ScopeRule struct {
-	AllTenant     bool
-	Self          bool
-	DirectReports bool
-	Regions       []string
-	Offices       []string
-	Divisions     []string
-	Departments   []string
-	Positions     []string
+	AllTenant     bool     `json:"allTenant,omitempty"`
+	Self          bool     `json:"self,omitempty"`
+	DirectReports bool     `json:"directReports,omitempty"`
+	Regions       []string `json:"regions,omitempty"`
+	Offices       []string `json:"offices,omitempty"`
+	Divisions     []string `json:"divisions,omitempty"`
+	Departments   []string `json:"departments,omitempty"`
+	Positions     []string `json:"positions,omitempty"`
 }
 
 type Grant struct {

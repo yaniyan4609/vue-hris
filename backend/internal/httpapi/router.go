@@ -42,6 +42,10 @@ func Router(db *sql.DB, options ...Options) http.Handler {
 	})
 	if db != nil {
 		mountAuth(r, db, config)
+		mountAccess(r, db)
+		mountAdmin(r, db, config)
+		mountESS(r, db)
+		mountPlatform(r, db)
 	}
 	return r
 }

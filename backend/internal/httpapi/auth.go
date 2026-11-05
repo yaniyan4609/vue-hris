@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -119,6 +120,10 @@ func readJSON(w http.ResponseWriter, req *http.Request, dst any) bool {
 	decoder := json.NewDecoder(http.MaxBytesReader(w, req.Body, 8192))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "JSON tidak valid"})
+		return false
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "JSON tidak valid"})
 		return false
 	}

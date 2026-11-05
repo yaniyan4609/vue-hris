@@ -1,62 +1,63 @@
-# Rencana implementasi digaji.id
+# Rencana implementasi digaji.id — revisi setelah PRD lengkap
 
-Status: rancangan kerja berdasarkan `PRD.MD` v2.3 (4 November 2026) dan template `frontend/` pada commit `31411c9`. Dokumen ini dapat bertambah saat paruh PRD yang belum ditulis selesai. Label `[WAJIB]`, `[BERTAHAP]`, `[USULAN]`, dan `[TERBUKA]` di PRD tetap menjadi sumber keputusan produk.
+Status: rencana kelanjutan proyek, 5 November 2026. Acuan produk adalah tiga dokumen di `full-docs/` (PRD v2.3, Matriks Menu/Role/Fungsional, dan Desain Database), serta `frontend/aturan-ui.md` dan `frontend/desain-ui.md`. Database tetap memakai server milik Product Owner di `192.168.11.85`, database `staging-saas-hris` (MariaDB 10.11, protokol MySQL); tidak memindahkannya ke server lain. Rancangan database berlabel **[USULAN]**; bagian **[TERBUKA]** belum menjadi keputusan implementasi. Saat dokumentasi dan kode berbeda, inventarisasi kondisi kode terlebih dahulu, lalu putuskan migrasi tambahan. Migrasi yang sudah diterapkan tidak diubah atau dijalankan ulang dari nol.
 
-PRD saat ini berhenti di Bagian 13. Bagian 17 dan AC-01 sampai AC-58 disebut di pembuka, tetapi belum ada dalam file. Kriteria terukur untuk fase setelah fondasi perlu dilengkapi sebelum modulnya dinyatakan selesai.
+## Tujuan dan batas produk
 
-## Pemahaman produk
+Satu platform SaaS melayani banyak tenant tanpa kebocoran data. Akun global dapat menjadi anggota beberapa tenant; satu sesi yang sama dapat membuka ESS dan Admin sesuai permission efektif. Superadmin memakai panel platform terpisah. Hak akses merupakan gabungan role aktif bertanggal, override Allow/Deny per user, scope per permission, dan entitlement paket; backend memutuskan akses akhir. Organisasi memisahkan Wilayah → Kantor dari Divisi → Departemen → Jabatan. ESS adalah PWA mobile-first; Admin dan Platform desktop-first. UI memakai template Vue yang telah diintegrasikan, termasuk dua layer, dual rail, morphing login/logout, komponen Base, dan empat palet terang/gelap.
 
-digaji.id adalah SaaS HRIS multi-tenant dengan tiga area: platform untuk operator SaaS, Admin Panel untuk operasi SDM tenant, dan ESS untuk karyawan. Satu identitas dan sesi tenant dapat membuka ESS serta Admin sesuai permission efektif. Hak akses merupakan gabungan banyak role yang berlaku pada tanggal tertentu, override per user, scope data per permission, dan entitlement paket. Backend Go wajib menegakkan semuanya pada setiap jalur data; UI hanya mencerminkan hasilnya.
+## Baseline proyek yang dipertahankan
 
-Organisasi memisahkan wilayah/kantor dari divisi → departemen → jabatan. Kehadiran mengacu pada shift instance dan waktu server, dengan geofence multi-polygon serta idempotency. Approval dan notifikasi adalah layanan lintas modul. Payroll Indonesia masuk fase akhir dan aturan regulasi diverifikasi lagi saat implementasi.
+| Area | Sudah tersedia di proyek | Celah terhadap PRD lengkap |
+| --- | --- | --- |
+| Infrastruktur | Monorepo `frontend/` Vue 3/Vite/Tailwind v4 dan `backend/` Go/Chi; staging MariaDB 10.11 `staging-saas-hris`; migrasi Goose 00001–00003 (00003 sudah diterapkan di staging, masih berada di working tree). | PRD menyebut MySQL 8, Pinia, Redis, S3, Docker/Linux, observability dan CI; belum semua ada. Sintaks/fitur MySQL 8 dalam rancangan DB perlu diuji kompatibilitas MariaDB sebelum migrasi baru. |
+| Identitas | Login dan logout dengan cookie sesi opaque, hash token di DB, toggle Simpan Sesi, idle 60 menit saat OFF, pemilihan tenant setelah login, tiga akun demo staging. | Daftar/cabut semua sesi, ganti sandi dan pencabutan sesi lain, re-autentikasi aksi kritis, pengaturan sesi per tenant, audit login, dan siklus resign belum lengkap. |
+| Akses | Evaluator Go untuk multi-role/override/scope; `Store.Decide` membaca DB per request; filter SQL karyawan; capability API Admin; beberapa uji unit dan integrasi staging. | Registry belum lengkap, entitlement belum aktif, UI Pengguna & Hak Akses belum ada, mutasi akses belum punya versi/audit/delegasi, dan cakupan enforcement baru pada endpoint yang sudah dibuat. |
+| Data & API | Master Wilayah/Kantor/Divisi/Departemen/Jabatan serta karyawan punya endpoint daftar/buat/ubah; audit write awal dan riwayat penugasan awal; platform dapat membaca daftar tenant. | Struktur `employees` saat ini menyimpan penugasan aktif dan tabel history tambahan; desain baru mengusulkan `employee_assignments` bertanggal dengan snapshot dimensi. Belum ada pagination/filter/sort server, kontrak OpenAPI lengkap, impor/ekspor, arsip, dan field sensitif. |
+| UI | Template Admin/Platform, morphing login/logout, ESS mobile, form demo staging, halaman organisasi/karyawan, dark mode dengan token permukaan. Build frontend lulus. | View data saat ini masih irisan awal dan harus diselaraskan dengan `BaseDataTable`/formula Data View, route/menu permission + entitlement, panel switcher, PWA, empat tema di seluruh layar, dan alur domain riil. ESS untuk kehadiran/pengajuan masih empty state. |
 
-## Keputusan teknis yang sudah ada
+`PRD.MD` lama terlihat terhapus secara lokal dan `full-docs/` baru belum terlacak Git. Perubahan dokumen Product Owner tersebut dipertahankan apa adanya; pemindahan/commit dokumen dilakukan terpisah dari perubahan kode agar riwayatnya jelas.
 
-- Vue 3 + Vite + Tailwind v4 + Vue Router; komponen `Base*` dan pola layout dari template.
-- Go, MariaDB 10.11, Redis, storage S3-compatible, OpenAPI, Docker/Linux.
-- Router backend: **Chi**, dipilih Product Owner pada 4 November 2026.
-- Database `staging-saas-hris` dibuat pada server MariaDB 10.11 milik Product Owner. Pada 4 November 2026, Product Owner memilih server itu sebagai target implementasi.
-- Setelah kata sandi benar, akun dengan beberapa keanggotaan memilih tenant dari daftar keanggotaan aktif. Idle timeout awal saat Simpan Sesi OFF: 60 menit, dapat diatur per tenant.
-- Mulai sebagai modular monolith Go. Ini keputusan implementasi yang dapat ditinjau kembali, sesuai usulan PRD.
-- Repo template di-clone ke `frontend/`. Data dan halaman demonstrasi di dalamnya adalah referensi, bukan fitur produk.
+## Urutan kerja yang baru
 
-## Urutan pengerjaan
+Setiap fase menghasilkan migrasi **aditif**, kontrak API, UI yang terhubung ke data nyata, dan tes batas tenant/permission/scope. Menu fitur yang belum hidup tidak dipresentasikan sebagai fitur siap pakai.
 
-| Fase | Hasil yang dapat diuji | Syarat selesai |
-|---|---|---|
-| 0. Fondasi | Struktur backend Go, API `/api/v1/health`, kontrak error/versi, evaluasi akses murni, draft ERD dan OpenAPI, migrasi MariaDB, setup Redis/S3 lokal; template Vue tetap dapat dijalankan | `go test ./...`, `npm run build`, health merespons; keputusan terbuka yang menyentuh fase berikut dicatat |
-| 1. Identitas dan organisasi | Login/logout dengan cookie sesi opaque, tenant membership/switcher, satu sesi lintas panel, permission registry, role bertanggal, override, scope SQL, entitlement, audit; wilayah/kantor dan divisi/departemen/jabatan, karyawan serta riwayat | Uji lintas tenant, deny dan override, scope AND/OR, perubahan hak berlaku pada request berikutnya, audit dan re-autentikasi aksi berisiko |
-| 2. Operasi harian | ESS mobile PWA, shift master/roster/instance, geofence, clock-in/out idempotent, koreksi, cuti/izin, lembur, approval terpusat | Uji shift lintas hari, flexible, lokasi, retry, saldo dan approval atomik, larangan approve sendiri |
-| 3. Komunikasi dan keuangan HR | Notification outbox, inbox REST + WebSocket, Web Push, reminder, broadcast bertarget; kasbon dan reimbursement; laporan | Uji penerima berdasarkan tenant/scope, dedupe, reconnect/replay, reminder recheck, pembayaran sekali |
-| 4. Payroll dan platform SaaS | Payroll run/snapshot/slip/ekspor bank; paket, langganan, billing, tenant lifecycle, dashboard platform | Uji finalisasi dan adjustment, field sensitif, audit; verifikasi pajak/BPJS dan kebijakan tenant sebelum rilis |
+| Tahap | Implementasi lanjutan | Gerbang selesai |
+| --- | --- | --- |
+| **A. Stabilkan baseline** | Review dan selesaikan working tree sebelumnya; uji migrasi 00003 dan integrasi staging; sinkronkan README, skema, OpenAPI, dan referensi PRD; verifikasi dark mode empat tema, mobile Admin/ESS, morphing dan reduced motion. | `go test ./...`, `go vet ./...`, `npm run build`, tes integrasi tenant dan audit, pemeriksaan visual; perubahan kode ter-commit tanpa mengikutsertakan perpindahan dokumen secara tidak sengaja. |
+| **B. Lengkapi fondasi Fase 0** | Registry permission final dari PRD + lima modul tambahan pada Matriks; preset role yang sudah disetujui; entitlement paket dan kuota awal; access-version/invalidation; endpoint akses efektif dan panel switcher; audit login/akses; sesi aktif, cabut sesi, ganti sandi; platform tenant/paket minimal; OpenAPI error/pagination; CI tenant-isolation. | AC-01–11, AC-45, AC-47–53 untuk perilaku fondasi. Deny menang, OR/AND scope benar, perubahan hak berlaku pada request berikutnya, tenant lain tidak terbaca, paket membatasi UI **dan** API. |
+| **C. SDM inti Fase 1** | Migrasi aditif dari `employees`/history kini ke penugasan efektif bertanggal; base office tunggal + allowed offices; CRUD organisasi/karyawan dengan detail, status/arsip, filter/sort/pagination server, riwayat; kontrak, dokumen dan penyimpanan objek; impor CSV dengan preview/validasi dan ekspor sebagai job; inbox REST, outbox, broadcast dasar. | AC-12–16, AC-38–39, AC-54–55 dan AC-57. FK tenant komposit, riwayat penugasan tidak tertimpa, impor/ekspor memakai scope dan audit, field sensitif hanya bagi pemegang izin. |
+| **D. Kehadiran Fase 2** | Shift master, roster, shift instance snapshot, libur dan allowed offices; geofence multi-polygon; presensi ESS dengan waktu server, selfie sesuai kebijakan, idempotency; rekap, koreksi; ESS PWA, reminder, WebSocket replay dan Web Push opt-in. | AC-17–23, AC-35–43 yang terkait notifikasi. Shift lintas hari memakai work date yang benar, retry tidak menggandakan event, reminder berhenti saat kondisi berubah, event asli tidak diedit. |
+| **E. Pengajuan Fase 3** | Mesin approval terpusat, task approver berdasar permission + scope, transaksi atomik, anti self-approve; cuti/izin dan ledger saldo, lembur/SPKL, kasbon, reimbursement; notifikasi tiap transisi. Jika D-06 memilih menunda mutasi/terminasi, kedua alur itu masuk setelah mesin approval siap. | AC-24–31, AC-35, AC-56 dan AC-58 ketika terminasi diaktifkan. Keputusan serentak konsisten, saldo/pencairan hanya sekali, jam lembur diusulkan/disetujui/dibayar terpisah. |
+| **F. Payroll dan platform Fase 4** | Aturan PPh 21/BPJS berversi setelah verifikasi regulasi, payroll run/snapshot/adjustment, slip dan ekspor bank; lifecycle tenant, langganan, billing, metrik platform dan audit pendukung. | AC-32–34 serta lifecycle yang sudah diputuskan. Hasil final tidak berubah; akses slip dicek saat unduh; nominal tidak memakai floating point. |
+| **G. Fase 5** | Talenta, integrasi/API, email/WhatsApp, analitik lanjutan dan support session sesuai prioritas produk. | AC modul terkait dan keputusan produk baru. |
 
-## Irisan implementasi untuk setiap modul
+### Sprint berikutnya yang konkret
 
-1. Finalkan aturan bisnis dan acceptance criteria yang terkait, terutama setiap `[TERBUKA]`.
-2. Definisikan entitas, constraint/index berawalan tenant, migrasi, dan kontrak OpenAPI.
-3. Implementasikan penyaringan tenant + entitlement + permission + scope di backend, termasuk ekspor, file, worker, dan event.
-4. Hubungkan frontend ke API. Menu difilter dari akses efektif API. Halaman menggunakan `Base*`, token tema, dan pola desktop/mobile dari dokumen UI.
-5. Tambahkan pengujian yang membuktikan batas tenant, otorisasi, transaksi/idempotency, serta alur pengguna. Jalankan build dan pemeriksaan visual empat tema.
+1. **Tutup pekerjaan yang sedang terbuka:** jalankan ulang tes integrasi migrasi 00003 setelah perubahan transaksi terakhir; koreksi bila gagal; cek tampilan dark Default/Blue/Pink/Terracotta pada Admin, Platform, ESS dan login; rapikan dokumentasi implementasi. Ini melanjutkan kode yang sudah dibuat, bukan membuat proyek baru.
+2. **Tetapkan kontrak fondasi:** registry permission per modul dan entitlement; hasil `GET /me/access` berisi izin, scope/sumber, panel tersedia, dan entitlement; definisi menu/frontend membaca hasil tersebut. Panel switcher satu sesi ditambahkan dengan guard backend.
+3. **Perkuat keamanan sesi dan akses:** audit perubahan role/override/scope, access-version, larangan eskalasi diri/delegasi berlebih, pencabutan sesi, serta tes lintas tenant dan status karyawan. Buat UI `PermissionMatrix`, `ScopePicker`, dan pratinjau akses dari komponen Base.
+4. **Selaraskan model karyawan secara aditif:** tetapkan pemetaan data dari `employees`/`employee_assignment_history` ke model penugasan bertanggal, validasi node organisasi, dan indeks scope. Data demo/migrasi lama tetap terbaca selama transisi.
+5. **Selesaikan daftar SDM yang siap dipakai:** pagination/filter/sort di server, detail/riwayat, form validasi, loading/error/empty state, data mobile card, serta OpenAPI dan tes kontrak. Setelah itu baru impor/ekspor dan modul SDM lain.
 
-## Keputusan produk yang masih terbuka
+## Kontrak lintas modul
 
-Butir berikut tidak akan diberi aturan bisnis tersirat saat modulnya dikerjakan:
+- **Tenant:** identitas tenant berasal dari sesi dan membership yang masih aktif. Semua query, join, worker, file, cache, ekspor, dan event dibatasi tenant. FK komposit menjadi lapisan kedua. ID dari body/URL tidak mengganti tenant sesi.
+- **Akses:** permission harus ada di registry. Evaluasi `tenant ∩ entitlement ∩ permission ∩ scope`; Deny per user menang. Beberapa nilai satu dimensi = OR, antardimensi dalam aturan = AND, antaraturan/role = OR. Untuk data terikat karyawan, filter diterjemahkan ke SQL; detail/ubah/impor/ekspor memakai batas yang sama. Aksi berisiko meminta re-autentikasi.
+- **Riwayat:** perubahan penempatan/status berlaku pada tanggal efektif, ditulis atomik, dan tidak menimpa rekaman lama. Audit append-only tidak menyimpan kata sandi, token, atau isi field sensitif mentah.
+- **UI:** sebelum memakai Base, baca `defineProps`/`defineEmits` aktual. Data View mengikuti container fixed-height, tabel desktop + kartu mobile dan pagination server; modal lewat `BaseModal`, aksi berbahaya lewat `ConfirmationModal`, hasil lewat `useToast`. Dark mode memakai `--theme-bg`, `--theme-layer-main`, `--theme-layer-2`, `--theme-surface`, `--theme-border`, dan teks tema; Default harus gelap netral seperti template. Komponen demo hanya referensi pola.
+- **Mutu:** setiap slice punya state loading/error/empty/tidak berhak, akses keyboard/fokus, `prefers-reduced-motion`, pengujian empat tema, serta tes API lintas tenant. Tidak menampilkan angka kehadiran/payroll yang tidak berasal dari API.
 
-- Masa trial/grace, perilaku tenant suspended, dan retensi setelah berhenti.
-- Perlu tidaknya legal entity di MVP; tanggal kerja shift fleksibel tanpa jam baku.
-- Ambang akurasi GPS, toleransi tepi geofence, dan alur kegagalan lokasi.
-- Carry-over/prorata/cuti bersama/saldo negatif; delegasi/escalation/SLA approval.
-- Default frekuensi reminder dan jam tenang; detail payroll yang bertanda `[TERBUKA]`.
-- Kebijakan pelindungan data pribadi dan pemeriksaan hukum.
+## Keputusan yang harus ditutup pada waktunya
 
-## Temuan template dan progres integrasi
+**Sudah diputuskan Product Owner:** Go/Chi (T-01), memilih tenant setelah kata sandi benar bila satu email memiliki beberapa membership (T-02), idle 60 menit untuk Simpan Sesi OFF (T-03), serta staging MariaDB 10.11. Keputusan ini berlaku meskipun tabel keputusan PRD v2.3 belum diperbarui.
 
-- Login simulasi sudah diganti API sesi dengan cookie HttpOnly. Form dan tombol demo staging telah dihubungkan ke API; token tidak disimpan di browser storage.
-- Rute demo (`/template/*`) tidak ada lagi di router produk. Source view Gunung/Pesanan tetap tersedia sebagai referensi pola.
-- Panel awal Superadmin, Admin Tenant, dan ESS tersedia. Navigasi ESS mobile, dual rail Admin, dan modul bisnis masih pekerjaan fase berikutnya.
-- Build awal template menghasilkan bundle besar; setelah rute demo dikeluarkan dari produk, bundle utama lebih kecil. Route lazy loading dilakukan saat rute produk bertambah.
-- Dokumen desain berisi beberapa contoh `<input>`/`<button>` mentah, sedangkan `aturan-ui.md` melarangnya bila sudah ada komponen Base. Saat berbeda, ikuti kode dan aturan UI terbaru.
+| Sebelum tahap | Keputusan terbuka dari dokumen | Dampak pada rencana |
+| --- | --- | --- |
+| Fondasi/SDM | **D-03:** DB baru mengusulkan BIGINT internal + ULID publik, sedangkan migrasi berjalan memakai ULID `CHAR(26)` sebagai PK. | Pilih mempertahankan identitas yang sudah berjalan atau migrasi aditif terukur; jangan mengganti PK migrasi 00001–00003 secara diam-diam. |
+| SDM | **T-04** saran Jabatan → role; **T-05/D-09** legal entity; **T-06** trial/grace/suspended/retensi; **D-04** enkripsi dan kunci field sensitif; **D-06** approval sejak Fase 1 atau mutasi/terminasi ditunda. | Tidak mengaktifkan alur atau menyimpan data sensitif sebelum keputusan terkait. Pilihan produk yang aman untuk sementara: mutasi/terminasi tetap belum aktif. |
+| Geofence/kehadiran | **D-08** MySQL spatial vs JSON + Go pada MariaDB; **D-01** satu atau beberapa shift per hari; **D-02** scope historis; **T-07–T-10** perangkat/PWA, GPS, work date fleksibel, interval reminder. | Pilih dan uji sebelum migrasi/algoritma presensi. `BaseMapPolygonEditor` sudah ada sebagai UI; penyimpanan dan validasi server tetap diputuskan tersendiri. |
+| Pengajuan/payroll | **T-11–T-13**, **D-05** aturan pajak/BPJS global atau per tenant. | Jangan membakukan kebijakan cuti, delegasi, formula, atau pajak saat membuat tabel awal. |
+| Pra-produksi | **T-14**, **T-15/D-07** target NFR, retensi dan kebijakan UU PDP. | Wajib ditutup sebelum klaim siap produksi; keputusan hukum memerlukan peninjauan yang tepat. |
 
-## Pekerjaan awal pada sesi ini
-
-Fondasi Go/Chi dan evaluasi akses murni dibuat terlebih dahulu. Migrasi versi 1 dan 2 telah diterapkan ke staging MariaDB 10.11; skema ada di `SCHEMA_CORE.md`. Login, sesi, tenant selection, dan seed tiga akun demo sudah tersedia. Evaluator permission/scope umum belum menjadi otorisasi endpoint bisnis sampai registry, entitlement, dan filter SQL tersedia. Endpoint health tidak mengakses data tenant.
+Preset role dalam Matriks dan rancangan DDL adalah **[USULAN]**, sehingga ditinjau per bagian sebelum di-seed. Perbedaan lain yang sudah diketahui: dokumen DB memakai collation dan spatial syntax MySQL 8, sementara target nyata MariaDB 10.11; dokumen UI masih menyebut contoh menu/template lama dan menyatakan `EssLayout` belum ada, padahal kode produk sudah menambahkannya. Implementasi baru memakai kondisi kode terbaru dan melaporkan setiap penyelarasan.
