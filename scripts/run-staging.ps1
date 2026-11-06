@@ -8,6 +8,7 @@ $workDir = Join-Path $repoRoot 'work/launcher'
 $stateFile = Join-Path $workDir 'current.json'
 $credentialFile = Join-Path $workDir 'db-credential.xml'
 $mfaKeyFile = Join-Path $workDir 'platform-mfa-key.xml'
+$smtpCredentialFile = Join-Path $workDir 'smtp-credential.xml'
 $backendProcess = $null
 $frontendProcess = $null
 $state = $null
@@ -120,10 +121,29 @@ try {
     $env:ENABLE_DEMO_LOGIN = 'true'
     $env:COOKIE_SECURE = 'false'
     $env:APP_ORIGIN = "http://${lanIP}:${frontendPort}"
+    if (-not $env:SMTP_HOST) { $env:SMTP_HOST = 'mail.digaji.id' }
+    if (-not $env:SMTP_PORT) { $env:SMTP_PORT = '587' }
+    if (-not $env:SMTP_FROM) { $env:SMTP_FROM = 'admin@digaji.id' }
+    if (-not $env:SMTP_USERNAME) { $env:SMTP_USERNAME = 'admin@digaji.id' }
+    if (-not $env:SMTP_TLS_MODE) { $env:SMTP_TLS_MODE = 'starttls' }
+    if (-not $env:SMTP_PASSWORD) {
+        if (Test-Path -LiteralPath $smtpCredentialFile) {
+            $smtpCredential = Import-Clixml -LiteralPath $smtpCredentialFile
+            if ($smtpCredential -isnot [System.Management.Automation.PSCredential] -or $smtpCredential.UserName -ne $env:SMTP_USERNAME) {
+                throw 'Credential SMTP tersimpan tidak sesuai dengan SMTP_USERNAME.'
+            }
+        } else {
+            $secureSmtpPassword = Read-Host 'Kata sandi SMTP (disimpan terenkripsi untuk akun Windows ini)' -AsSecureString
+            $smtpCredential = [System.Management.Automation.PSCredential]::new($env:SMTP_USERNAME, $secureSmtpPassword)
+            $smtpCredential | Export-Clixml -LiteralPath $smtpCredentialFile
+        }
+        $env:SMTP_PASSWORD = $smtpCredential.GetNetworkCredential().Password
+    }
     $env:HTTP_ADDR = "0.0.0.0:${backendPort}"
     $backendProcess = Start-Process -FilePath $backendExe -WorkingDirectory $backendDir -WindowStyle Hidden -RedirectStandardOutput (Join-Path $instanceDir 'backend.out.log') -RedirectStandardError (Join-Path $instanceDir 'backend.err.log') -PassThru
     Remove-Item Env:DB_PASSWORD -ErrorAction SilentlyContinue
     Remove-Item Env:PLATFORM_MFA_KEY -ErrorAction SilentlyContinue
+    Remove-Item Env:SMTP_PASSWORD -ErrorAction SilentlyContinue
     if (-not (Wait-HrisURL -Url "http://127.0.0.1:${backendPort}/readyz" -Seconds 30 -Process $backendProcess)) {
         throw "Backend gagal siap. Periksa $(Join-Path $instanceDir 'backend.err.log')"
     }
@@ -168,6 +188,7 @@ try {
 } finally {
     Remove-Item Env:DB_PASSWORD -ErrorAction SilentlyContinue
     Remove-Item Env:PLATFORM_MFA_KEY -ErrorAction SilentlyContinue
+    Remove-Item Env:SMTP_PASSWORD -ErrorAction SilentlyContinue
     if ($ready -and $state) {
         Stop-HrisOwnedProcess -ProcessId $state.frontendPid -StartedUtcTicks $state.frontendStartedUtcTicks
         Stop-HrisOwnedProcess -ProcessId $state.backendPid -StartedUtcTicks $state.backendStartedUtcTicks
