@@ -12,6 +12,7 @@ import (
 func mountPlatform(r chi.Router, db *sql.DB, config Options) {
 	service := auth.Service{DB: db}
 	r.Get("/api/v1/platform/staff", func(w http.ResponseWriter, req *http.Request) { listPlatformStaff(w, req, db) })
+	r.With(checkOrigin(config)).Post("/api/v1/platform/staff", func(w http.ResponseWriter, req *http.Request) { createPlatformStaff(w, req, db) })
 	r.Get("/api/v1/platform/staff/roles", func(w http.ResponseWriter, req *http.Request) { listPlatformRoles(w, req, db) })
 	r.Get("/api/v1/platform/staff/{id}", func(w http.ResponseWriter, req *http.Request) { getPlatformStaff(w, req, db) })
 	r.With(checkOrigin(config)).Post("/api/v1/platform/staff/roles", func(w http.ResponseWriter, req *http.Request) { assignPlatformRole(w, req, db) })

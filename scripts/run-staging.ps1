@@ -7,6 +7,7 @@ $frontendDir = Join-Path $repoRoot 'frontend'
 $workDir = Join-Path $repoRoot 'work/launcher'
 $stateFile = Join-Path $workDir 'current.json'
 $credentialFile = Join-Path $workDir 'db-credential.xml'
+$mfaKeyFile = Join-Path $workDir 'platform-mfa-key.xml'
 $backendProcess = $null
 $frontendProcess = $null
 $state = $null
@@ -101,6 +102,20 @@ try {
     $env:DB_ADDR = '192.168.11.85:3306'
     $env:DB_USER = $dbUser
     $env:DB_NAME = 'staging-saas-hris'
+    if (-not $env:PLATFORM_MFA_KEY) {
+        if (Test-Path -LiteralPath $mfaKeyFile) {
+            $secureMfaKey = Import-Clixml -LiteralPath $mfaKeyFile
+        } else {
+            $keyBytes = New-Object byte[] 32
+            [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($keyBytes)
+            $secureMfaKey = [System.Security.SecureString]::new()
+            foreach ($character in [Convert]::ToBase64String($keyBytes).ToCharArray()) { $secureMfaKey.AppendChar($character) }
+            $secureMfaKey.MakeReadOnly()
+            $secureMfaKey | Export-Clixml -LiteralPath $mfaKeyFile
+            [Array]::Clear($keyBytes, 0, $keyBytes.Length)
+        }
+        $env:PLATFORM_MFA_KEY = ([System.Net.NetworkCredential]::new('', $secureMfaKey)).Password
+    }
     $env:APP_ENV = 'staging'
     $env:ENABLE_DEMO_LOGIN = 'true'
     $env:COOKIE_SECURE = 'false'
@@ -108,6 +123,7 @@ try {
     $env:HTTP_ADDR = "0.0.0.0:${backendPort}"
     $backendProcess = Start-Process -FilePath $backendExe -WorkingDirectory $backendDir -WindowStyle Hidden -RedirectStandardOutput (Join-Path $instanceDir 'backend.out.log') -RedirectStandardError (Join-Path $instanceDir 'backend.err.log') -PassThru
     Remove-Item Env:DB_PASSWORD -ErrorAction SilentlyContinue
+    Remove-Item Env:PLATFORM_MFA_KEY -ErrorAction SilentlyContinue
     if (-not (Wait-HrisURL -Url "http://127.0.0.1:${backendPort}/readyz" -Seconds 30 -Process $backendProcess)) {
         throw "Backend gagal siap. Periksa $(Join-Path $instanceDir 'backend.err.log')"
     }
@@ -151,6 +167,7 @@ try {
     throw
 } finally {
     Remove-Item Env:DB_PASSWORD -ErrorAction SilentlyContinue
+    Remove-Item Env:PLATFORM_MFA_KEY -ErrorAction SilentlyContinue
     if ($ready -and $state) {
         Stop-HrisOwnedProcess -ProcessId $state.frontendPid -StartedUtcTicks $state.frontendStartedUtcTicks
         Stop-HrisOwnedProcess -ProcessId $state.backendPid -StartedUtcTicks $state.backendStartedUtcTicks

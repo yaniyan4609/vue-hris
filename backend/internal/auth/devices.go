@@ -11,6 +11,7 @@ import (
 )
 
 var ErrPasswordPolicy = errors.New("kata sandi baru minimal 8 karakter")
+var ErrSessionNotFound = errors.New("sesi perangkat tidak ditemukan")
 
 type SessionInfo struct {
 	ID          string    `json:"id"`
@@ -86,12 +87,49 @@ func (s Service) ActiveSessions(ctx context.Context, token string) ([]SessionInf
 }
 
 func (s Service) LogoutAll(ctx context.Context, token string) error {
+	return s.LogoutAllExceptCurrent(ctx, token, false)
+}
+
+func (s Service) LogoutAllExceptCurrent(ctx context.Context, token string, exceptCurrent bool) error {
 	state, err := s.Current(ctx, token)
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, `UPDATE sessions SET revoked_at=UTC_TIMESTAMP(6), revoked_reason='logout_all' WHERE user_id=? AND revoked_at IS NULL`, state.User.ID)
+	query := `UPDATE sessions SET revoked_at=UTC_TIMESTAMP(6), revoked_reason='logout_all' WHERE user_id=? AND revoked_at IS NULL`
+	args := []any{state.User.ID}
+	if exceptCurrent {
+		hash, _ := tokenHash(token)
+		query += ` AND token_hash<>?`
+		args = append(args, hash[:])
+	}
+	_, err = s.DB.ExecContext(ctx, query, args...)
 	return err
+}
+
+func (s Service) RevokeSession(ctx context.Context, token, sessionID string) (bool, error) {
+	state, err := s.Current(ctx, token)
+	if err != nil {
+		return false, err
+	}
+	var targetHash []byte
+	err = s.DB.QueryRowContext(ctx, `SELECT token_hash FROM sessions WHERE id=? AND user_id=? AND revoked_at IS NULL`, sessionID, state.User.ID).Scan(&targetHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrSessionNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+	currentHash, _ := tokenHash(token)
+	current := subtle.ConstantTimeCompare(targetHash, currentHash[:]) == 1
+	result, err := s.DB.ExecContext(ctx, `UPDATE sessions SET revoked_at=UTC_TIMESTAMP(6), revoked_reason='device_revoked' WHERE id=? AND user_id=? AND revoked_at IS NULL`, sessionID, state.User.ID)
+	if err != nil {
+		return false, err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil || changed != 1 {
+		return false, ErrSessionNotFound
+	}
+	return current, nil
 }
 
 func (s Service) ChangePassword(ctx context.Context, token, currentPassword, newPassword string) error {
@@ -123,6 +161,9 @@ func (s Service) ChangePassword(ctx context.Context, token, currentPassword, new
 		return ErrInvalidCredentials
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE users SET password_hash=? WHERE id=?`, newHash, state.User.ID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE sessions SET reauthenticated_at=NULL WHERE user_id=? AND revoked_at IS NULL`, state.User.ID); err != nil {
 		return err
 	}
 	hash, _ := tokenHash(token)

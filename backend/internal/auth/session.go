@@ -18,6 +18,8 @@ var (
 	ErrInvalidCredentials = errors.New("email atau kata sandi salah")
 	ErrUnauthenticated    = errors.New("sesi tidak sah")
 	ErrTenantUnavailable  = errors.New("perusahaan tidak tersedia untuk akun ini")
+	ErrMFARequired        = errors.New("verifikasi dua langkah diperlukan")
+	ErrMFAUnavailable     = errors.New("kunci MFA platform belum dikonfigurasi")
 )
 
 type User struct {
@@ -40,6 +42,7 @@ type State struct {
 	SelectedTenantID string   `json:"selectedTenantId,omitempty"`
 	Tenants          []Tenant `json:"tenants"`
 	Remember         bool     `json:"remember"`
+	MFARequired      bool     `json:"mfaRequired,omitempty"`
 }
 
 type Service struct{ DB *sql.DB }
@@ -62,7 +65,7 @@ func (s Service) Login(ctx context.Context, email, password string, remember boo
 		}
 		return "", State{}, ErrInvalidCredentials
 	}
-	return s.createSession(ctx, user, remember, device, "login_success")
+	return s.createSession(ctx, user, remember, device, "login_success", false)
 }
 
 // DemoLogin bypasses the password only when the HTTP server enables staging
@@ -85,10 +88,10 @@ func (s Service) DemoLogin(ctx context.Context, account string, device SessionDe
 		}
 		return "", State{}, err
 	}
-	return s.createSession(ctx, user, false, device, "demo_login")
+	return s.createSession(ctx, user, false, device, "demo_login", true)
 }
 
-func (s Service) createSession(ctx context.Context, user User, remember bool, device SessionDevice, event string) (string, State, error) {
+func (s Service) createSession(ctx context.Context, user User, remember bool, device SessionDevice, event string, demo bool) (string, State, error) {
 	token, hash, err := newToken()
 	if err != nil {
 		return "", State{}, err
@@ -100,6 +103,13 @@ func (s Service) createSession(ctx context.Context, user User, remember bool, de
 	state, err := s.stateForUser(ctx, user)
 	if err != nil {
 		return "", State{}, err
+	}
+	state.MFARequired = state.Platform && !demo
+	if state.MFARequired && platformMFAKey() == nil {
+		return "", State{}, ErrMFAUnavailable
+	}
+	if state.Platform {
+		remember = false
 	}
 	var selected any
 	idleMinutes := 60
@@ -118,7 +128,7 @@ func (s Service) createSession(ctx context.Context, user User, remember bool, de
 		return "", State{}, err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, `INSERT INTO sessions (id, token_hash, user_id, selected_tenant_id, remember, idle_timeout_minutes, last_seen_at, user_agent, ip, device_label) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), ?, ?, ?)`, id, hash[:], user.ID, selected, remember, idleMinutes, userAgent, deviceIP(device), deviceLabel(userAgent))
+	_, err = tx.ExecContext(ctx, `INSERT INTO sessions (id, token_hash, user_id, selected_tenant_id, remember, idle_timeout_minutes, last_seen_at, user_agent, ip, device_label, mfa_required, mfa_demo_exempt) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), ?, ?, ?, ?, ?)`, id, hash[:], user.ID, selected, remember, idleMinutes, userAgent, deviceIP(device), deviceLabel(userAgent), state.MFARequired, demo)
 	if err != nil {
 		return "", State{}, err
 	}
@@ -133,15 +143,19 @@ func (s Service) createSession(ctx context.Context, user User, remember bool, de
 }
 
 func (s Service) Current(ctx context.Context, token string) (State, error) {
-	return s.current(ctx, token, true)
+	return s.current(ctx, token, true, false)
 }
 
 // Peek validates a long-lived connection without extending its idle timeout.
 func (s Service) Peek(ctx context.Context, token string) (State, error) {
-	return s.current(ctx, token, false)
+	return s.current(ctx, token, false, false)
 }
 
-func (s Service) current(ctx context.Context, token string, touch bool) (State, error) {
+func (s Service) Pending(ctx context.Context, token string) (State, error) {
+	return s.current(ctx, token, true, true)
+}
+
+func (s Service) current(ctx context.Context, token string, touch, allowPending bool) (State, error) {
 	hash, ok := tokenHash(token)
 	if !ok {
 		return State{}, ErrUnauthenticated
@@ -152,7 +166,10 @@ func (s Service) current(ctx context.Context, token string, touch bool) (State, 
 	var lastSeen time.Time
 	var idleMinutes int
 	var expires sql.NullTime
-	err := s.DB.QueryRowContext(ctx, `SELECT u.id, u.email, u.display_name, s.selected_tenant_id, s.remember, s.last_seen_at, s.idle_timeout_minutes, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND u.status='active'`, hash[:]).Scan(&user.ID, &user.Email, &user.Name, &selected, &remember, &lastSeen, &idleMinutes, &expires)
+	var mfaRequired bool
+	var mfaVerified sql.NullTime
+	var mfaDemoExempt bool
+	err := s.DB.QueryRowContext(ctx, `SELECT u.id, u.email, u.display_name, s.selected_tenant_id, s.remember, s.last_seen_at, s.idle_timeout_minutes, s.expires_at, s.mfa_required, s.mfa_verified_at, s.mfa_demo_exempt FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND u.status='active'`, hash[:]).Scan(&user.ID, &user.Email, &user.Name, &selected, &remember, &lastSeen, &idleMinutes, &expires, &mfaRequired, &mfaVerified, &mfaDemoExempt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return State{}, ErrUnauthenticated
@@ -169,6 +186,10 @@ func (s Service) current(ctx context.Context, token string, touch bool) (State, 
 		return State{}, err
 	}
 	state.Remember = remember
+	state.MFARequired = state.Platform && !mfaDemoExempt && !mfaVerified.Valid
+	if state.MFARequired && !allowPending {
+		return State{}, ErrMFARequired
+	}
 	if selected.Valid {
 		for _, tenant := range state.Tenants {
 			if tenant.ID == selected.String {
@@ -212,7 +233,7 @@ func (s Service) SelectTenant(ctx context.Context, token, tenantID string, devic
 		return "", State{}, err
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, `UPDATE sessions SET selected_tenant_id=?, token_hash=?, idle_timeout_minutes=?, rotated_at=UTC_TIMESTAMP(6) WHERE token_hash=? AND revoked_at IS NULL`, tenantID, newHash[:], idle, oldHash[:])
+	result, err := tx.ExecContext(ctx, `UPDATE sessions SET selected_tenant_id=?, token_hash=?, idle_timeout_minutes=?, rotated_at=UTC_TIMESTAMP(6), reauthenticated_at=NULL WHERE token_hash=? AND revoked_at IS NULL`, tenantID, newHash[:], idle, oldHash[:])
 	if err != nil {
 		return "", State{}, err
 	}

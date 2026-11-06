@@ -7,7 +7,7 @@ Klik dua kali **`run-hris.bat`** di akar proyek. Launcher otomatis:
 3. Membangun backend Go, lalu menjalankan backend pada semua interface jaringan dan Vite pada semua interface jaringan. WebSocket dan Swagger UI berada di backend yang sama; frontend memproksikan `/api`, `/healthz`, dan `/readyz` ke backend.
 4. Memeriksa `/readyz` serta halaman docs, menampilkan URL, dan membuka frontend serta docs di browser.
 
-Saat pertama kali dijalankan, masukkan kata sandi MariaDB staging di jendela launcher. Setelah koneksi berhasil, credential disimpan dengan enkripsi Windows yang terikat pada akun Windows ini di `work/launcher/db-credential.xml`. File `work/` diabaikan Git. Launcher tidak menaruh kata sandi dalam `.bat`, argumen command line, atau log. Jalankan berikutnya cukup klik `.bat` lagi. Jika `DB_PASSWORD` sudah ada di environment proses, launcher memakai nilai itu tanpa membuat file credential.
+Saat pertama kali dijalankan, masukkan kata sandi MariaDB staging di jendela launcher. Setelah koneksi berhasil, credential disimpan dengan enkripsi Windows yang terikat pada akun Windows ini di `work/launcher/db-credential.xml`. Launcher membuat kunci TOTP platform acak dan menyimpannya dengan enkripsi Windows di `work/launcher/platform-mfa-key.xml`; pertahankan file ini agar authenticator yang sudah terdaftar tetap dapat digunakan. File `work/` diabaikan Git. Launcher tidak menaruh rahasia dalam `.bat`, argumen command line, atau log. Jalankan berikutnya cukup klik `.bat` lagi. Jika `DB_PASSWORD` atau `PLATFORM_MFA_KEY` sudah ada di environment proses, launcher memakai nilai tersebut.
 
 Contoh pada komputer dengan IP LAN `192.168.200.112` dan pasangan port pertama:
 

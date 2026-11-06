@@ -28,3 +28,18 @@ func requireCSRF(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func requireMutationCSRF(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || r.Method == http.MethodTrace || cookieToken(r) == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Login and password recovery establish a new session without a prior token.
+		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/demo-login" || r.URL.Path == "/api/v1/auth/password/forgot" || r.URL.Path == "/api/v1/auth/password/reset" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		requireCSRF(next).ServeHTTP(w, r)
+	})
+}

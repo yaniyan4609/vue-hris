@@ -2,7 +2,7 @@
 
 Status: roadmap aktif, 6 November 2026. Acuan utama: `full-docs/Spesifikasi API digaji.id — REST + WebSocket.md` (draft 4 November 2026), PRD v2.3, Matriks Menu/Role/Fungsional, Desain Database, dan keputusan Product Owner dalam percakapan. Proyek Go/Chi, Vue, dan MariaDB staging `192.168.11.85` dilanjutkan; migrasi `00001`–`00023` tidak ditulis ulang.
 
-**Implementasi pertama:** migrasi aditif `00024` sudah diterapkan pada staging. Inbox REST, token CSRF untuk aksi inbox, `X-Request-Id`, versi akses dan ETag `/me/access`, endpoint `/healthz` dan `/readyz`, serta WebSocket notifikasi awal sudah tersedia. Frontend Admin/ESS membaca inbox nyata dan menyambung ulang WebSocket. Tes integrasi staging membuktikan notifikasi diterima, tidak terbaca akun lain, dan aksi tanpa CSRF ditolak. Protokol WebSocket lengkap, worker outbox, MFA, dan modul domain lain masih mengikuti tahap di bawah.
+**Status implementasi:** migrasi aditif `00024`–`00029` sudah diterapkan pada staging. Inbox REST/WebSocket awal, CSRF untuk mutasi bersesi, `X-Request-Id`, versi akses/ETag, health/readiness, reauth 5 menit, sesi perangkat, preferensi, TOTP staf platform, dan token reset kata sandi sudah tersedia. Endpoint organisasi dan akses Admin baru memakai `{data,meta}` dan `snake_case` sambil mempertahankan alias lama. CRUD role kustom, penugasan role, Allow/Deny massal, scope, pengguna tenant, sesi, dan undangan staf platform sudah ditambahkan. Pengiriman reset menunggu konfigurasi SMTP pemilik proyek. Protokol WebSocket lengkap, worker outbox, dan modul domain lain masih mengikuti tahap di bawah.
 
 ## 1. Hasil pencocokan spesifikasi dengan kode
 
@@ -78,7 +78,7 @@ Setiap irisan mencakup handler Chi, service/domain, query DB tenant-aware, OpenA
 | Keputusan | Rekomendasi saat ini | Dampak |
 | --- | --- | --- |
 | A-01–A-06, A-10 | Ikuti usulan spesifikasi: OpenAPI spec-first, 404 di luar scope, offset master/cursor log, job impor/ekspor generik, respons massal per item, `version`, pesan Indonesia + kode stabil. | Menetapkan kontrak fondasi. |
-| A-08 | Wajib MFA staf platform; pilih TOTP dahulu atau WebAuthn/passkey. | Menentukan migrasi credential dan alur login. |
+| A-08 | Diputuskan: TOTP aplikasi authenticator. | Migrasi `00026`, aktivasi, verifikasi, dan kode pemulihan sudah aktif; tombol demo khusus staging melewati MFA. |
 | A-09 | Support session baca-saja, tanpa payroll dan dokumen sensitif; durasi pendek, alasan, indikator UI, audit. | Menentukan evaluator khusus support. |
 | Spesifikasi 11.1 vs keputusan Product Owner | **Aturan PPh 21/BPJS sepenuhnya per tenant**. Perbaiki spesifikasi sebelum OpenAPI final. | Endpoint CRUD aturan, hak kelola, snapshot run. |
 | Pola roster | Tambah endpoint pola mingguan/bulanan, slot, duplicate, preview; data model sudah ada. | Tanpa ini UI pola tidak dapat memakai backend. |

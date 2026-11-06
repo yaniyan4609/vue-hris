@@ -1,14 +1,15 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.5.0
+  version: 0.7.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
     URL. Masuk pada origin yang sama sebelum mencoba endpoint bersesi. Swagger UI
     menambahkan X-CSRF-Token otomatis pada mutasi setelah login. Demo login hanya
     aktif di staging bila diaktifkan pada server. WebSocket didokumentasikan sebagai
-    handshake HTTP; pesan dan event dijelaskan pada operasi tersebut.
+    handshake HTTP; pesan dan event dijelaskan pada operasi tersebut. Akun staf
+    platform memerlukan TOTP pada login biasa. Tombol demo staging melewati MFA.
 servers:
   - url: /
     description: Origin yang sama dengan aplikasi dan sesi cookie
@@ -261,6 +262,175 @@ paths:
                 type: object
                 additionalProperties: { type: boolean }
         '403': { description: Panel Admin tidak tersedia }
+  /api/v1/auth/reauth:
+    post:
+      tags: [Auth]
+      summary: Verifikasi ulang kata sandi untuk perubahan akses sensitif
+      operationId: reauthenticate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, format: password }
+      responses:
+        '200': { description: Bukti verifikasi ulang berlaku selama lima menit dalam sesi saat ini }
+        '403': { description: Kata sandi salah }
+  /api/v1/auth/switch-tenant:
+    post:
+      tags: [Auth]
+      summary: Pilih tenant dengan kontrak snake_case
+      operationId: switchTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id]
+              properties:
+                tenant_id: { type: string }
+      responses:
+        '200': { description: Sesi diputar ke tenant terpilih }
+        '403': { description: Pengguna bukan anggota tenant }
+  /api/v1/auth/password/change:
+    post:
+      tags: [Auth]
+      summary: Ganti kata sandi akun
+      operationId: changePasswordCanonical
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string, format: password }
+                new_password: { type: string, format: password }
+      responses:
+        '204': { description: Kata sandi berubah; sesi perangkat lain dicabut }
+        '400': { description: Kata sandi lama salah atau kebijakan kata sandi tidak terpenuhi }
+  /api/v1/auth/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Minta tautan reset kata sandi melalui SMTP
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202': { description: Respons sama untuk email terdaftar dan tidak terdaftar }
+        '503': { description: SMTP belum dikonfigurasi atau pengiriman gagal }
+  /api/v1/auth/password/reset:
+    post:
+      tags: [Auth]
+      summary: Gunakan token sekali pakai untuk mengganti kata sandi
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token: { type: string }
+                new_password: { type: string, format: password }
+      responses:
+        '204': { description: Kata sandi berubah; seluruh sesi dicabut }
+        '400': { description: Token tidak sah atau kata sandi tidak memenuhi kebijakan }
+  /api/v1/auth/mfa/status:
+    get:
+      tags: [Auth]
+      summary: Status TOTP sesi staf platform, termasuk sesi yang belum terverifikasi
+      operationId: getMFAStatus
+      responses:
+        '200': { description: Data required dan enrolled }
+  /api/v1/auth/mfa/setup:
+    post:
+      tags: [Auth]
+      summary: Buat secret TOTP untuk akun staf platform yang belum terdaftar
+      operationId: setupMFA
+      responses:
+        '200': { description: Secret Base32 dan otpauth_uri; respons tidak disimpan cache }
+        '409': { description: Authenticator sudah aktif }
+  /api/v1/auth/mfa/confirm:
+    post:
+      tags: [Auth]
+      summary: Konfirmasi TOTP pertama dan terima sepuluh kode pemulihan sekali pakai
+      operationId: confirmMFA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '200': { description: Sesi terverifikasi; kode pemulihan hanya muncul sekali }
+        '403': { description: Kode tidak sah }
+  /api/v1/auth/mfa/verify:
+    post:
+      tags: [Auth]
+      summary: Verifikasi TOTP atau kode pemulihan pada login platform
+      operationId: verifyMFA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200': { description: Sesi platform terverifikasi }
+        '403': { description: Kode tidak sah; lima kegagalan mencabut sesi }
+  /api/v1/me/sessions:
+    get:
+      tags: [Auth]
+      summary: Daftar sesi perangkat milik akun
+      operationId: listMySessionsCanonical
+      responses:
+        '200': { description: Daftar sesi aktif dalam data }
+  /api/v1/me/sessions/{id}:
+    delete:
+      tags: [Auth]
+      summary: Cabut sesi perangkat milik akun
+      operationId: revokeMySession
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Sesi dicabut }
+        '404': { description: Sesi bukan milik akun }
+  /api/v1/me/preferences:
+    get:
+      tags: [Auth]
+      summary: Preferensi tema akun
+      operationId: getMyPreferences
+      responses:
+        '200': { description: Preferensi tema akun }
+    patch:
+      tags: [Auth]
+      summary: Simpan preferensi tema akun
+      operationId: updateMyPreferences
+      responses:
+        '200': { description: Preferensi tema tersimpan }
   /api/v1/me/access:
     get:
       tags: [Access]
@@ -476,6 +646,344 @@ paths:
       responses:
         '204': { description: Scope khusus dihapus dan versi akses naik }
         '403': { description: Diri sendiri atau delegasi tidak cukup }
+  /api/v1/admin/users:
+    get:
+      tags: [Access]
+      summary: Daftar pengguna tenant, termasuk keanggotaan nonaktif
+      operationId: listTenantUsers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Search'
+        - { in: query, name: status, schema: { type: string, enum: [active, disabled] } }
+        - { in: query, name: role_id, schema: { type: string } }
+        - { in: query, name: office_id, schema: { type: string } }
+      responses:
+        '200': { description: Pengguna dalam data dan metadata halaman }
+        '403': { description: Izin pengguna.lihat tidak ada }
+    post:
+      tags: [Access]
+      summary: Tambah akun atau keanggotaan dan kirim undangan
+      operationId: createTenantUser
+      description: Memerlukan reauth. Saat SMTP belum dikonfigurasi, 503 dikembalikan sebelum data dibuat. Jika pengiriman gagal setelah akun dibuat, invitation_status=failed; admin dapat mengirim ulang lewat reset-password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name]
+              properties:
+                email: { type: string, format: email }
+                name: { type: string }
+                phone: { type: string }
+                employee_id: { type: string }
+      responses:
+        '201': { description: Akun/keanggotaan dibuat; periksa invitation_status }
+        '403': { description: Izin pengguna.buat atau reauth tidak ada }
+        '409': { description: Keanggotaan sudah ada atau kuota terlampaui }
+        '503': { description: SMTP belum dikonfigurasi }
+  /api/v1/admin/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    get:
+      tags: [Access]
+      summary: Detail pengguna, role, hak efektif, dan riwayat
+      operationId: getTenantUser
+      responses:
+        '200': { description: Detail pengguna tenant }
+        '404': { description: Pengguna di luar tenant atau tidak ditemukan }
+    patch:
+      tags: [Access]
+      summary: Ubah nama atau telepon akun dengan satu keanggotaan
+      operationId: updateTenantUser
+      responses:
+        '200': { description: Profil akun diperbarui dan diaudit }
+        '409': { description: Identitas dipakai di beberapa tenant }
+  /api/v1/admin/users/{id}/disable:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    post:
+      tags: [Access]
+      summary: Nonaktifkan keanggotaan tenant dan cabut sesinya
+      operationId: disableTenantUser
+      responses:
+        '204': { description: Keanggotaan nonaktif }
+        '403': { description: Tidak boleh menonaktifkan diri sendiri }
+  /api/v1/admin/users/{id}/enable:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    post:
+      tags: [Access]
+      summary: Aktifkan kembali keanggotaan tenant
+      operationId: enableTenantUser
+      responses:
+        '204': { description: Keanggotaan aktif }
+        '409': { description: Akun dinonaktifkan secara global }
+  /api/v1/admin/users/{id}/reset-password:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    post:
+      tags: [Access]
+      summary: Kirim tautan reset kata sandi ke pengguna tenant
+      operationId: sendTenantUserReset
+      responses:
+        '202': { description: Tautan reset dikirim }
+        '503': { description: SMTP belum tersedia atau pengiriman gagal }
+  /api/v1/admin/users/{id}/sessions:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    get:
+      tags: [Access]
+      summary: Sesi pengguna yang memilih tenant ini
+      operationId: listTenantUserSessions
+      responses:
+        '200': { description: Sesi dalam tenant ini }
+    delete:
+      tags: [Access]
+      summary: Cabut seluruh sesi pengguna pada tenant ini
+      operationId: revokeTenantUserSessions
+      responses:
+        '204': { description: Sesi dicabut dan diaudit }
+  /api/v1/admin/users/{id}/sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+      - $ref: '#/components/parameters/SessionID'
+    delete:
+      tags: [Access]
+      summary: Cabut satu sesi pengguna pada tenant ini
+      operationId: revokeTenantUserSession
+      responses:
+        '204': { description: Sesi dicabut dan diaudit }
+        '404': { description: Sesi tidak ditemukan dalam tenant }
+  /api/v1/admin/users/{id}/roles:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    get:
+      tags: [Access]
+      summary: Role dan periode penugasan pengguna
+      operationId: listTenantUserRoles
+      responses:
+        '200': { description: Penugasan role pengguna }
+    post:
+      tags: [Access]
+      summary: Berikan role yang berada dalam kewenangan delegasi Admin
+      operationId: assignTenantUserRole
+      responses:
+        '201': { description: Penugasan dibuat dan diaudit }
+        '403': { description: Reauth atau kewenangan delegasi tidak cukup }
+  /api/v1/admin/users/{id}/roles/{assignmentId}:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+      - $ref: '#/components/parameters/AssignmentID'
+    patch:
+      tags: [Access]
+      summary: Ubah tanggal berlaku penugasan role
+      operationId: updateTenantUserRolePeriod
+      responses:
+        '200': { description: Periode role diperbarui }
+        '409': { description: Periode bertumpang tindih }
+    delete:
+      tags: [Access]
+      summary: Cabut penugasan role
+      operationId: revokeTenantUserRole
+      responses:
+        '204': { description: Role dicabut dan diaudit }
+  /api/v1/admin/users/{id}/permission-overrides:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    get:
+      tags: [Access]
+      summary: Override Allow/Deny milik pengguna
+      operationId: listTenantUserOverrides
+      responses:
+        '200': { description: Daftar override }
+    put:
+      tags: [Access]
+      summary: Ganti beberapa override secara atomik
+      operationId: updateTenantUserOverrides
+      description: Body overrides berisi permission_code dan decision allow/deny/inherit. Reauth dan validasi delegasi berlaku pada seluruh batch sebelum commit; Deny menang.
+      responses:
+        '204': { description: Seluruh perubahan tersimpan }
+        '403': { description: Delegasi tidak cukup }
+  /api/v1/admin/users/{id}/scopes:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    get:
+      tags: [Access]
+      summary: Scope override mentah per permission pengguna
+      operationId: listTenantUserScopes
+      responses:
+        '200': { description: Peta permission_code ke aturan scope }
+  /api/v1/admin/users/{id}/scopes/{code}:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+      - $ref: '#/components/parameters/PermissionCode'
+    put:
+      tags: [Access]
+      summary: Ganti scope override untuk satu permission
+      operationId: updateTenantUserScope
+      responses:
+        '204': { description: Scope disimpan dan diaudit }
+    delete:
+      tags: [Access]
+      summary: Kembali ke scope bawaan role untuk satu permission
+      operationId: clearTenantUserScope
+      responses:
+        '204': { description: Override scope dihapus }
+  /api/v1/admin/users/{id}/effective-access:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    get:
+      tags: [Access]
+      summary: Hak efektif dan sumbernya
+      operationId: getTenantUserEffectiveAccess
+      responses:
+        '200': { description: Peta keputusan per permission }
+  /api/v1/admin/users/{id}/effective-access/preview:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    post:
+      tags: [Access]
+      summary: Pratinjau satu perubahan izin/scope sebelum simpan
+      operationId: previewTenantUserAccess
+      responses:
+        '200': { description: Keputusan simulasi tanpa perubahan data }
+  /api/v1/admin/users/{id}/access-history:
+    parameters:
+      - $ref: '#/components/parameters/UserID'
+    get:
+      tags: [Access]
+      summary: Riwayat perubahan akses pengguna
+      operationId: getTenantUserAccessHistory
+      responses:
+        '200': { description: Riwayat audit }
+  /api/v1/admin/permissions:
+    get:
+      tags: [Access]
+      summary: Registry izin yang tersedia dalam paket tenant
+      operationId: listTenantPermissions
+      responses:
+        '200': { description: Izin, modul, sensitivitas, entitlement, dan dimensi scope }
+  /api/v1/admin/roles:
+    get:
+      tags: [Access]
+      summary: Daftar role tenant
+      operationId: listTenantRoles
+      responses:
+        '200': { description: Role, versi, dan daftar izin }
+    post:
+      tags: [Access]
+      summary: Buat role kustom
+      operationId: createTenantRole
+      responses:
+        '201': { description: Role kustom dibuat }
+  /api/v1/admin/roles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RoleID'
+    get:
+      tags: [Access]
+      summary: Detail role beserta permission dan scope preset
+      operationId: getTenantRole
+      responses:
+        '200': { description: Detail role }
+    patch:
+      tags: [Access]
+      summary: Ubah nama/deskripsi role kustom dengan version
+      operationId: updateTenantRole
+      responses:
+        '200': { description: Versi role naik }
+        '409': { description: Versi berubah sejak dibaca }
+    delete:
+      tags: [Access]
+      summary: Hapus role kustom yang belum pernah ditugaskan
+      operationId: deleteTenantRole
+      responses:
+        '204': { description: Role dihapus }
+        '409': { description: Role memiliki riwayat penugasan }
+  /api/v1/admin/roles/{id}/permissions:
+    parameters:
+      - $ref: '#/components/parameters/RoleID'
+    put:
+      tags: [Access]
+      summary: Ganti daftar permission role dengan version dan validasi delegasi
+      operationId: updateTenantRolePermissions
+      responses:
+        '200': { description: Izin diganti; versi role dan akses anggota naik }
+  /api/v1/admin/roles/{id}/scopes:
+    parameters:
+      - $ref: '#/components/parameters/RoleID'
+    get:
+      tags: [Access]
+      summary: Scope preset role per permission
+      operationId: getTenantRoleScopes
+      responses:
+        '200': { description: Scope dan versi role }
+    put:
+      tags: [Access]
+      summary: Ganti scope preset dengan version dan validasi delegasi
+      operationId: updateTenantRoleScopes
+      responses:
+        '200': { description: Scope diganti; versi role dan akses anggota naik }
+  /api/v1/admin/{kind}:
+    parameters:
+      - in: path
+        name: kind
+        required: true
+        schema: { type: string, enum: [regions, offices, divisions, departments, positions] }
+    get:
+      tags: [Organization]
+      summary: Daftar organisasi dengan respons data dan meta
+      operationId: listOrganizationCanonical
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: parent_id
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [name, -name, code, -code] }
+      responses:
+        '200': { description: Array data serta meta page, per_page, total }
+        '403': { description: Izin organisasi.lihat tidak ada }
+    post:
+      tags: [Organization]
+      summary: Buat node organisasi dengan kontrak snake_case
+      operationId: createOrganizationCanonical
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrganizationNode' }
+      responses:
+        '201': { description: Node dibuat dan diaudit }
+  /api/v1/admin/{kind}/{id}:
+    parameters:
+      - in: path
+        name: kind
+        required: true
+        schema: { type: string, enum: [regions, offices, divisions, departments, positions] }
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Organization]
+      summary: Detail node organisasi dalam tenant terpilih
+      operationId: getOrganizationCanonical
+      responses:
+        '200': { description: Data node organisasi }
+        '404': { description: Node tidak ditemukan dalam tenant }
+    patch:
+      tags: [Organization]
+      summary: Ubah node organisasi dengan kontrak snake_case
+      operationId: updateOrganizationCanonical
+      responses:
+        '200': { description: Node diubah dan diaudit }
   /api/v1/admin/organization/{kind}:
     parameters:
       - in: path
@@ -673,6 +1181,27 @@ paths:
       responses:
         '200': { description: Halaman staf dan jumlah role aktif }
         '403': { description: Izin staf platform tidak ada }
+    post:
+      tags: [Platform]
+      summary: Buat staf platform dan kirim undangan
+      operationId: createPlatformStaff
+      description: Hanya Superadmin dengan reauth. Login biasa staf baru memerlukan TOTP. Saat SMTP belum dikonfigurasi, 503 sebelum data dibuat; status undangan ada di invitation_status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name, role_code]
+              properties:
+                email: { type: string, format: email }
+                name: { type: string }
+                role_code: { type: string, enum: [SUPERADMIN, ADMIN_PLATFORM, SUPPORT, FINANCE_PLATFORM] }
+                tenant_ids: { type: array, items: { type: string } }
+      responses:
+        '201': { description: Staf dan penugasan dibuat; periksa invitation_status }
+        '403': { description: Bukan Superadmin atau reauth belum ada }
+        '503': { description: SMTP belum dikonfigurasi }
   /api/v1/platform/staff/roles:
     get:
       tags: [Platform]
@@ -818,6 +1347,35 @@ paths:
         '403': { description: Origin, permission, atau entitlement ditolak }
 components:
   parameters:
+    UserID:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, minLength: 26, maxLength: 26 }
+    RoleID:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, minLength: 26, maxLength: 26 }
+    AssignmentID:
+      in: path
+      name: assignmentId
+      required: true
+      schema: { type: string, minLength: 26, maxLength: 26 }
+    SessionID:
+      in: path
+      name: sessionId
+      required: true
+      schema: { type: string, minLength: 26, maxLength: 26 }
+    PermissionCode:
+      in: path
+      name: code
+      required: true
+      schema: { type: string }
+    PerPage:
+      in: query
+      name: per_page
+      schema: { type: integer, minimum: 1, maximum: 100, default: 15 }
     CSRFToken:
       in: header
       name: X-CSRF-Token
@@ -949,6 +1507,7 @@ components:
             email: { type: string, format: email }
             name: { type: string }
         platform: { type: boolean }
+        mfaRequired: { type: boolean, description: Sesi platform harus menyelesaikan TOTP sebelum mengakses API lain }
         selectedTenantId: { type: string }
         tenants:
           type: array

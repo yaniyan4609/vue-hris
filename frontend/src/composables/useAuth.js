@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { effectiveAccess } from './useCapabilities'
-import { clearCsrfToken } from './csrf'
+import { clearCsrfToken, getCsrfToken } from './csrf'
 
 const state = ref(null)
 const isAuthenticated = computed(() => Boolean(state.value?.user))
@@ -15,14 +15,19 @@ const currentUser = computed(() => ({
 }))
 
 async function request(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase()
+  const headers = { 'Content-Type': 'application/json', ...options.headers }
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !['/login', '/demo-login', '/password/forgot', '/password/reset'].includes(path)) {
+    headers['X-CSRF-Token'] = await getCsrfToken()
+  }
   const response = await fetch(`/api/v1/auth${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers,
   })
   if (response.status === 204) return null
   const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(payload.error || 'Permintaan gagal. Coba lagi.')
+  if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : payload.error?.message || 'Permintaan gagal. Coba lagi.')
   return payload
 }
 
@@ -71,6 +76,20 @@ export function useAuth() {
     return state.value
   }
 
+  const mfaStatus = async () => (await request('/mfa/status')).data
+  const mfaSetup = async () => (await request('/mfa/setup', { method: 'POST', body: '{}' })).data
+  const mfaConfirm = async (code) => {
+    const result = (await request('/mfa/confirm', { method: 'POST', body: JSON.stringify({ code }) })).data
+    state.value = result.state
+    return result.recovery_codes
+  }
+  const mfaVerify = async (code) => {
+    state.value = (await request('/mfa/verify', { method: 'POST', body: JSON.stringify({ code }) })).data
+    return state.value
+  }
+  const forgotPassword = async (email) => (await request('/password/forgot', { method: 'POST', body: JSON.stringify({ email }) })).data
+  const resetPassword = async (token, newPassword) => request('/password/reset', { method: 'POST', body: JSON.stringify({ token, new_password: newPassword }) })
+
   const selectTenant = async (tenantId) => {
     state.value = await request('/select-tenant', {
       method: 'POST',
@@ -99,6 +118,12 @@ export function useAuth() {
     loadDemoAccounts,
     login,
     demoLogin,
+    mfaStatus,
+    mfaSetup,
+    mfaConfirm,
+    mfaVerify,
+    forgotPassword,
+    resetPassword,
     selectTenant,
     logout,
     finishLogout,

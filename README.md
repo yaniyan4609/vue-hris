@@ -12,7 +12,7 @@ Repositori produk berdasarkan empat dokumen di `full-docs/`: PRD v2.3, Matriks M
 
 ## Menjalankan lokal
 
-Di Windows, klik dua kali `run-hris.bat` untuk menjalankan frontend, backend, WebSocket, dan Swagger UI pada IP LAN serta pasangan port yang kosong. Kata sandi MariaDB diminta hanya pada jalankan pertama dan disimpan terenkripsi untuk akun Windows ini. Alamat, cara menghentikan proses, dan log dijelaskan di `docs/LOCAL_LAUNCHER.md`.
+Di Windows, klik dua kali `run-hris.bat` untuk menjalankan frontend, backend, WebSocket, dan Swagger UI pada IP LAN serta pasangan port yang kosong. Kata sandi MariaDB diminta hanya pada jalankan pertama dan disimpan terenkripsi untuk akun Windows ini. Launcher juga membuat kunci TOTP platform acak dan menyimpannya terenkripsi untuk akun Windows yang sama. Alamat, cara menghentikan proses, dan log dijelaskan di `docs/LOCAL_LAUNCHER.md`.
 
 ```powershell
 cd frontend
@@ -31,6 +31,7 @@ $env:APP_ENV = 'staging'
 $env:ENABLE_DEMO_LOGIN = 'true'
 $env:COOKIE_SECURE = 'false' # hanya untuk HTTP localhost
 $env:APP_ORIGIN = 'http://localhost:5173'
+$env:PLATFORM_MFA_KEY = '<kunci-acak-32-byte-dalam-base64>' # wajib untuk login staf platform biasa
 go run ./cmd/api
 ```
 
@@ -53,4 +54,4 @@ go vet ./...
 
 Database staging bernama `staging-saas-hris` pada server MariaDB 10.11 milik Product Owner di `192.168.11.85`. Kredensial hanya diberikan melalui konfigurasi lokal yang tidak di-commit.
 
-Migrasi 00001–00024 sudah diterapkan ke staging. Migrasi 00011–00023 menambahkan skema domain secara aditif, termasuk assignment karyawan, approval, shift/roster, presensi, cuti, payroll, billing, dan penyimpanan ciphertext per tenant. Migrasi 00024 memberi akses inbox milik sendiri kepada role tenant, tetap tunduk pada Deny dan entitlement. Inbox REST `/api/v1/notifications`, token `/api/v1/auth/csrf`, dan WebSocket `/api/v1/realtime/ws` sudah aktif; WebSocket saat ini mengirim `notification.created` serta jumlah belum dibaca, dengan pemulihan melalui REST `/notifications/sync`. Skema baru belum berarti seluruh API/worker/UI domain aktif; status rinci dan keputusan tersisa ada di `docs/DATABASE_SCHEMA_MIGRATION_DRAFT.md`, `docs/IMPLEMENTATION_PLAN.md`, dan `docs/BACKEND_API_IMPLEMENTATION_PLAN.md`. Admin dapat membuka `/admin/settings/users` untuk mengelola akses; Admin dan ESS dapat membuka inbox notifikasi nyata. Struktur inti dijelaskan di `docs/SCHEMA_CORE.md`. Jangan menyimpan `DB_PASSWORD` atau master key di file proyek atau commit.
+Migrasi 00001–00029 sudah diterapkan ke staging. Migrasi 00025–00029 menambahkan bukti verifikasi ulang, preferensi akun, TOTP platform, evaluasi MFA saat role berubah, token reset kata sandi, serta versi role tenant. Login staf platform biasa memerlukan TOTP; tombol demo staging tetap melewati TOTP. Alur reset melalui email memerlukan `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_TLS_MODE` (`starttls` atau `implicit`), serta `SMTP_USERNAME`/`SMTP_PASSWORD` bila server memerlukan autentikasi. Konfigurasi SMTP belum diberikan, sehingga tombol reset dan pembuatan akun baru akan menampilkan bahwa pengiriman belum tersedia sebelum menulis data. Jika server email gagal setelah akun dibuat, API mengembalikan invitation_status=failed; admin dapat mengirim ulang tautan dari endpoint reset. Inbox REST `/api/v1/notifications`, token `/api/v1/auth/csrf`, dan WebSocket `/api/v1/realtime/ws` sudah aktif. Sebagian besar API domain lain masih direncanakan dalam `docs/BACKEND_API_IMPLEMENTATION_PLAN.md`. Jangan menyimpan `DB_PASSWORD`, `PLATFORM_MFA_KEY`, atau kredensial SMTP di file proyek atau commit.

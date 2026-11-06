@@ -41,6 +41,20 @@ func TestViteWebSocketProxy(t *testing.T) {
 	defer func() {
 		request, _ := http.NewRequest(http.MethodPost, base+"/api/v1/auth/logout", bytes.NewBufferString(`{}`))
 		request.Header.Set("Content-Type", "application/json")
+		csrfResponse, err := client.Get(base + "/api/v1/auth/csrf")
+		if err == nil && csrfResponse.StatusCode == http.StatusOK {
+			var token struct {
+				Data struct {
+					CSRFToken string `json:"csrf_token"`
+				} `json:"data"`
+			}
+			if json.NewDecoder(csrfResponse.Body).Decode(&token) == nil {
+				request.Header.Set("X-CSRF-Token", token.Data.CSRFToken)
+			}
+		}
+		if csrfResponse != nil {
+			csrfResponse.Body.Close()
+		}
 		response, err := client.Do(request)
 		if err == nil {
 			response.Body.Close()

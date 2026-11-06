@@ -254,6 +254,27 @@ func doJSON(t *testing.T, client *http.Client, method, url string, input any, wa
 	if input != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch || method == http.MethodDelete {
+		if req.URL.Path != "/api/v1/auth/login" && req.URL.Path != "/api/v1/auth/demo-login" {
+			csrfURL := req.URL.Scheme + "://" + req.URL.Host + "/api/v1/auth/csrf"
+			csrfResponse, err := client.Get(csrfURL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if csrfResponse.StatusCode == http.StatusOK {
+				var token struct {
+					Data struct {
+						CSRFToken string `json:"csrf_token"`
+					} `json:"data"`
+				}
+				if err := json.NewDecoder(csrfResponse.Body).Decode(&token); err != nil {
+					t.Fatal(err)
+				}
+				req.Header.Set("X-CSRF-Token", token.Data.CSRFToken)
+			}
+			csrfResponse.Body.Close()
+		}
+	}
 	response, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)

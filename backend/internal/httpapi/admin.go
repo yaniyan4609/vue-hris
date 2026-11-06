@@ -31,6 +31,8 @@ type adminContext struct {
 func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 	a := adminAPI{db: db, auth: auth.Service{DB: db}, access: access.Store{DB: db}}
 	r.Route("/api/v1/admin", func(r chi.Router) {
+		a.mountOrganizationContract(r, config)
+		a.mountAccessContract(r, config)
 		r.Get("/capabilities", a.capabilities)
 		r.Get("/organization/{kind}", a.listOrganization)
 		r.With(checkOrigin(config)).Post("/organization/{kind}", a.createOrganization)

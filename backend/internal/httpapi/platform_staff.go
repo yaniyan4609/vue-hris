@@ -209,7 +209,14 @@ func beginPlatformChange(w http.ResponseWriter, r *http.Request, db *sql.DB, act
 		writeJSON(w, 404, map[string]string{"error": "Pengguna aktif tidak ditemukan"})
 		return nil, false
 	}
-	if err := reauthenticate(r.Context(), tx, actor.state.User.ID, password); err != nil {
+	if password == "" {
+		valid, err := (auth.Service{DB: db}).RecentlyReauthenticated(r.Context(), cookieToken(r))
+		if err != nil || !valid {
+			tx.Rollback()
+			writeAPIError(w, r, 403, "REAUTH_REQUIRED", "Verifikasi ulang kata sandi sebelum mengubah hak akses platform.")
+			return nil, false
+		}
+	} else if err := reauthenticate(r.Context(), tx, actor.state.User.ID, password); err != nil {
 		tx.Rollback()
 		writeJSON(w, 403, map[string]string{"error": "Kata sandi Superadmin tidak benar"})
 		return nil, false

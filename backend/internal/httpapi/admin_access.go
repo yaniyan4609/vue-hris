@@ -80,8 +80,13 @@ func (a adminAPI) listAccessUsers(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	where := "tm.tenant_id=? AND tm.status='active'"
+	where := "tm.tenant_id=?"
 	args := []any{c.tenant.ID}
+	location, err := time.LoadLocation(c.tenant.Timezone)
+	if err != nil {
+		location = time.UTC
+	}
+	roleDate := time.Now().In(location).Format("2006-01-02")
 	if q != "" {
 		where += " AND (LOCATE(LOWER(?),LOWER(u.display_name))>0 OR LOCATE(LOWER(?),LOWER(u.email))>0)"
 		args = append(args, q, q)
@@ -91,20 +96,34 @@ func (a adminAPI) listAccessUsers(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 400, map[string]string{"error": "Filter status tidak valid"})
 			return
 		}
-		where += " AND u.status=?"
-		args = append(args, status)
+		if status == "active" {
+			where += " AND tm.status='active' AND u.status='active'"
+		} else {
+			where += " AND (tm.status='inactive' OR u.status='disabled')"
+		}
 	}
-	location, err := time.LoadLocation(c.tenant.Timezone)
-	if err != nil {
-		location = time.UTC
+	if roleID := r.URL.Query().Get("role_id"); roleID != "" {
+		if len(roleID) != 26 {
+			writeJSON(w, 400, map[string]string{"error": "Role tidak valid"})
+			return
+		}
+		where += ` AND EXISTS (SELECT 1 FROM user_roles ur WHERE ur.tenant_id=tm.tenant_id AND ur.user_id=tm.user_id AND ur.role_id=? AND ur.revoked_at IS NULL AND ur.valid_from<=? AND (ur.valid_until IS NULL OR ur.valid_until>=?))`
+		args = append(args, roleID, roleDate, roleDate)
 	}
-	roleDate := time.Now().In(location).Format("2006-01-02")
+	if officeID := r.URL.Query().Get("office_id"); officeID != "" {
+		if len(officeID) != 26 {
+			writeJSON(w, 400, map[string]string{"error": "Kantor tidak valid"})
+			return
+		}
+		where += ` AND EXISTS (SELECT 1 FROM employees e WHERE e.tenant_id=tm.tenant_id AND e.user_id=tm.user_id AND e.base_office_id=?)`
+		args = append(args, officeID)
+	}
 	var total int
 	if err := a.db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM tenant_memberships tm JOIN users u ON u.id=tm.user_id WHERE `+where, args...).Scan(&total); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "Gagal membaca pengguna"})
 		return
 	}
-	query := `SELECT u.id,u.display_name,u.email,u.status,tm.access_version,
+	query := `SELECT u.id,u.display_name,u.email,CASE WHEN tm.status='active' AND u.status='active' THEN 'active' ELSE 'disabled' END,tm.access_version,
 		(SELECT COUNT(*) FROM user_roles ur WHERE ur.tenant_id=tm.tenant_id AND ur.user_id=tm.user_id AND ur.revoked_at IS NULL AND ur.valid_from<=? AND (ur.valid_until IS NULL OR ur.valid_until>=?))
 		FROM tenant_memberships tm JOIN users u ON u.id=tm.user_id WHERE ` + where + ` ORDER BY u.display_name,u.id LIMIT ? OFFSET ?`
 	listArgs := append([]any{roleDate, roleDate}, args...)
@@ -170,7 +189,7 @@ func (a adminAPI) getAccessUser(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := chi.URLParam(r, "id")
 	var detail accessUserDetail
-	err := a.db.QueryRowContext(r.Context(), `SELECT u.id,u.display_name,u.email,u.status,tm.access_version FROM tenant_memberships tm JOIN users u ON u.id=tm.user_id WHERE tm.tenant_id=? AND tm.user_id=? AND tm.status='active'`, c.tenant.ID, userID).Scan(&detail.User.ID, &detail.User.Name, &detail.User.Email, &detail.User.Status, &detail.User.AccessVersion)
+	err := a.db.QueryRowContext(r.Context(), `SELECT u.id,u.display_name,u.email,CASE WHEN tm.status='active' AND u.status='active' THEN 'active' ELSE 'disabled' END,tm.access_version FROM tenant_memberships tm JOIN users u ON u.id=tm.user_id WHERE tm.tenant_id=? AND tm.user_id=?`, c.tenant.ID, userID).Scan(&detail.User.ID, &detail.User.Name, &detail.User.Email, &detail.User.Status, &detail.User.AccessVersion)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeJSON(w, 404, map[string]string{"error": "Pengguna tidak ditemukan"})
 		return
@@ -339,7 +358,14 @@ func (a adminAPI) beginAccessChange(w http.ResponseWriter, r *http.Request, c ad
 			return nil, false
 		}
 	}
-	if err := reauthenticate(r.Context(), tx, c.state.User.ID, password); err != nil {
+	if password == "" {
+		valid, err := a.auth.RecentlyReauthenticated(r.Context(), cookieToken(r))
+		if err != nil || !valid {
+			tx.Rollback()
+			writeAPIError(w, r, 403, "REAUTH_REQUIRED", "Verifikasi ulang kata sandi sebelum mengubah hak akses.")
+			return nil, false
+		}
+	} else if err := reauthenticate(r.Context(), tx, c.state.User.ID, password); err != nil {
 		tx.Rollback()
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			writeJSON(w, 403, map[string]string{"error": "Kata sandi Admin tidak benar"})

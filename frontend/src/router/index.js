@@ -30,6 +30,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'Masuk', component: PanelHomeView },
+    { path: '/reset-password', name: 'ResetPassword', component: PanelHomeView },
     { path: '/platform', name: 'Platform', component: PanelHomeView },
     { path: '/platform/tenants', name: 'PlatformTenants', component: PlatformTenantsView, meta: { fixedHeight: true } },
     { path: '/platform/staff', name: 'PlatformStaff', component: PlatformStaffView, meta: { fixedHeight: true } },

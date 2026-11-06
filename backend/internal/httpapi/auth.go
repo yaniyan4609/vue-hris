@@ -13,20 +13,44 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const sessionCookieName = "digaji_session"
+const (
+	sessionCookieName       = "dgj_session"
+	legacySessionCookieName = "digaji_session"
+)
 
 func mountAuth(r chi.Router, db *sql.DB, config Options) {
 	service := auth.Service{DB: db}
 	r.Route("/api/v1/auth", func(r chi.Router) {
 		r.Get("/csrf", func(w http.ResponseWriter, req *http.Request) {
-			if _, err := service.Current(req.Context(), cookieToken(req)); err != nil {
+			if _, err := service.Pending(req.Context(), cookieToken(req)); err != nil {
 				writeAPIError(w, req, http.StatusUnauthorized, "AUTH_SESSION_INVALID", "Sesi tidak sah atau berakhir.")
 				return
 			}
 			writeAPIData(w, http.StatusOK, map[string]string{"csrf_token": csrfToken(cookieToken(req))}, nil)
 		})
+		r.With(checkOrigin(config)).Post("/reauth", func(w http.ResponseWriter, req *http.Request) {
+			var body struct {
+				Password string `json:"password"`
+			}
+			if !readJSON(w, req, &body) {
+				return
+			}
+			until, err := service.Reauthenticate(req.Context(), cookieToken(req), body.Password)
+			if err != nil {
+				switch {
+				case errors.Is(err, auth.ErrInvalidCredentials):
+					writeAPIError(w, req, 403, "REAUTH_FAILED", "Kata sandi tidak benar.")
+				case errors.Is(err, auth.ErrUnauthenticated):
+					writeAPIError(w, req, 401, "AUTH_SESSION_INVALID", "Sesi tidak sah atau berakhir.")
+				default:
+					writeAPIError(w, req, 500, "INTERNAL_ERROR", "Gagal memverifikasi ulang akun.")
+				}
+				return
+			}
+			writeAPIData(w, 200, map[string]any{"valid_until": until}, nil)
+		})
 		r.Get("/me", func(w http.ResponseWriter, req *http.Request) {
-			state, err := service.Current(req.Context(), cookieToken(req))
+			state, err := service.Pending(req.Context(), cookieToken(req))
 			if err != nil {
 				writeAuthError(w, err)
 				return
@@ -86,11 +110,19 @@ func mountAuth(r chi.Router, db *sql.DB, config Options) {
 			writeJSON(w, 200, items)
 		})
 		r.With(checkOrigin(config)).Post("/logout-all", func(w http.ResponseWriter, req *http.Request) {
-			if err := service.LogoutAll(req.Context(), cookieToken(req)); err != nil {
+			var body struct {
+				ExceptCurrent bool `json:"except_current"`
+			}
+			if !readJSON(w, req, &body) {
+				return
+			}
+			if err := service.LogoutAllExceptCurrent(req.Context(), cookieToken(req), body.ExceptCurrent); err != nil {
 				writeAuthError(w, err)
 				return
 			}
-			clearSessionCookie(w, config.CookieSecure)
+			if !body.ExceptCurrent {
+				clearSessionCookie(w, config.CookieSecure)
+			}
 			w.WriteHeader(http.StatusNoContent)
 		})
 		r.With(checkOrigin(config)).Post("/change-password", func(w http.ResponseWriter, req *http.Request) {
@@ -138,7 +170,10 @@ func mountAuth(r chi.Router, db *sql.DB, config Options) {
 				writeJSON(w, http.StatusOK, state)
 			})
 		}
+		mountMFA(r, service, config)
+		mountPasswordReset(r, service, config)
 	})
+	mountAuthContract(r, db, config)
 }
 
 func sessionDevice(req *http.Request) auth.SessionDevice {
@@ -150,23 +185,29 @@ func sessionDevice(req *http.Request) auth.SessionDevice {
 }
 
 func clearSessionCookie(w http.ResponseWriter, secure bool) {
-	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode})
+	for _, name := range []string{sessionCookieName, legacySessionCookieName} {
+		http.SetCookie(w, &http.Cookie{Name: name, Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
+	}
 }
 
 func cookieToken(req *http.Request) string {
 	cookie, err := req.Cookie(sessionCookieName)
 	if err != nil {
-		return ""
+		cookie, err = req.Cookie(legacySessionCookieName)
+		if err != nil {
+			return ""
+		}
 	}
 	return cookie.Value
 }
 
 func setSessionCookie(w http.ResponseWriter, token string, remember, secure bool) {
-	cookie := &http.Cookie{Name: sessionCookieName, Value: token, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode}
+	cookie := &http.Cookie{Name: sessionCookieName, Value: token, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode}
 	if remember {
 		cookie.MaxAge = 400 * 24 * 60 * 60
 	}
 	http.SetCookie(w, cookie)
+	http.SetCookie(w, &http.Cookie{Name: legacySessionCookieName, Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
 }
 
 func readJSON(w http.ResponseWriter, req *http.Request, dst any) bool {
@@ -195,6 +236,10 @@ func writeAuthError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Sesi tidak sah atau berakhir"})
 	case errors.Is(err, auth.ErrTenantUnavailable):
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": "Perusahaan tidak tersedia"})
+	case errors.Is(err, auth.ErrMFARequired):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "Verifikasi dua langkah diperlukan", "code": "MFA_REQUIRED"})
+	case errors.Is(err, auth.ErrMFAUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Kunci MFA platform belum dikonfigurasi", "code": "MFA_UNAVAILABLE"})
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Terjadi kesalahan server"})
 	}
