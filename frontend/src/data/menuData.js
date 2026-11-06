@@ -1,7 +1,7 @@
 import { Activity, BarChart3, Bell, BookOpen, BriefcaseBusiness, Building2, CalendarDays, ClipboardCheck, Clock3, CreditCard, FileBarChart, FileText, GraduationCap, HandCoins, HeartHandshake, Home, Layers, MapPinned, Megaphone, Receipt, Settings, UserRound, Users, Wallet } from 'lucide-vue-next'
 
 // Katalog tunggal untuk sidebar, rute, izin, dan status kesiapan modul.
-const activePages = new Set(['dashboard-saas', 'tenants', 'staff', 'dashboard', 'employees', 'regions', 'offices', 'divisions', 'departments', 'positions', 'users-access'])
+const activePages = new Set(['dashboard-saas', 'tenants', 'staff', 'dashboard', 'employees', 'regions', 'offices', 'divisions', 'departments', 'positions', 'users-access', 'notifications'])
 const page = (id, label, route, permission, entitlement = '', kind = 'data') => ({ id, label, route, permission, menuPermission: route.startsWith('/admin') ? `menu.${id}.lihat` : '', entitlement, kind, status: activePages.has(id) ? 'active' : 'preview' })
 const templatePage = (id, label, route, kind = 'settings') => ({ ...page(id, label, route, 'platform.dashboard.lihat', '', kind), status: 'active', superadminOnly: true })
 const group = (id, label, icon, submenus) => ({ id, label, icon, route: submenus[0].route, submenus: submenus.map((item) => ({ ...item, icon })) })

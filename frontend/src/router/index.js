@@ -7,6 +7,7 @@ import EmployeesView from '../views/EmployeesView.vue'
 import AccessUsersView from '../views/AccessUsersView.vue'
 import EssHomeView from '../views/EssHomeView.vue'
 import EssFeatureView from '../views/EssFeatureView.vue'
+import NotificationsView from '../views/NotificationsView.vue'
 import EssMoreView from '../views/EssMoreView.vue'
 import ModulePreviewView from '../views/ModulePreviewView.vue'
 import PlatformStaffView from '../views/PlatformStaffView.vue'
@@ -39,11 +40,11 @@ const router = createRouter({
     { path: '/ess', name: 'KaryawanESS', component: EssHomeView },
     { path: '/ess/absensi', name: 'EssAbsensi', component: EssFeatureView },
     { path: '/ess/pengajuan', name: 'EssPengajuan', component: EssFeatureView },
-    { path: '/ess/notifikasi', name: 'EssNotifikasi', component: EssFeatureView },
+    { path: '/ess/notifikasi', name: 'EssNotifikasi', component: NotificationsView },
     { path: '/ess/lainnya', name: 'EssLainnya', component: EssMoreView },
     { path: '/ess/fitur/:feature', name: 'EssFeature', component: EssFeatureView },
     { path: '/pilih-perusahaan', name: 'PilihPerusahaan', component: TenantSelectView },
-    ...allPages.filter((item) => !['/admin', '/platform', '/platform/tenants', '/platform/staff', '/admin/employees', '/admin/settings/users'].includes(item.route) && !item.route.startsWith('/admin/organization/')).map((item) => ({ path: item.route, name: `Module_${item.id}`, component: templateViews[item.id] || ModulePreviewView, meta: { fixedHeight: item.kind === 'data', permission: item.permission, entitlement: item.entitlement, superadminOnly: item.superadminOnly } })),
+    ...allPages.filter((item) => !['/admin', '/platform', '/platform/tenants', '/platform/staff', '/admin/employees', '/admin/settings/users'].includes(item.route) && !item.route.startsWith('/admin/organization/')).map((item) => ({ path: item.route, name: `Module_${item.id}`, component: item.route === '/admin/communication/notifications' ? NotificationsView : templateViews[item.id] || ModulePreviewView, meta: { fixedHeight: item.kind === 'data', permission: item.permission, entitlement: item.entitlement, superadminOnly: item.superadminOnly } })),
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

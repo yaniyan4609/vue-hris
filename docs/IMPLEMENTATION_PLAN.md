@@ -1,5 +1,7 @@
 # Rencana implementasi digaji.id — revisi setelah PRD lengkap
 
+**Pembaruan 6 November 2026:** rencana backend REST + WebSocket yang mencocokkan spesifikasi API baru dengan route, permission, dan migrasi yang sudah ada tercatat di `BACKEND_API_IMPLEMENTATION_PLAN.md`. Untuk pekerjaan backend berikutnya, gunakan urutan dan kontrak pada dokumen itu. Migrasi `00001`–`00023` tetap berlaku; aturan PPh 21/BPJS mengikuti keputusan Product Owner, yaitu per tenant. Dokumen spesifikasi API masih draft dan selisih kontraknya dicatat di rencana backend sebelum OpenAPI final.
+
 ## Implementasi menu Superadmin dan Admin — 5 November 2026
 
 Pekerjaan ini melanjutkan fondasi yang sudah ada. Migrasi aditif `00007`–`00010` telah diterapkan pada MariaDB staging `staging-saas-hris`. Registry izin, preset role tenant, izin baca per submenu, entitlement paket, empat role platform, override staf, penugasan tenant staf, dan audit perubahan akses tersedia. Preset sensitif yang semula terlalu luas telah dibatasi; akses lihat HR Staff pada kebijakan cuti/notifikasi/pengaturan tidak memberi hak kelola. Tenant demo memiliki seluruh entitlement aktif. Evaluasi `GET /api/v1/me/access` sekarang membatch keputusan akses dan menambahkan `platformPermissions`, `platformSuperadmin`, serta `entitlements` tanpa menghapus field lama.

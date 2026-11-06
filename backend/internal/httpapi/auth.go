@@ -18,6 +18,13 @@ const sessionCookieName = "digaji_session"
 func mountAuth(r chi.Router, db *sql.DB, config Options) {
 	service := auth.Service{DB: db}
 	r.Route("/api/v1/auth", func(r chi.Router) {
+		r.Get("/csrf", func(w http.ResponseWriter, req *http.Request) {
+			if _, err := service.Current(req.Context(), cookieToken(req)); err != nil {
+				writeAPIError(w, req, http.StatusUnauthorized, "AUTH_SESSION_INVALID", "Sesi tidak sah atau berakhir.")
+				return
+			}
+			writeAPIData(w, http.StatusOK, map[string]string{"csrf_token": csrfToken(cookieToken(req))}, nil)
+		})
 		r.Get("/me", func(w http.ResponseWriter, req *http.Request) {
 			state, err := service.Current(req.Context(), cookieToken(req))
 			if err != nil {

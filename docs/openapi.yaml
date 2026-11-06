@@ -1,9 +1,22 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.3.0
-  description: Kontrak endpoint yang sudah tersedia. Tenant bisnis selalu berasal dari sesi, bukan dari body atau URL.
+  version: 0.4.0
+  description: Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi ke spesifikasi REST + WebSocket. Tenant bisnis selalu berasal dari sesi, bukan dari body atau URL.
 paths:
+  /healthz:
+    get:
+      summary: Liveness proses API
+      operationId: getHealthz
+      responses:
+        '200': { description: Proses berjalan }
+  /readyz:
+    get:
+      summary: Readiness koneksi database
+      operationId: getReadyz
+      responses:
+        '200': { description: Database siap }
+        '503': { description: Database belum siap }
   /api/v1/health:
     get:
       summary: Status proses API
@@ -54,6 +67,23 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AuthState' }
         '401': { description: Email atau kata sandi salah }
+  /api/v1/auth/csrf:
+    get:
+      summary: Ambil token CSRF untuk aksi bersesi
+      operationId: getCSRF
+      responses:
+        '200':
+          description: Token terikat pada sesi; berganti saat token sesi diputar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      csrf_token: { type: string }
+        '401': { description: Sesi tidak sah }
   /api/v1/auth/me:
     get:
       summary: State sesi saat ini
@@ -617,8 +647,106 @@ paths:
       operationId: updatePlatformTenants
       responses:
         '204': { description: Penugasan tenant diubah dan diaudit }
+  /api/v1/notifications:
+    get:
+      summary: Inbox notifikasi milik pengguna pada tenant aktif
+      operationId: listNotifications
+      parameters:
+        - { in: query, name: cursor, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+        - { in: query, name: category, schema: { type: string } }
+        - { in: query, name: unread, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Daftar diurutkan dari terbaru; cursor adalah ID item terakhir
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission atau entitlement tidak tersedia }
+  /api/v1/notifications/sync:
+    get:
+      summary: Pulihkan notifikasi setelah sambungan terputus
+      operationId: syncNotifications
+      parameters:
+        - { in: query, name: after_id, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+      responses:
+        '200':
+          description: Daftar diurutkan dari terlama setelah after_id
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+  /api/v1/notifications/unread-count:
+    get:
+      summary: Jumlah notifikasi aktif yang belum dibaca
+      operationId: getUnreadNotificationCount
+      responses:
+        '200': { description: data.count berisi jumlah belum dibaca }
+  /api/v1/notifications/{id}:
+    get:
+      summary: Detail notifikasi milik pengguna
+      operationId: getNotification
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Detail notifikasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Notification' }
+        '404': { description: Notifikasi tidak ada atau bukan milik pengguna }
+  /api/v1/notifications/{id}/read:
+    post:
+      summary: Tandai notifikasi terbaca
+      operationId: readNotification
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '204': { description: Notifikasi terbaca }
+        '403': { description: CSRF atau akses tidak sah }
+        '404': { description: Notifikasi tidak ada atau bukan milik pengguna }
+  /api/v1/notifications/{id}/archive:
+    post:
+      summary: Arsipkan notifikasi
+      operationId: archiveNotification
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '204': { description: Notifikasi diarsipkan }
+  /api/v1/notifications/read-all:
+    post:
+      summary: Tandai semua notifikasi terbaca
+      operationId: readAllNotifications
+      parameters:
+        - { in: query, name: category, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '204': { description: Semua notifikasi dalam filter ditandai terbaca }
+  /api/v1/realtime/ws:
+    get:
+      summary: Sambungan WebSocket notifikasi tenant aktif
+      operationId: realtimeWebSocket
+      description: Cookie sesi dan Origin wajib. Klien memakai hello/resume, ping, dan ack. Setelah reconnect, pulihkan event melalui /notifications/sync. Implementasi saat ini mengirim notification.created dan notification.unread_count.
+      x-websocket-close-codes:
+        '4401': Sesi tidak sah atau dicabut
+        '4408': Hak akses berubah
+      responses:
+        '101': { description: Koneksi WebSocket diterima }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Origin, permission, atau entitlement ditolak }
 components:
   parameters:
+    CSRFToken:
+      in: header
+      name: X-CSRF-Token
+      required: true
+      schema: { type: string }
     Page:
       in: query
       name: page
@@ -632,6 +760,30 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    Notification:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string }
+        event_type: { type: string }
+        title: { type: string }
+        body: { type: string }
+        deep_link: { type: string, nullable: true }
+        priority: { type: string }
+        created_at: { type: string, format: date-time }
+        read_at: { type: string, format: date-time, nullable: true }
+        archived: { type: boolean }
+        obsolete: { type: boolean }
+    NotificationPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        meta:
+          type: object
+          properties:
+            next_cursor: { type: string, nullable: true }
     AccessDecision:
       type: object
       required: [allowed, reason]

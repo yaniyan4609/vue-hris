@@ -1,11 +1,12 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Building2, ChevronDown, LogOut, Mail, Menu, Moon, Sun, X } from 'lucide-vue-next'
+import { Bell, Building2, ChevronDown, LogOut, Mail, Menu, Moon, Sun, X } from 'lucide-vue-next'
 import { useAuth, defaultPanelRoute } from '../../composables/useAuth'
 import { useBackground } from '../../composables/useBackground'
 import { useTheme } from '../../composables/useTheme'
 import { useToast } from '../../composables/useToast'
+import { startNotifications, stopNotifications, unreadNotifications } from '../../composables/useNotifications'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BasePasswordInput from '../ui/BasePasswordInput.vue'
@@ -68,6 +69,11 @@ watch([state, () => route.path], () => {
   }
 })
 
+watch(() => [state.value?.user?.id, state.value?.selectedTenantId], ([userId, tenantId]) => {
+  if (userId && tenantId) startNotifications(`${userId}:${tenantId}`)
+  else stopNotifications()
+}, { immediate: true })
+
 function refreshSessionOnFocus() {
   if (!ready.value || !isAuthenticated.value || document.visibilityState !== 'visible') return
   if (sessionRefreshPromise || Date.now() - lastSessionRefresh < 3000) return
@@ -95,6 +101,7 @@ onMounted(async () => {
   await loadDemoAccounts()
 })
 onUnmounted(() => {
+  stopNotifications()
   window.removeEventListener('focus', refreshSessionOnFocus)
   document.removeEventListener('visibilitychange', refreshSessionOnFocus)
   for (const timer of timers) clearTimeout(timer)
@@ -140,6 +147,7 @@ async function submitLogout() {
   busy.value = true
   try {
     await logout()
+    stopNotifications()
     mobileDrawerOpen.value = false
     stage.value = 'collapsing'
     dashboardMounted.value = false
@@ -178,6 +186,7 @@ provide('requestLogout', submitLogout)
         <span v-if="stage === 'authenticated'" class="hidden sm:block text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-40">{{ state?.user?.name }}</span>
         <BaseButton v-if="stage === 'authenticated' && state?.tenants?.length > 1 && !state?.platform" variant="outline" size="sm" title="Pilih perusahaan" aria-label="Pilih perusahaan" @click="router.push('/pilih-perusahaan')"><Building2 class="w-4 h-4" /><ChevronDown class="w-3 h-3" /></BaseButton>
         <BaseButton v-if="stage === 'authenticated' && selectedTenant?.admin && selectedTenant?.ess" variant="outline" size="sm" :title="isEssPanel ? 'Buka Admin Panel' : 'Buka ESS'" @click="router.push(isEssPanel ? '/admin' : '/ess')">{{ isEssPanel ? 'Admin' : 'ESS' }}</BaseButton>
+        <BaseButton v-if="stage === 'authenticated' && selectedTenant && !isEssPanel" variant="outline" size="sm" class="relative !p-2" title="Notifikasi" aria-label="Notifikasi" @click="router.push('/admin/communication/notifications')"><Bell class="w-4 h-4" /><span v-if="unreadNotifications" class="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-full bg-[var(--theme-primary)] text-[var(--theme-primary-text)] text-[9px] font-bold flex items-center justify-center">{{ Math.min(unreadNotifications, 99) }}</span></BaseButton>
         <BaseButton variant="outline" size="sm" class="!p-2" :title="isDark ? 'Mode terang' : 'Mode gelap'" :aria-label="isDark ? 'Mode terang' : 'Mode gelap'" @click="toggleTheme($event)"><Sun v-if="isDark" class="w-4 h-4" /><Moon v-else class="w-4 h-4" /></BaseButton>
         <BaseButton v-if="stage === 'authenticated'" variant="outline" size="sm" :disabled="busy" title="Keluar sesi" aria-label="Keluar sesi" @click="submitLogout"><LogOut class="w-4 h-4" /><span class="hidden sm:inline">Keluar</span></BaseButton>
       </div>

@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { effectiveAccess } from './useCapabilities'
+import { clearCsrfToken } from './csrf'
 
 const state = ref(null)
 const isAuthenticated = computed(() => Boolean(state.value?.user))
@@ -57,6 +58,7 @@ export function useAuth() {
       method: 'POST',
       body: JSON.stringify({ email, password, remember }),
     })
+    clearCsrfToken()
     return state.value
   }
 
@@ -65,6 +67,7 @@ export function useAuth() {
       method: 'POST',
       body: JSON.stringify({ account }),
     })
+    clearCsrfToken()
     return state.value
   }
 
@@ -73,11 +76,13 @@ export function useAuth() {
       method: 'POST',
       body: JSON.stringify({ tenantId }),
     })
+    clearCsrfToken()
     return state.value
   }
 
   const logout = async () => {
     await request('/logout', { method: 'POST', body: '{}' })
+    clearCsrfToken()
   }
 
   const finishLogout = () => {

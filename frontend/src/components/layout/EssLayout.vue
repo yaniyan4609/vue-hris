@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Bell, Building2, Fingerprint, UserRound } from 'lucide-vue-next'
 import { useAuth } from '../../composables/useAuth'
 import { essMenus } from '../../data/menuData'
+import { unreadNotifications } from '../../composables/useNotifications'
 import BaseButton from '../ui/BaseButton.vue'
 
 defineEmits(['logout'])
@@ -23,7 +24,7 @@ function active(item) { return item.route === '/ess' ? route.path === '/ess' : r
         <div><p class="text-xs opacity-80">Selamat datang,</p><h1 class="text-lg font-bold leading-tight">{{ firstName }}</h1><p class="text-[11px] opacity-75 mt-1">{{ state?.tenants?.find((tenant) => tenant.id === state.selectedTenantId)?.name || 'Digaji.id' }}</p></div>
         <div class="flex gap-2">
           <BaseButton v-if="selectedTenant?.admin" variant="ghost" size="sm" class="!rounded-full !p-2 !text-[var(--theme-primary-text)] dark:!text-[var(--theme-text-primary)] !bg-white/15 dark:!bg-[var(--theme-surface-raised)]" title="Buka Admin Panel" aria-label="Buka Admin Panel" @click="router.push('/admin')"><Building2 class="w-4 h-4" /></BaseButton>
-          <BaseButton variant="ghost" size="sm" class="!rounded-full !p-2 !text-[var(--theme-primary-text)] dark:!text-[var(--theme-text-primary)] !bg-white/15 dark:!bg-[var(--theme-surface-raised)]" title="Notifikasi" aria-label="Notifikasi" @click="router.push('/ess/notifikasi')"><Bell class="w-4 h-4" /></BaseButton>
+          <BaseButton variant="ghost" size="sm" class="relative !rounded-full !p-2 !text-[var(--theme-primary-text)] dark:!text-[var(--theme-text-primary)] !bg-white/15 dark:!bg-[var(--theme-surface-raised)]" title="Notifikasi" aria-label="Notifikasi" @click="router.push('/ess/notifikasi')"><Bell class="w-4 h-4" /><span v-if="unreadNotifications" class="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-full bg-white text-[var(--theme-primary)] dark:bg-[var(--theme-primary)] dark:text-[var(--theme-primary-text)] text-[9px] font-bold flex items-center justify-center">{{ Math.min(unreadNotifications, 99) }}</span></BaseButton>
           <BaseButton variant="ghost" size="sm" class="!rounded-full !p-2 !text-[var(--theme-primary-text)] dark:!text-[var(--theme-text-primary)] !bg-white/15 dark:!bg-[var(--theme-surface-raised)]" title="Akun" aria-label="Akun" @click="router.push('/ess/lainnya')"><UserRound class="w-4 h-4" /></BaseButton>
         </div>
       </div>

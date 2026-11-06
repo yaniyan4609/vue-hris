@@ -133,6 +133,15 @@ func (s Service) createSession(ctx context.Context, user User, remember bool, de
 }
 
 func (s Service) Current(ctx context.Context, token string) (State, error) {
+	return s.current(ctx, token, true)
+}
+
+// Peek validates a long-lived connection without extending its idle timeout.
+func (s Service) Peek(ctx context.Context, token string) (State, error) {
+	return s.current(ctx, token, false)
+}
+
+func (s Service) current(ctx context.Context, token string, touch bool) (State, error) {
 	hash, ok := tokenHash(token)
 	if !ok {
 		return State{}, ErrUnauthenticated
@@ -168,7 +177,9 @@ func (s Service) Current(ctx context.Context, token string) (State, error) {
 			}
 		}
 	}
-	_, err = s.DB.ExecContext(ctx, `UPDATE sessions SET last_seen_at=UTC_TIMESTAMP(6) WHERE token_hash=? AND revoked_at IS NULL`, hash[:])
+	if touch {
+		_, err = s.DB.ExecContext(ctx, `UPDATE sessions SET last_seen_at=UTC_TIMESTAMP(6) WHERE token_hash=? AND revoked_at IS NULL`, hash[:])
+	}
 	return state, err
 }
 
