@@ -12,6 +12,8 @@ Repositori produk berdasarkan empat dokumen di `full-docs/`: PRD v2.3, Matriks M
 
 ## Menjalankan lokal
 
+Di Windows, klik dua kali `run-hris.bat` untuk menjalankan frontend, backend, WebSocket, dan Swagger UI pada IP LAN serta pasangan port yang kosong. Kata sandi MariaDB diminta hanya pada jalankan pertama dan disimpan terenkripsi untuk akun Windows ini. Alamat, cara menghentikan proses, dan log dijelaskan di `docs/LOCAL_LAUNCHER.md`.
+
 ```powershell
 cd frontend
 npm ci

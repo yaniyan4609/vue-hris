@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -16,7 +17,7 @@ import (
 	"github.com/coder/websocket/wsjson"
 )
 
-// Run with HRIS_PROXY_URL=http://127.0.0.1:<vite-port> against a local
+// Run with HRIS_PROXY_URL=http://<local-IP>:<vite-port> against a local
 // staging frontend and API. It verifies Vite forwards WebSocket upgrades.
 func TestViteWebSocketProxy(t *testing.T) {
 	base := os.Getenv("HRIS_PROXY_URL")
@@ -24,7 +25,7 @@ func TestViteWebSocketProxy(t *testing.T) {
 		t.Skip("local Vite proxy test is opt-in")
 	}
 	u, err := url.Parse(base)
-	if err != nil || u.Scheme != "http" || !strings.HasPrefix(u.Host, "127.0.0.1:") {
+	if err != nil || u.Scheme != "http" || u.Port() == "" || !isLocalProxyIP(u.Hostname()) {
 		t.Fatal("proxy URL must be a local HTTP address")
 	}
 	jar, _ := cookiejar.New(nil)
@@ -66,4 +67,24 @@ func TestViteWebSocketProxy(t *testing.T) {
 		raw, _ := json.Marshal(frame)
 		t.Fatalf("wrong first frame: %s", raw)
 	}
+}
+
+func isLocalProxyIP(host string) bool {
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() {
+		return true
+	}
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return false
+	}
+	for _, addr := range addrs {
+		if network, ok := addr.(*net.IPNet); ok && network.IP.Equal(ip) {
+			return true
+		}
+	}
+	return false
 }
