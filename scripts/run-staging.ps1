@@ -121,7 +121,7 @@ try {
     $env:ENABLE_DEMO_LOGIN = 'true'
     $env:COOKIE_SECURE = 'false'
     $env:APP_ORIGIN = "http://${lanIP}:${frontendPort}"
-    if (-not $env:SMTP_HOST) { $env:SMTP_HOST = 'mail.digaji.id' }
+    if (-not $env:SMTP_HOST) { $env:SMTP_HOST = 'digaji.id' }
     if (-not $env:SMTP_PORT) { $env:SMTP_PORT = '587' }
     if (-not $env:SMTP_FROM) { $env:SMTP_FROM = 'admin@digaji.id' }
     if (-not $env:SMTP_USERNAME) { $env:SMTP_USERNAME = 'admin@digaji.id' }
