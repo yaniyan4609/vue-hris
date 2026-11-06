@@ -1,0 +1,963 @@
+openapi: 3.0.3
+info:
+  title: digaji.id API
+  version: 0.5.0
+  description: >-
+    Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
+    ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
+    URL. Masuk pada origin yang sama sebelum mencoba endpoint bersesi. Swagger UI
+    menambahkan X-CSRF-Token otomatis pada mutasi setelah login. Demo login hanya
+    aktif di staging bila diaktifkan pada server. WebSocket didokumentasikan sebagai
+    handshake HTTP; pesan dan event dijelaskan pada operasi tersebut.
+servers:
+  - url: /
+    description: Origin yang sama dengan aplikasi dan sesi cookie
+tags:
+  - name: Health
+    description: Kesehatan dan kesiapan layanan
+  - name: Auth
+    description: Login, tenant, dan sesi
+  - name: Access
+    description: Permission, scope, dan hak efektif
+  - name: Organization
+    description: Master organisasi tenant
+  - name: Employees
+    description: Data karyawan dan profil ESS
+  - name: Platform
+    description: Operasi staf platform
+  - name: Notifications
+    description: Inbox notifikasi milik akun yang masuk
+  - name: Realtime
+    description: Handshake dan protokol WebSocket
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness proses API
+      operationId: getHealthz
+      responses:
+        '200': { description: Proses berjalan }
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness koneksi database
+      operationId: getReadyz
+      responses:
+        '200': { description: Database siap }
+        '503': { description: Database belum siap }
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: Status proses API
+      operationId: getHealth
+      responses:
+        '200':
+          description: Proses berjalan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /api/v1/ready:
+    get:
+      tags: [Health]
+      summary: Kesiapan koneksi database
+      operationId: getReady
+      responses:
+        '200':
+          description: Database dapat diakses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+        '503':
+          description: Database belum siap
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Masuk dengan email dan kata sandi
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+                remember: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Sesi dibuat dalam cookie HttpOnly; jika ada beberapa tenant, pilih melalui select-tenant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthState' }
+        '401': { description: Email atau kata sandi salah }
+  /api/v1/auth/csrf:
+    get:
+      tags: [Auth]
+      summary: Ambil token CSRF untuk aksi bersesi
+      operationId: getCSRF
+      responses:
+        '200':
+          description: Token terikat pada sesi; berganti saat token sesi diputar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      csrf_token: { type: string }
+        '401': { description: Sesi tidak sah }
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: State sesi saat ini
+      operationId: getCurrentSession
+      responses:
+        '200':
+          description: Sesi aktif
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthState' }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/auth/select-tenant:
+    post:
+      tags: [Auth]
+      summary: Pilih tenant yang diikuti pengguna dan putar token sesi
+      operationId: selectTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId]
+              properties:
+                tenantId: { type: string }
+      responses:
+        '200':
+          description: Tenant terpilih
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthState' }
+        '403': { description: Pengguna bukan anggota tenant tersebut }
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cabut sesi saat ini
+      operationId: logout
+      responses:
+        '204': { description: Sesi dicabut }
+  /api/v1/auth/sessions:
+    get:
+      tags: [Auth]
+      summary: Daftar perangkat dengan sesi akun yang masih aktif
+      operationId: listMySessions
+      responses:
+        '200':
+          description: Maksimal 100 sesi aktif terbaru; sesi ini ditandai current
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, deviceLabel, remember, current, createdAt, lastSeenAt]
+                  properties:
+                    id: { type: string }
+                    deviceLabel: { type: string }
+                    ip: { type: string }
+                    remember: { type: boolean }
+                    current: { type: boolean }
+                    createdAt: { type: string, format: date-time }
+                    lastSeenAt: { type: string, format: date-time }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Cabut semua sesi akun ini, termasuk perangkat saat ini
+      operationId: logoutAll
+      responses:
+        '204': { description: Semua sesi dicabut dan cookie dibersihkan }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Ganti kata sandi dan cabut sesi di perangkat lain
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password, minLength: 8 }
+      responses:
+        '204': { description: Kata sandi berubah; sesi saat ini tetap aktif }
+        '400': { description: Kata sandi lama salah, sama dengan yang baru, atau kata sandi baru terlalu pendek }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/auth/demo-accounts:
+    get:
+      tags: [Auth]
+      summary: Daftar akun demo (hanya staging)
+      operationId: getDemoAccounts
+      responses:
+        '200':
+          description: Akun demo tersedia
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    email: { type: string, format: email }
+                    label: { type: string }
+        '404': { description: Mode demo tidak aktif }
+  /api/v1/auth/demo-login:
+    post:
+      tags: [Auth]
+      summary: Masuk cepat ke akun demo (hanya staging)
+      operationId: demoLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account]
+              properties:
+                account: { type: string, enum: [super, admin, ess] }
+      responses:
+        '200':
+          description: Sesi demo dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthState' }
+        '404': { description: Mode demo tidak aktif }
+  /api/v1/admin/capabilities:
+    get:
+      tags: [Access]
+      summary: Izin Admin efektif untuk fitur yang sudah tersedia
+      operationId: getAdminCapabilities
+      responses:
+        '200':
+          description: Peta kode permission ke status izin efektif
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: boolean }
+        '403': { description: Panel Admin tidak tersedia }
+  /api/v1/me/access:
+    get:
+      tags: [Access]
+      summary: Hak akses efektif akun untuk tenant terpilih
+      operationId: getEffectiveAccess
+      responses:
+        '200':
+          description: Keputusan izin tenant dan platform dalam satu batch; perubahan akses berlaku pada request berikutnya
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [admin, ess, platform, permissions]
+                properties:
+                  tenantId: { type: string }
+                  admin: { type: boolean }
+                  ess: { type: boolean }
+                  platform: { type: boolean }
+                  platformSuperadmin: { type: boolean }
+                  platformPermissions:
+                    type: object
+                    additionalProperties: { $ref: '#/components/schemas/AccessDecision' }
+                  entitlements:
+                    type: object
+                    additionalProperties: { type: boolean }
+                  permissions:
+                    type: object
+                    additionalProperties: { $ref: '#/components/schemas/AccessDecision' }
+        '401': { description: Sesi tidak sah atau berakhir }
+  /api/v1/admin/access/users:
+    get:
+      tags: [Access]
+      summary: Daftar anggota aktif tenant terpilih
+      operationId: listAccessUsers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+      responses:
+        '200':
+          description: Halaman pengguna dengan jumlah role aktif dan versi akses
+          content:
+            application/json:
+              schema: { type: object, required: [items, total, page, pageSize] }
+        '403': { description: Izin pengguna.lihat tidak ada }
+  /api/v1/admin/access/roles:
+    get:
+      tags: [Access]
+      summary: Role tenant dan permission yang diberikan oleh tiap role
+      operationId: listAccessRoles
+      responses:
+        '200':
+          description: Role yang tersedia untuk dipilih
+          content:
+            application/json:
+              schema: { type: array, items: { type: object } }
+        '403': { description: Izin pengguna.lihat tidak ada }
+  /api/v1/admin/access/users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    get:
+      tags: [Access]
+      summary: Detail anggota, riwayat role, dan izin efektif per permission
+      operationId: getAccessUser
+      responses:
+        '200':
+          description: Detail izin dengan sumber, scope, dan override
+          content:
+            application/json:
+              schema: { type: object, required: [user, roles, permissions] }
+        '403': { description: Izin pengguna.lihat tidak ada }
+        '404': { description: Pengguna bukan anggota aktif tenant terpilih }
+  /api/v1/admin/access/users/{id}/roles:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    post:
+      tags: [Access]
+      summary: Berikan role dalam batas delegasi Admin
+      operationId: assignUserRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleId, currentPassword]
+              properties:
+                roleId: { type: string }
+                validFrom: { type: string, format: date }
+                validUntil: { type: string, format: date }
+                currentPassword: { type: string, format: password }
+      responses:
+        '201': { description: Role diberikan, diaudit, dan versi akses naik }
+        '403': { description: Diri sendiri, kata sandi salah, atau melebihi hak delegasi }
+        '404': { description: Pengguna/role bukan milik tenant terpilih }
+        '409': { description: Periode role bertabrakan }
+  /api/v1/admin/access/users/{id}/roles/{assignmentId}:
+    delete:
+      tags: [Access]
+      summary: Cabut penugasan role segera dengan riwayat tetap tersimpan
+      operationId: revokeUserRole
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: assignmentId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+      responses:
+        '204': { description: Role dicabut, diaudit, dan versi akses naik }
+        '403': { description: Diri sendiri atau re-autentikasi gagal }
+        '404': { description: Penugasan tidak ditemukan di tenant terpilih }
+  /api/v1/admin/access/users/{id}/permissions/{code}:
+    put:
+      tags: [Access]
+      summary: Atur override izin per pengguna
+      operationId: updateUserPermission
+      description: Allow untuk izin berscope memerlukan scope khusus yang sudah disimpan. Aktor harus memiliki izin yang didelegasikan dan scope seluruh tenant untuk izin berscope.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: code
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, currentPassword]
+              properties:
+                decision: { type: string, enum: [inherit, allow, deny] }
+                currentPassword: { type: string, format: password }
+      responses:
+        '204': { description: Override berubah, diaudit, dan versi akses naik }
+        '400': { description: Izin berscope memerlukan editor scope sebelum Allow }
+        '403': { description: Diri sendiri, re-autentikasi gagal, atau delegasi ditolak }
+        '404': { description: Pengguna atau permission tidak ditemukan }
+  /api/v1/admin/access/scope-options:
+    get:
+      tags: [Access]
+      summary: Pilihan node organisasi untuk editor scope tenant
+      operationId: listScopeOptions
+      responses:
+        '200': { description: Wilayah, kantor, divisi, departemen, dan jabatan }
+        '403': { description: Izin pengguna.lihat tidak ada }
+  /api/v1/admin/access/preview:
+    post:
+      tags: [Access]
+      summary: Pratinjau izin efektif tanpa menyimpan perubahan
+      operationId: previewUserAccess
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, permissionCode, decision]
+              properties:
+                userId: { type: string }
+                permissionCode: { type: string }
+                decision: { type: string, enum: [inherit, allow, deny] }
+                rules: { type: array, items: { type: object } }
+      responses:
+        '200': { description: Keputusan hipotetis beserta sumber dan scope }
+        '403': { description: Izin pengguna.lihat tidak ada }
+  /api/v1/admin/access/users/{id}/scopes/{code}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+      - in: path
+        name: code
+        required: true
+        schema: { type: string }
+    put:
+      tags: [Access]
+      summary: Simpan aturan scope khusus per permission pengguna
+      operationId: updateUserScope
+      description: Antaraturan OR, antardimensi dalam satu aturan AND. Membutuhkan re-autentikasi, delegasi seluruh tenant, dan audit.
+      responses:
+        '204': { description: Scope diubah dan versi akses naik }
+        '403': { description: Diri sendiri atau delegasi tidak cukup }
+    delete:
+      tags: [Access]
+      summary: Pulihkan scope bawaan role
+      operationId: clearUserScope
+      responses:
+        '204': { description: Scope khusus dihapus dan versi akses naik }
+        '403': { description: Diri sendiri atau delegasi tidak cukup }
+  /api/v1/admin/organization/{kind}:
+    parameters:
+      - in: path
+        name: kind
+        required: true
+        schema: { type: string, enum: [regions, offices, divisions, departments, positions] }
+    get:
+      tags: [Organization]
+      summary: Daftar node organisasi tenant terpilih
+      operationId: listOrganization
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: parentId
+          description: Khusus kantor, departemen, dan jabatan
+          schema: { type: string, minLength: 26, maxLength: 26 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [name, code], default: name }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: asc }
+      responses:
+        '200':
+          description: Halaman node organisasi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationPage' }
+        '403': { description: Permission organisasi.lihat tidak ada }
+    post:
+      tags: [Organization]
+      summary: Tambah node organisasi
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrganizationNode' }
+      responses:
+        '201':
+          description: Node dibuat dan diaudit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationNode' }
+        '403': { description: Permission organisasi.buat tidak ada }
+  /api/v1/admin/organization/{kind}/{id}:
+    parameters:
+      - in: path
+        name: kind
+        required: true
+        schema: { type: string, enum: [regions, offices, divisions, departments, positions] }
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    patch:
+      tags: [Organization]
+      summary: Ubah node organisasi
+      operationId: updateOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrganizationNode' }
+      responses:
+        '200':
+          description: Node diubah dan diaudit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizationNode' }
+        '403': { description: Permission organisasi.ubah dan lihat diperlukan }
+  /api/v1/admin/employees:
+    get:
+      tags: [Employees]
+      summary: Daftar karyawan sesuai tenant dan scope
+      operationId: listEmployees
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, probation, leave, resigned, terminated] }
+        - in: query
+          name: officeId
+          schema: { type: string, minLength: 26, maxLength: 26 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [name, number, status], default: name }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: asc }
+      responses:
+        '200':
+          description: Halaman karyawan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmployeePage' }
+        '403': { description: Permission karyawan.lihat atau scope tidak ada }
+    post:
+      tags: [Employees]
+      summary: Tambah karyawan pada penempatan dalam scope
+      operationId: createEmployee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Employee' }
+      responses:
+        '201':
+          description: Karyawan dibuat dengan riwayat dan audit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employee' }
+        '403': { description: Permission atau scope tidak mencakup penempatan }
+  /api/v1/admin/employees/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    get:
+      tags: [Employees]
+      summary: Detail karyawan dalam scope
+      operationId: getEmployee
+      responses:
+        '200':
+          description: Detail karyawan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employee' }
+        '404': { description: Tidak ditemukan atau di luar scope }
+    patch:
+      tags: [Employees]
+      summary: Ubah karyawan dalam scope dan catat audit
+      operationId: updateEmployee
+      description: Status resigned/terminated belum tersedia; gunakan alur terminasi bertanggal ketika sudah diimplementasikan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Employee' }
+      responses:
+        '200':
+          description: Karyawan diubah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employee' }
+        '403': { description: Permission atau scope tidak mencakup data }
+  /api/v1/ess/me/employee:
+    get:
+      tags: [Employees]
+      summary: Profil karyawan milik sesi ESS
+      operationId: getMyEmployee
+      responses:
+        '200':
+          description: Profil milik sendiri
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Employee' }
+        '403': { description: Akun tidak terhubung ke karyawan aktif }
+  /api/v1/platform/tenants:
+    get:
+      tags: [Platform]
+      summary: Daftar tenant platform; staf non-Superadmin hanya melihat tenant yang ditugaskan
+      operationId: listPlatformTenants
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200':
+          description: Halaman tenant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformTenantPage' }
+        '403': { description: Akses platform tidak tersedia }
+  /api/v1/platform/staff:
+    get:
+      tags: [Platform]
+      summary: Daftar staf platform menurut permission platform.pengguna.lihat
+      operationId: listPlatformStaff
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Search'
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+      responses:
+        '200': { description: Halaman staf dan jumlah role aktif }
+        '403': { description: Izin staf platform tidak ada }
+  /api/v1/platform/staff/roles:
+    get:
+      tags: [Platform]
+      summary: Daftar empat role platform
+      operationId: listPlatformRoles
+      responses:
+        '200': { description: Pilihan role platform }
+    post:
+      tags: [Platform]
+      summary: Berikan role platform kepada akun terdaftar
+      operationId: assignPlatformRole
+      responses:
+        '204': { description: Role diberikan dan diaudit }
+        '403': { description: Hanya Superadmin dengan re-autentikasi yang dapat mengubah }
+  /api/v1/platform/staff/{id}:
+    get:
+      tags: [Platform]
+      summary: Detail role, izin efektif, override, dan penugasan tenant staf
+      operationId: getPlatformStaff
+      responses:
+        '200': { description: Detail staf platform }
+  /api/v1/platform/staff/{id}/roles/{code}:
+    delete:
+      tags: [Platform]
+      summary: Cabut role platform
+      operationId: revokePlatformRole
+      responses:
+        '204': { description: Role dicabut dan diaudit }
+  /api/v1/platform/staff/{id}/permissions/{code}:
+    put:
+      tags: [Platform]
+      summary: Atur Allow, Deny, atau Inherit staf platform
+      operationId: updatePlatformOverride
+      responses:
+        '204': { description: Override diubah dan diaudit }
+  /api/v1/platform/staff/{id}/tenants:
+    put:
+      tags: [Platform]
+      summary: Atur tenant yang dapat dilihat staf platform
+      operationId: updatePlatformTenants
+      responses:
+        '204': { description: Penugasan tenant diubah dan diaudit }
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: Inbox notifikasi milik pengguna pada tenant aktif
+      operationId: listNotifications
+      parameters:
+        - { in: query, name: cursor, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+        - { in: query, name: category, schema: { type: string } }
+        - { in: query, name: unread, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Daftar diurutkan dari terbaru; cursor adalah ID item terakhir
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission atau entitlement tidak tersedia }
+  /api/v1/notifications/sync:
+    get:
+      tags: [Notifications]
+      summary: Pulihkan notifikasi setelah sambungan terputus
+      operationId: syncNotifications
+      parameters:
+        - { in: query, name: after_id, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+      responses:
+        '200':
+          description: Daftar diurutkan dari terlama setelah after_id
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+  /api/v1/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Jumlah notifikasi aktif yang belum dibaca
+      operationId: getUnreadNotificationCount
+      responses:
+        '200': { description: data.count berisi jumlah belum dibaca }
+  /api/v1/notifications/{id}:
+    get:
+      tags: [Notifications]
+      summary: Detail notifikasi milik pengguna
+      operationId: getNotification
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Detail notifikasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Notification' }
+        '404': { description: Notifikasi tidak ada atau bukan milik pengguna }
+  /api/v1/notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      summary: Tandai notifikasi terbaca
+      operationId: readNotification
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '204': { description: Notifikasi terbaca }
+        '403': { description: CSRF atau akses tidak sah }
+        '404': { description: Notifikasi tidak ada atau bukan milik pengguna }
+  /api/v1/notifications/{id}/archive:
+    post:
+      tags: [Notifications]
+      summary: Arsipkan notifikasi
+      operationId: archiveNotification
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '204': { description: Notifikasi diarsipkan }
+  /api/v1/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Tandai semua notifikasi terbaca
+      operationId: readAllNotifications
+      parameters:
+        - { in: query, name: category, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '204': { description: Semua notifikasi dalam filter ditandai terbaca }
+  /api/v1/realtime/ws:
+    get:
+      tags: [Realtime]
+      summary: Sambungan WebSocket notifikasi tenant aktif
+      operationId: realtimeWebSocket
+      description: Cookie sesi dan Origin wajib. Klien memakai hello/resume, ping, dan ack. Setelah reconnect, pulihkan event melalui /notifications/sync. Implementasi saat ini mengirim notification.created dan notification.unread_count.
+      x-websocket-close-codes:
+        '4401': Sesi tidak sah atau dicabut
+        '4408': Hak akses berubah
+      responses:
+        '101': { description: Koneksi WebSocket diterima }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Origin, permission, atau entitlement ditolak }
+components:
+  parameters:
+    CSRFToken:
+      in: header
+      name: X-CSRF-Token
+      required: true
+      schema: { type: string }
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 15 }
+    Search:
+      in: query
+      name: q
+      schema: { type: string, maxLength: 100 }
+  schemas:
+    Notification:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string }
+        event_type: { type: string }
+        title: { type: string }
+        body: { type: string }
+        deep_link: { type: string, nullable: true }
+        priority: { type: string }
+        created_at: { type: string, format: date-time }
+        read_at: { type: string, format: date-time, nullable: true }
+        archived: { type: boolean }
+        obsolete: { type: boolean }
+    NotificationPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        meta:
+          type: object
+          properties:
+            next_cursor: { type: string, nullable: true }
+    AccessDecision:
+      type: object
+      required: [allowed, reason]
+      properties:
+        allowed: { type: boolean }
+        reason: { type: string }
+        sources: { type: array, items: { type: string } }
+        scopes: { type: array, items: { type: object } }
+        override: { type: string, enum: [allow, deny] }
+    OrganizationNode:
+      type: object
+      required: [code, name]
+      properties:
+        id: { type: string, readOnly: true }
+        code: { type: string }
+        name: { type: string }
+        parentId: { type: string, description: Diperlukan untuk kantor, departemen, dan jabatan }
+        timezone: { type: string, description: Khusus kantor }
+    OrganizationPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrganizationNode' }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+    Employee:
+      type: object
+      required: [employeeNumber, displayName, status, baseOfficeId, positionId]
+      properties:
+        id: { type: string, readOnly: true }
+        employeeNumber: { type: string }
+        displayName: { type: string }
+        status: { type: string, description: Penulisan langsung hanya menerima active, probation, atau leave }
+        baseOfficeId: { type: string }
+        officeName: { type: string, readOnly: true }
+        positionId: { type: string }
+        positionName: { type: string, readOnly: true }
+        reportsToId: { type: string }
+        userId: { type: string, description: Opsional saat membuat; tidak dapat diubah lewat PATCH }
+    EmployeePage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Employee' }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+    PlatformTenant:
+      type: object
+      required: [id, slug, name, status]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        name: { type: string }
+        status: { type: string }
+    PlatformTenantPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PlatformTenant' }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+    Status:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, ready, unavailable]
+    AuthState:
+      type: object
+      required: [user, platform, tenants, remember]
+      properties:
+        user:
+          type: object
+          required: [id, email, name]
+          properties:
+            id: { type: string }
+            email: { type: string, format: email }
+            name: { type: string }
+        platform: { type: boolean }
+        selectedTenantId: { type: string }
+        tenants:
+          type: array
+          items:
+            type: object
+            required: [id, name, admin, ess]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              admin: { type: boolean }
+              ess: { type: boolean }
+        remember: { type: boolean }

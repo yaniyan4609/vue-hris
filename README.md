@@ -32,7 +32,7 @@ $env:APP_ORIGIN = 'http://localhost:5173'
 go run ./cmd/api
 ```
 
-Frontend default di `http://localhost:5173` dengan proxy `/api` ke API `http://127.0.0.1:8080`. `GET /api/v1/health` memeriksa proses API dan `GET /api/v1/ready` memeriksa koneksi database. Kontrak ada di `docs/openapi.yaml`. Endpoint daftar awal memakai `page`, `pageSize` (1–100), dan `q`, lalu mengembalikan `{ items, total, page, pageSize }`.
+Frontend default di `http://localhost:5173` dengan proxy `/api` ke API `http://127.0.0.1:8080`. `GET /api/v1/health` memeriksa proses API dan `GET /api/v1/ready` memeriksa koneksi database. Dokumentasi Swagger UI tersedia di `/api/v1/docs/` pada port frontend atau `/api-docs/` pada port backend; sumber kontrak berada di `docs/openapi.yaml` dan petunjuknya di `docs/API_DOCS.md`. Endpoint daftar awal memakai `page`, `pageSize` (1–100), dan `q`, lalu mengembalikan `{ items, total, page, pageSize }`.
 
 Untuk menyiapkan ulang akun demo, jalankan `go run ./cmd/seed-demo` dari terminal backend dengan `APP_ENV=staging` dan `DB_NAME=staging-saas-hris`. Perintah meminta kata sandi database dan kata sandi akun demo secara interaktif; akun yang sudah ada dengan kata sandi berbeda tidak ditimpa. Tombol masuk cepat muncul hanya jika API berjalan dengan `APP_ENV=staging`, `ENABLE_DEMO_LOGIN=true`, dan nama database staging yang tepat. Daftar akun dan cara akses ada di `docs/DEMO_ACCOUNTS.md`.
 

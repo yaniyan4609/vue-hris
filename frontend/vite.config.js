@@ -14,6 +14,8 @@ export default defineConfig({
         target: process.env.VITE_API_PROXY || 'http://127.0.0.1:8080',
         ws: true,
       },
+      '/healthz': process.env.VITE_API_PROXY || 'http://127.0.0.1:8080',
+      '/readyz': process.env.VITE_API_PROXY || 'http://127.0.0.1:8080',
     },
   },
 })

@@ -31,6 +31,7 @@ func Router(db *sql.DB, options ...Options) http.Handler {
 		})
 	})
 	r.Use(middleware.Recoverer)
+	mountAPIDocs(r)
 	r.Get("/api/v1/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(struct {

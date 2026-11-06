@@ -1,17 +1,45 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.4.0
-  description: Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi ke spesifikasi REST + WebSocket. Tenant bisnis selalu berasal dari sesi, bukan dari body atau URL.
+  version: 0.5.0
+  description: >-
+    Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
+    ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
+    URL. Masuk pada origin yang sama sebelum mencoba endpoint bersesi. Swagger UI
+    menambahkan X-CSRF-Token otomatis pada mutasi setelah login. Demo login hanya
+    aktif di staging bila diaktifkan pada server. WebSocket didokumentasikan sebagai
+    handshake HTTP; pesan dan event dijelaskan pada operasi tersebut.
+servers:
+  - url: /
+    description: Origin yang sama dengan aplikasi dan sesi cookie
+tags:
+  - name: Health
+    description: Kesehatan dan kesiapan layanan
+  - name: Auth
+    description: Login, tenant, dan sesi
+  - name: Access
+    description: Permission, scope, dan hak efektif
+  - name: Organization
+    description: Master organisasi tenant
+  - name: Employees
+    description: Data karyawan dan profil ESS
+  - name: Platform
+    description: Operasi staf platform
+  - name: Notifications
+    description: Inbox notifikasi milik akun yang masuk
+  - name: Realtime
+    description: Handshake dan protokol WebSocket
 paths:
   /healthz:
     get:
+      tags: [Health]
       summary: Liveness proses API
       operationId: getHealthz
       responses:
         '200': { description: Proses berjalan }
   /readyz:
     get:
+      tags: [Health]
       summary: Readiness koneksi database
       operationId: getReadyz
       responses:
@@ -19,6 +47,7 @@ paths:
         '503': { description: Database belum siap }
   /api/v1/health:
     get:
+      tags: [Health]
       summary: Status proses API
       operationId: getHealth
       responses:
@@ -30,6 +59,7 @@ paths:
                 $ref: '#/components/schemas/Status'
   /api/v1/ready:
     get:
+      tags: [Health]
       summary: Kesiapan koneksi database
       operationId: getReady
       responses:
@@ -47,6 +77,7 @@ paths:
                 $ref: '#/components/schemas/Status'
   /api/v1/auth/login:
     post:
+      tags: [Auth]
       summary: Masuk dengan email dan kata sandi
       operationId: login
       requestBody:
@@ -69,6 +100,7 @@ paths:
         '401': { description: Email atau kata sandi salah }
   /api/v1/auth/csrf:
     get:
+      tags: [Auth]
       summary: Ambil token CSRF untuk aksi bersesi
       operationId: getCSRF
       responses:
@@ -86,6 +118,7 @@ paths:
         '401': { description: Sesi tidak sah }
   /api/v1/auth/me:
     get:
+      tags: [Auth]
       summary: State sesi saat ini
       operationId: getCurrentSession
       responses:
@@ -97,6 +130,7 @@ paths:
         '401': { description: Sesi tidak sah atau berakhir }
   /api/v1/auth/select-tenant:
     post:
+      tags: [Auth]
       summary: Pilih tenant yang diikuti pengguna dan putar token sesi
       operationId: selectTenant
       requestBody:
@@ -117,12 +151,14 @@ paths:
         '403': { description: Pengguna bukan anggota tenant tersebut }
   /api/v1/auth/logout:
     post:
+      tags: [Auth]
       summary: Cabut sesi saat ini
       operationId: logout
       responses:
         '204': { description: Sesi dicabut }
   /api/v1/auth/sessions:
     get:
+      tags: [Auth]
       summary: Daftar perangkat dengan sesi akun yang masih aktif
       operationId: listMySessions
       responses:
@@ -146,6 +182,7 @@ paths:
         '401': { description: Sesi tidak sah atau berakhir }
   /api/v1/auth/logout-all:
     post:
+      tags: [Auth]
       summary: Cabut semua sesi akun ini, termasuk perangkat saat ini
       operationId: logoutAll
       responses:
@@ -153,6 +190,7 @@ paths:
         '401': { description: Sesi tidak sah atau berakhir }
   /api/v1/auth/change-password:
     post:
+      tags: [Auth]
       summary: Ganti kata sandi dan cabut sesi di perangkat lain
       operationId: changePassword
       requestBody:
@@ -171,6 +209,7 @@ paths:
         '401': { description: Sesi tidak sah atau berakhir }
   /api/v1/auth/demo-accounts:
     get:
+      tags: [Auth]
       summary: Daftar akun demo (hanya staging)
       operationId: getDemoAccounts
       responses:
@@ -189,6 +228,7 @@ paths:
         '404': { description: Mode demo tidak aktif }
   /api/v1/auth/demo-login:
     post:
+      tags: [Auth]
       summary: Masuk cepat ke akun demo (hanya staging)
       operationId: demoLogin
       requestBody:
@@ -209,6 +249,7 @@ paths:
         '404': { description: Mode demo tidak aktif }
   /api/v1/admin/capabilities:
     get:
+      tags: [Access]
       summary: Izin Admin efektif untuk fitur yang sudah tersedia
       operationId: getAdminCapabilities
       responses:
@@ -222,6 +263,7 @@ paths:
         '403': { description: Panel Admin tidak tersedia }
   /api/v1/me/access:
     get:
+      tags: [Access]
       summary: Hak akses efektif akun untuk tenant terpilih
       operationId: getEffectiveAccess
       responses:
@@ -250,6 +292,7 @@ paths:
         '401': { description: Sesi tidak sah atau berakhir }
   /api/v1/admin/access/users:
     get:
+      tags: [Access]
       summary: Daftar anggota aktif tenant terpilih
       operationId: listAccessUsers
       parameters:
@@ -268,6 +311,7 @@ paths:
         '403': { description: Izin pengguna.lihat tidak ada }
   /api/v1/admin/access/roles:
     get:
+      tags: [Access]
       summary: Role tenant dan permission yang diberikan oleh tiap role
       operationId: listAccessRoles
       responses:
@@ -284,6 +328,7 @@ paths:
         required: true
         schema: { type: string, minLength: 26, maxLength: 26 }
     get:
+      tags: [Access]
       summary: Detail anggota, riwayat role, dan izin efektif per permission
       operationId: getAccessUser
       responses:
@@ -301,6 +346,7 @@ paths:
         required: true
         schema: { type: string, minLength: 26, maxLength: 26 }
     post:
+      tags: [Access]
       summary: Berikan role dalam batas delegasi Admin
       operationId: assignUserRole
       requestBody:
@@ -322,6 +368,7 @@ paths:
         '409': { description: Periode role bertabrakan }
   /api/v1/admin/access/users/{id}/roles/{assignmentId}:
     delete:
+      tags: [Access]
       summary: Cabut penugasan role segera dengan riwayat tetap tersimpan
       operationId: revokeUserRole
       parameters:
@@ -348,6 +395,7 @@ paths:
         '404': { description: Penugasan tidak ditemukan di tenant terpilih }
   /api/v1/admin/access/users/{id}/permissions/{code}:
     put:
+      tags: [Access]
       summary: Atur override izin per pengguna
       operationId: updateUserPermission
       description: Allow untuk izin berscope memerlukan scope khusus yang sudah disimpan. Aktor harus memiliki izin yang didelegasikan dan scope seluruh tenant untuk izin berscope.
@@ -377,6 +425,7 @@ paths:
         '404': { description: Pengguna atau permission tidak ditemukan }
   /api/v1/admin/access/scope-options:
     get:
+      tags: [Access]
       summary: Pilihan node organisasi untuk editor scope tenant
       operationId: listScopeOptions
       responses:
@@ -384,6 +433,7 @@ paths:
         '403': { description: Izin pengguna.lihat tidak ada }
   /api/v1/admin/access/preview:
     post:
+      tags: [Access]
       summary: Pratinjau izin efektif tanpa menyimpan perubahan
       operationId: previewUserAccess
       requestBody:
@@ -412,6 +462,7 @@ paths:
         required: true
         schema: { type: string }
     put:
+      tags: [Access]
       summary: Simpan aturan scope khusus per permission pengguna
       operationId: updateUserScope
       description: Antaraturan OR, antardimensi dalam satu aturan AND. Membutuhkan re-autentikasi, delegasi seluruh tenant, dan audit.
@@ -419,6 +470,7 @@ paths:
         '204': { description: Scope diubah dan versi akses naik }
         '403': { description: Diri sendiri atau delegasi tidak cukup }
     delete:
+      tags: [Access]
       summary: Pulihkan scope bawaan role
       operationId: clearUserScope
       responses:
@@ -431,6 +483,7 @@ paths:
         required: true
         schema: { type: string, enum: [regions, offices, divisions, departments, positions] }
     get:
+      tags: [Organization]
       summary: Daftar node organisasi tenant terpilih
       operationId: listOrganization
       parameters:
@@ -455,6 +508,7 @@ paths:
               schema: { $ref: '#/components/schemas/OrganizationPage' }
         '403': { description: Permission organisasi.lihat tidak ada }
     post:
+      tags: [Organization]
       summary: Tambah node organisasi
       operationId: createOrganization
       requestBody:
@@ -480,6 +534,7 @@ paths:
         required: true
         schema: { type: string, minLength: 26, maxLength: 26 }
     patch:
+      tags: [Organization]
       summary: Ubah node organisasi
       operationId: updateOrganization
       requestBody:
@@ -496,6 +551,7 @@ paths:
         '403': { description: Permission organisasi.ubah dan lihat diperlukan }
   /api/v1/admin/employees:
     get:
+      tags: [Employees]
       summary: Daftar karyawan sesuai tenant dan scope
       operationId: listEmployees
       parameters:
@@ -522,6 +578,7 @@ paths:
               schema: { $ref: '#/components/schemas/EmployeePage' }
         '403': { description: Permission karyawan.lihat atau scope tidak ada }
     post:
+      tags: [Employees]
       summary: Tambah karyawan pada penempatan dalam scope
       operationId: createEmployee
       requestBody:
@@ -543,6 +600,7 @@ paths:
         required: true
         schema: { type: string, minLength: 26, maxLength: 26 }
     get:
+      tags: [Employees]
       summary: Detail karyawan dalam scope
       operationId: getEmployee
       responses:
@@ -553,6 +611,7 @@ paths:
               schema: { $ref: '#/components/schemas/Employee' }
         '404': { description: Tidak ditemukan atau di luar scope }
     patch:
+      tags: [Employees]
       summary: Ubah karyawan dalam scope dan catat audit
       operationId: updateEmployee
       description: Status resigned/terminated belum tersedia; gunakan alur terminasi bertanggal ketika sudah diimplementasikan.
@@ -570,6 +629,7 @@ paths:
         '403': { description: Permission atau scope tidak mencakup data }
   /api/v1/ess/me/employee:
     get:
+      tags: [Employees]
       summary: Profil karyawan milik sesi ESS
       operationId: getMyEmployee
       responses:
@@ -581,6 +641,7 @@ paths:
         '403': { description: Akun tidak terhubung ke karyawan aktif }
   /api/v1/platform/tenants:
     get:
+      tags: [Platform]
       summary: Daftar tenant platform; staf non-Superadmin hanya melihat tenant yang ditugaskan
       operationId: listPlatformTenants
       parameters:
@@ -599,6 +660,7 @@ paths:
         '403': { description: Akses platform tidak tersedia }
   /api/v1/platform/staff:
     get:
+      tags: [Platform]
       summary: Daftar staf platform menurut permission platform.pengguna.lihat
       operationId: listPlatformStaff
       parameters:
@@ -613,11 +675,13 @@ paths:
         '403': { description: Izin staf platform tidak ada }
   /api/v1/platform/staff/roles:
     get:
+      tags: [Platform]
       summary: Daftar empat role platform
       operationId: listPlatformRoles
       responses:
         '200': { description: Pilihan role platform }
     post:
+      tags: [Platform]
       summary: Berikan role platform kepada akun terdaftar
       operationId: assignPlatformRole
       responses:
@@ -625,30 +689,35 @@ paths:
         '403': { description: Hanya Superadmin dengan re-autentikasi yang dapat mengubah }
   /api/v1/platform/staff/{id}:
     get:
+      tags: [Platform]
       summary: Detail role, izin efektif, override, dan penugasan tenant staf
       operationId: getPlatformStaff
       responses:
         '200': { description: Detail staf platform }
   /api/v1/platform/staff/{id}/roles/{code}:
     delete:
+      tags: [Platform]
       summary: Cabut role platform
       operationId: revokePlatformRole
       responses:
         '204': { description: Role dicabut dan diaudit }
   /api/v1/platform/staff/{id}/permissions/{code}:
     put:
+      tags: [Platform]
       summary: Atur Allow, Deny, atau Inherit staf platform
       operationId: updatePlatformOverride
       responses:
         '204': { description: Override diubah dan diaudit }
   /api/v1/platform/staff/{id}/tenants:
     put:
+      tags: [Platform]
       summary: Atur tenant yang dapat dilihat staf platform
       operationId: updatePlatformTenants
       responses:
         '204': { description: Penugasan tenant diubah dan diaudit }
   /api/v1/notifications:
     get:
+      tags: [Notifications]
       summary: Inbox notifikasi milik pengguna pada tenant aktif
       operationId: listNotifications
       parameters:
@@ -666,6 +735,7 @@ paths:
         '403': { description: Permission atau entitlement tidak tersedia }
   /api/v1/notifications/sync:
     get:
+      tags: [Notifications]
       summary: Pulihkan notifikasi setelah sambungan terputus
       operationId: syncNotifications
       parameters:
@@ -679,12 +749,14 @@ paths:
               schema: { $ref: '#/components/schemas/NotificationPage' }
   /api/v1/notifications/unread-count:
     get:
+      tags: [Notifications]
       summary: Jumlah notifikasi aktif yang belum dibaca
       operationId: getUnreadNotificationCount
       responses:
         '200': { description: data.count berisi jumlah belum dibaca }
   /api/v1/notifications/{id}:
     get:
+      tags: [Notifications]
       summary: Detail notifikasi milik pengguna
       operationId: getNotification
       parameters:
@@ -701,6 +773,7 @@ paths:
         '404': { description: Notifikasi tidak ada atau bukan milik pengguna }
   /api/v1/notifications/{id}/read:
     post:
+      tags: [Notifications]
       summary: Tandai notifikasi terbaca
       operationId: readNotification
       parameters:
@@ -712,6 +785,7 @@ paths:
         '404': { description: Notifikasi tidak ada atau bukan milik pengguna }
   /api/v1/notifications/{id}/archive:
     post:
+      tags: [Notifications]
       summary: Arsipkan notifikasi
       operationId: archiveNotification
       parameters:
@@ -721,6 +795,7 @@ paths:
         '204': { description: Notifikasi diarsipkan }
   /api/v1/notifications/read-all:
     post:
+      tags: [Notifications]
       summary: Tandai semua notifikasi terbaca
       operationId: readAllNotifications
       parameters:
@@ -730,6 +805,7 @@ paths:
         '204': { description: Semua notifikasi dalam filter ditandai terbaca }
   /api/v1/realtime/ws:
     get:
+      tags: [Realtime]
       summary: Sambungan WebSocket notifikasi tenant aktif
       operationId: realtimeWebSocket
       description: Cookie sesi dan Origin wajib. Klien memakai hello/resume, ping, dan ack. Setelah reconnect, pulihkan event melalui /notifications/sync. Implementasi saat ini mengirim notification.created dan notification.unread_count.
