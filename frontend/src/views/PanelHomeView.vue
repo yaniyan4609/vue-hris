@@ -5,7 +5,7 @@ import { Activity, Building2, CalendarDays, Clock3, FileBarChart, RefreshCw, Use
 import { apiRequest } from '../composables/useApi'
 import { useAuth } from '../composables/useAuth'
 import { useToast } from '../composables/useToast'
-import { adminCapabilities, platformCapabilities } from '../composables/useCapabilities'
+import { adminCapabilities, platformCapabilities, effectiveAccess } from '../composables/useCapabilities'
 import { visibleAdminMenus, visiblePlatformMenus } from '../data/menuData'
 import { activeEntitlements } from '../composables/useCapabilities'
 import BaseBadge from '../components/ui/BaseBadge.vue'
@@ -21,7 +21,7 @@ const platform = computed(() => route.path.startsWith('/platform'))
 const loading = ref(false)
 const error = ref(false)
 const counts = ref({})
-const menus = computed(() => platform.value ? visiblePlatformMenus(platformCapabilities.value) : visibleAdminMenus(adminCapabilities.value, activeEntitlements.value))
+const menus = computed(() => platform.value ? visiblePlatformMenus(platformCapabilities.value, Boolean(effectiveAccess.value?.platformSuperadmin)) : visibleAdminMenus(adminCapabilities.value, activeEntitlements.value))
 const shortcuts = computed(() => menus.value.flatMap(group => group.submenus).filter(page => page.kind !== 'dashboard').slice(0, 6))
 const kpis = computed(() => platform.value ? [
   { title: 'Perusahaan', value: counts.value.tenants ?? 0, icon: Building2, tone: 'primary' },

@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { ChevronRight } from 'lucide-vue-next'
 import { useAuth } from '../../composables/useAuth'
 import { useToast } from '../../composables/useToast'
-import { adminCapabilities, platformCapabilities, activeEntitlements, refreshAdminCapabilities } from '../../composables/useCapabilities'
+import { adminCapabilities, platformCapabilities, activeEntitlements, effectiveAccess, refreshAdminCapabilities } from '../../composables/useCapabilities'
 import { menuByPath, pageByPath, visibleAdminMenus, visiblePlatformMenus } from '../../data/menuData'
 import BaseButton from '../ui/BaseButton.vue'
 import PrimarySidebar from './PrimarySidebar.vue'
@@ -17,13 +17,13 @@ const toast = useToast()
 const { state, selectedTenant } = useAuth()
 const submenuCollapsed = ref(true)
 const accessReady = ref(false)
-const menus = computed(() => state.value?.platform ? visiblePlatformMenus(platformCapabilities.value) : visibleAdminMenus(adminCapabilities.value, activeEntitlements.value))
+const menus = computed(() => state.value?.platform ? visiblePlatformMenus(platformCapabilities.value, Boolean(effectiveAccess.value?.platformSuperadmin)) : visibleAdminMenus(adminCapabilities.value, activeEntitlements.value))
 const activeMenuId = computed(() => menuByPath(route.path)?.id || 'beranda')
 const currentMenu = computed(() => menus.value.find((item) => item.id === activeMenuId.value) || menus.value[0])
 const authorized = computed(() => {
   const item = pageByPath(route.path)
   if (!item) return false
-  if (state.value?.platform) return Boolean(platformCapabilities.value[item.permission])
+  if (state.value?.platform) return Boolean(platformCapabilities.value[item.permission] && (!item.superadminOnly || effectiveAccess.value?.platformSuperadmin))
   return Boolean(adminCapabilities.value[item.menuPermission] && adminCapabilities.value[item.permission] && (!item.entitlement || activeEntitlements.value[item.entitlement]))
 })
 

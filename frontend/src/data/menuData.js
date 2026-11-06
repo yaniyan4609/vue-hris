@@ -3,6 +3,7 @@ import { Activity, BarChart3, Bell, BookOpen, BriefcaseBusiness, Building2, Cale
 // Katalog tunggal untuk sidebar, rute, izin, dan status kesiapan modul.
 const activePages = new Set(['dashboard-saas', 'tenants', 'staff', 'dashboard', 'employees', 'regions', 'offices', 'divisions', 'departments', 'positions', 'users-access'])
 const page = (id, label, route, permission, entitlement = '', kind = 'data') => ({ id, label, route, permission, menuPermission: route.startsWith('/admin') ? `menu.${id}.lihat` : '', entitlement, kind, status: activePages.has(id) ? 'active' : 'preview' })
+const templatePage = (id, label, route, kind = 'settings') => ({ ...page(id, label, route, 'platform.dashboard.lihat', '', kind), status: 'active', superadminOnly: true })
 const group = (id, label, icon, submenus) => ({ id, label, icon, route: submenus[0].route, submenus: submenus.map((item) => ({ ...item, icon })) })
 
 export const platformMenus = [
@@ -14,6 +15,18 @@ export const platformMenus = [
   group('dukungan', 'Dukungan', HeartHandshake, [page('support', 'Dukungan & Tiket', '/platform/support', 'platform.dukungan.lihat')]),
   group('analitik', 'Analitik', BarChart3, [page('analytics', 'Analitik SaaS', '/platform/analytics', 'platform.analitik.lihat', '', 'dashboard')]),
   group('pengaturan', 'Pengaturan', Settings, [page('settings', 'Pengaturan Platform', '/platform/settings', 'platform.pengaturan.lihat', '', 'settings')]),
+  group('template', 'Template', BookOpen, [
+    templatePage('template-dashboard', 'Dashboard Contoh', '/platform/template/dashboard', 'dashboard'),
+    templatePage('template-kanban', 'Contoh Kanban', '/platform/template/kanban', 'dashboard'),
+    templatePage('template-data-1', 'Contoh Data 1', '/platform/template/data-1', 'data'),
+    templatePage('template-data-2', 'Contoh Data 2', '/platform/template/data-2', 'data'),
+    templatePage('template-components', 'Katalog Komponen', '/platform/template/komponen', 'data'),
+    templatePage('template-general', 'Pengaturan Umum', '/platform/template/umum'),
+    templatePage('template-background', 'Dasar Pertama', '/platform/template/dasar-pertama'),
+    templatePage('template-modal', 'Modal', '/platform/template/modal'),
+    templatePage('template-notifications', 'Notifikasi', '/platform/template/notifikasi'),
+    templatePage('template-security', 'Keamanan', '/platform/template/keamanan'),
+  ]),
 ]
 
 export const adminMenus = [
@@ -92,7 +105,7 @@ export const allPages = [...platformMenus, ...adminMenus].flatMap((item) => item
 export const pageByPath = (path) => allPages.find((item) => item.route === path)
 export const menuByPath = (path) => [...platformMenus, ...adminMenus].find((item) => item.submenus.some((sub) => sub.route === path))
 export const visibleAdminMenus = (capabilities, entitlements = {}) => adminMenus.map((item) => ({ ...item, submenus: item.submenus.filter((sub) => capabilities[sub.menuPermission] && capabilities[sub.permission] && (!sub.entitlement || entitlements[sub.entitlement])) })).filter((item) => item.submenus.length)
-export const visiblePlatformMenus = (capabilities) => platformMenus.map((item) => ({ ...item, submenus: item.submenus.filter((sub) => capabilities[sub.permission]) })).filter((item) => item.submenus.length)
+export const visiblePlatformMenus = (capabilities, isSuperadmin = false) => platformMenus.map((item) => ({ ...item, submenus: item.submenus.filter((sub) => capabilities[sub.permission] && (!sub.superadminOnly || isSuperadmin)) })).filter((item) => item.submenus.length)
 
 export const essMenus = [
   { id: 'home', label: 'Beranda', icon: Home, route: '/ess' },

@@ -4,7 +4,7 @@ Repositori produk berdasarkan tiga dokumen lengkap di `full-docs/`: PRD v2.3, Ma
 
 ## Struktur
 
-- `frontend/` — template Vue/Vite dan komponen Base dengan login morphing, panel Platform/Admin, serta ESS mobile. View demonstrasi template tetap menjadi referensi kode dan tidak masuk navigasi produk.
+- `frontend/` — template Vue/Vite dan komponen Base dengan login morphing, panel Platform/Admin, serta ESS mobile. View demonstrasi tersedia melalui menu Template khusus Superadmin.
 - `backend/` — API Go/Chi, sesi login, seed staging, evaluasi permission/scope dan endpoint organisasi/karyawan awal.
 - `docs/IMPLEMENTATION_PLAN.md` — urutan fase, keputusan, dan isu produk yang masih terbuka.
 - `full-docs/` — kebutuhan produk dan rancangan lengkap dari Product Owner.

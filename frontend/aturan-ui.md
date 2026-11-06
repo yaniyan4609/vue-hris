@@ -5,7 +5,7 @@ Template kode lengkap ada di [`desain-ui.md`](./desain-ui.md). Dokumen ini menje
 
 Seluruh isi dokumen ini sudah dicocokkan dengan kode di `src/` (props dibaca dari `defineProps`, token dari `style.css`, pola dari `views/` dan `AppLayout.vue`).
 
-**Adaptasi proyek HRIS:** template telah diintegrasikan ke produk berdasarkan `../full-docs/`. Contoh view Template tetap tersedia sebagai referensi pola, tetapi tidak menjadi menu produk. `AdminLayout.vue` dan `EssLayout.vue` sudah ada; periksa implementasi keduanya saat mengubah panel.
+**Adaptasi proyek HRIS:** template telah diintegrasikan ke produk berdasarkan `../full-docs/`. Contoh view Template tersedia pada menu khusus Superadmin sebagai referensi pola, dengan data demonstrasi yang tidak tersambung ke domain HRIS. `AdminLayout.vue` dan `EssLayout.vue` sudah ada; periksa implementasi keduanya saat mengubah panel.
 
 > **Kebenaran tertinggi adalah kode.** Jika dokumen ini atau `desain-ui.md` berbeda dengan file `.vue` / `.css` / `.js`, ikuti kode, lalu laporkan perbedaannya.
 
