@@ -15,7 +15,7 @@ DELETE,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
 DELETE,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/employees/{id},7.1 Karyawan,planned
-DELETE,/api/v1/admin/employees/{id}/allowed-offices/{allowedId},7.2 Data pendukung karyawan,planned
+DELETE,/api/v1/admin/employees/{id}/allowed-offices/{allowedId},7.2 Data pendukung karyawan,active
 DELETE,/api/v1/admin/employees/{id}/bank-accounts/{accountId},7.2 Data pendukung karyawan,planned
 DELETE,/api/v1/admin/employees/{id}/emergency-contacts/{contactId},7.2 Data pendukung karyawan,planned
 DELETE,/api/v1/admin/employees/{id}/families/{familyId},7.2 Data pendukung karyawan,planned
@@ -99,7 +99,7 @@ GET,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
 GET,/api/v1/admin/employees,7.1 Karyawan,active
 GET,/api/v1/admin/employees/next-number,7.1 Karyawan,planned
 GET,/api/v1/admin/employees/{id},7.1 Karyawan,active
-GET,/api/v1/admin/employees/{id}/allowed-offices,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/allowed-offices,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/assignments,7.2 Data pendukung karyawan,planned
 GET,/api/v1/admin/employees/{id}/bank-accounts,7.2 Data pendukung karyawan,planned
 GET,/api/v1/admin/employees/{id}/contracts,7.3 Kontrak,planned
@@ -368,7 +368,7 @@ POST,/api/v1/admin/employee-documents/{id}/verify,12.2 Dokumen,planned
 POST,/api/v1/admin/employees,7.1 Karyawan,active
 POST,/api/v1/admin/employees/bulk-archive,7.1 Karyawan,planned
 POST,/api/v1/admin/employees/{id}/account,7.1 Karyawan,planned
-POST,/api/v1/admin/employees/{id}/allowed-offices,7.2 Data pendukung karyawan,planned
+POST,/api/v1/admin/employees/{id}/allowed-offices,7.2 Data pendukung karyawan,active
 POST,/api/v1/admin/employees/{id}/assignments,7.2 Data pendukung karyawan,planned
 POST,/api/v1/admin/employees/{id}/bank-accounts,7.2 Data pendukung karyawan,planned
 POST,/api/v1/admin/employees/{id}/emergency-contacts,7.2 Data pendukung karyawan,planned
@@ -441,7 +441,7 @@ POST,/api/v1/auth/switch-tenant,"4. Autentikasi, akun, dan sesi",active
 POST,/api/v1/ess/attendance/clock-in,8.1 ESS: absensi dan jadwal pribadi,planned
 POST,/api/v1/ess/attendance/clock-out,8.1 ESS: absensi dan jadwal pribadi,planned
 POST,/api/v1/ess/attendance/corrections,8.1 ESS: absensi dan jadwal pribadi,planned
-POST,/api/v1/ess/attendance/location-check,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/ess/attendance/location-check,8.1 ESS: absensi dan jadwal pribadi,active
 POST,/api/v1/ess/documents,12.2 Dokumen,planned
 POST,/api/v1/ess/leave-requests,9.1 ESS: cuti dan izin,planned
 POST,/api/v1/ess/leave-requests/preview,9.1 ESS: cuti dan izin,planned

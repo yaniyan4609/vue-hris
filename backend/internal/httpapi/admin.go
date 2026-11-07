@@ -41,6 +41,9 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 		r.With(checkOrigin(config)).Patch("/organization/{kind}/{id}", a.updateOrganization)
 		r.Get("/employees", a.listEmployees)
 		r.Get("/employees/{id}", a.getEmployee)
+		r.Get("/employees/{id}/allowed-offices", a.listAllowedOffices)
+		r.With(checkOrigin(config)).Post("/employees/{id}/allowed-offices", a.createAllowedOffice)
+		r.With(checkOrigin(config)).Delete("/employees/{id}/allowed-offices/{allowedId}", a.revokeAllowedOffice)
 		r.With(checkOrigin(config)).Post("/employees", a.createEmployee)
 		r.With(checkOrigin(config)).Patch("/employees/{id}", a.updateEmployee)
 		r.Get("/access/users", a.listAccessUsers)
@@ -59,6 +62,7 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 	r.Get("/api/v1/holidays", a.calendarHolidays)
 	r.Get("/api/v1/ess/schedule", a.essSchedule)
 	a.mountEssAttendance(r)
+	r.With(checkOrigin(config)).Post("/api/v1/ess/attendance/location-check", a.essLocationCheck)
 }
 
 func (a adminAPI) authorize(w http.ResponseWriter, r *http.Request, code string) (adminContext, bool) {

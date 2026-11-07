@@ -142,7 +142,7 @@ func (a adminAPI) essAttendanceToday(w http.ResponseWriter, r *http.Request) {
 		GeofenceCount int    `json:"geofence_count"`
 	}
 	offices := []allowedOffice{}
-	rows, err := a.db.QueryContext(r.Context(), `SELECT o.id,o.name,(SELECT COUNT(*) FROM office_geofences g WHERE g.tenant_id=o.tenant_id AND g.office_id=o.id AND g.is_active=TRUE) FROM offices o WHERE o.tenant_id=? AND (o.id=(SELECT a.office_id FROM employee_assignments a WHERE a.tenant_id=? AND a.employee_id=? AND a.current_flag=TRUE) OR EXISTS (SELECT 1 FROM employee_allowed_offices ao WHERE ao.tenant_id=o.tenant_id AND ao.office_id=o.id AND ao.employee_id=? AND ao.valid_from<=? AND (ao.valid_to IS NULL OR ao.valid_to>=?))) ORDER BY o.name,o.id`, c.state.SelectedTenantID, c.state.SelectedTenantID, c.employeeID, c.employeeID, today, today)
+	rows, err := a.db.QueryContext(r.Context(), `SELECT o.id,o.name,(SELECT COUNT(*) FROM office_geofences g WHERE g.tenant_id=o.tenant_id AND g.office_id=o.id AND g.is_active=TRUE) FROM offices o WHERE o.tenant_id=? AND (o.id=(SELECT a.office_id FROM employee_assignments a WHERE a.tenant_id=? AND a.employee_id=? AND a.current_flag=TRUE) OR EXISTS (SELECT 1 FROM employee_allowed_offices ao WHERE ao.tenant_id=o.tenant_id AND ao.office_id=o.id AND ao.employee_id=? AND ao.revoked_at IS NULL AND ao.valid_from<=? AND (ao.valid_to IS NULL OR ao.valid_to>=?))) ORDER BY o.name,o.id`, c.state.SelectedTenantID, c.state.SelectedTenantID, c.employeeID, c.employeeID, today, today)
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca kantor presensi.")
 		return

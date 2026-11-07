@@ -1139,6 +1139,50 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Employee' }
         '403': { description: Permission atau scope tidak mencakup data }
+  /api/v1/admin/employees/{id}/allowed-offices:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: listEmployeeAllowedOffices
+      x-permission: karyawan.lihat
+      summary: Daftar izin kantor tambahan termasuk riwayat pencabutan
+      responses:
+        '200': { description: Seluruh izin kantor karyawan dalam scope }
+        '404': { description: Karyawan di luar tenant atau scope }
+    post:
+      tags: [Employees]
+      operationId: createEmployeeAllowedOffice
+      x-permission: karyawan.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AllowedOfficeInput' }
+      responses:
+        '201': { description: Izin kantor dibuat dan diaudit }
+        '404': { description: Karyawan di luar scope atau kantor di luar tenant }
+        '409': { description: Masa berlaku tumpang tindih }
+  /api/v1/admin/employees/{id}/allowed-offices/{allowedId}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+      - in: path
+        name: allowedId
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    delete:
+      tags: [Employees]
+      operationId: revokeEmployeeAllowedOffice
+      x-permission: karyawan.ubah
+      summary: Cabut izin segera tanpa menghapus riwayat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Izin dicabut dan diaudit }
+        '404': { description: Izin tidak ditemukan dalam tenant atau scope }
+        '409': { description: Izin sudah dicabut }
   /api/v1/ess/me/employee:
     get:
       tags: [Employees]
@@ -1920,6 +1964,28 @@ paths:
       responses:
         '200': { description: Tanggal lokal, shift instance bila ada, event, dan kantor diizinkan }
         '404': { description: Akun ESS belum memiliki profil karyawan aktif }
+  /api/v1/ess/attendance/location-check:
+    post:
+      tags: [Schedule]
+      operationId: checkEssAttendanceLocation
+      summary: Uji titik GPS pada geofence kantor yang sedang diizinkan tanpa menulis event
+      description: Ambang akurasi GPS masih keputusan terbuka T-08; respons ini hanya hasil geometri dan tidak memberi izin untuk mencatat presensi.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng, accuracy_m]
+              properties:
+                lat: { type: number, minimum: -90, maximum: 90 }
+                lng: { type: number, minimum: -180, maximum: 180 }
+                accuracy_m: { type: number, exclusiveMinimum: 0 }
+      responses:
+        '200': { description: Status inside, outside, flexible, atau unknown }
+        '400': { description: Koordinat atau akurasi tidak valid }
   /api/v1/ess/attendance/history:
     get:
       tags: [Schedule]
@@ -2151,6 +2217,23 @@ components:
         clock_out_window_end_at: { type: string, format: date-time }
         rule_snapshot: { type: object, description: Aturan shift saat roster diterbitkan }
         status: { type: string }
+    AllowedOfficeInput:
+      type: object
+      required: [office_id, valid_from]
+      properties:
+        office_id: { type: string, minLength: 26, maxLength: 26 }
+        valid_from: { type: string, format: date }
+        valid_to: { type: string, format: date, nullable: true }
+        reason: { type: string, maxLength: 255 }
+    AllowedOffice:
+      allOf:
+        - $ref: '#/components/schemas/AllowedOfficeInput'
+        - type: object
+          properties:
+            id: { type: string }
+            employee_id: { type: string }
+            office_name: { type: string }
+            revoked_at: { type: string, format: date-time, nullable: true }
     Notification:
       type: object
       properties:
