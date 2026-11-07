@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.8.0
+  version: 0.9.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -26,6 +26,8 @@ tags:
     description: Pilihan ringan dengan permission dan scope
   - name: Schedule
     description: Master shift, pola jadwal, dan hari libur
+  - name: Approvals
+    description: Pembacaan pengajuan dan tugas approval
   - name: Employees
     description: Data karyawan dan profil ESS
   - name: Platform
@@ -1183,6 +1185,125 @@ paths:
         '204': { description: Izin dicabut dan diaudit }
         '404': { description: Izin tidak ditemukan dalam tenant atau scope }
         '409': { description: Izin sudah dicabut }
+  /api/v1/admin/employees/{id}/families:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: listEmployeeFamilies
+      x-permission: karyawan.lihat
+      responses:
+        '200': { description: Keluarga dan tanggungan karyawan dalam scope }
+        '404': { description: Karyawan di luar tenant atau scope }
+    post:
+      tags: [Employees]
+      operationId: createEmployeeFamily
+      x-permission: karyawan.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeeFamilyInput' }
+      responses:
+        '201': { description: Anggota keluarga dibuat dan diaudit }
+        '400': { description: Data keluarga tidak valid }
+  /api/v1/admin/employees/{id}/assignments:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: listEmployeeAssignments
+      x-permission: karyawan.lihat
+      summary: Riwayat penugasan karyawan dalam scope
+      responses:
+        '200': { description: Riwayat dan penugasan saat ini menurut valid_from }
+        '404': { description: Karyawan di luar tenant atau scope }
+  /api/v1/admin/employees/{id}/families/{familyId}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+      - in: path
+        name: familyId
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    patch:
+      tags: [Employees]
+      operationId: updateEmployeeFamily
+      x-permission: karyawan.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeeFamilyInput' }
+      responses:
+        '200': { description: Data keluarga diubah dan diaudit; birth_date null mengosongkan tanggal }
+        '404': { description: Karyawan atau anggota keluarga di luar scope }
+    delete:
+      tags: [Employees]
+      operationId: deleteEmployeeFamily
+      x-permission: karyawan.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Data keluarga dihapus dan diaudit }
+        '404': { description: Karyawan atau anggota keluarga di luar scope }
+  /api/v1/admin/employees/{id}/emergency-contacts:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: listEmployeeEmergencyContacts
+      x-permission: karyawan.lihat
+      responses:
+        '200': { description: Kontak darurat karyawan dalam scope }
+        '404': { description: Karyawan di luar tenant atau scope }
+    post:
+      tags: [Employees]
+      operationId: createEmployeeEmergencyContact
+      x-permission: karyawan.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmergencyContactInput' }
+      responses:
+        '201': { description: Kontak darurat dibuat dan diaudit }
+        '400': { description: Nama, hubungan, atau telepon tidak valid }
+  /api/v1/admin/employees/{id}/emergency-contacts/{contactId}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+      - in: path
+        name: contactId
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    patch:
+      tags: [Employees]
+      operationId: updateEmployeeEmergencyContact
+      x-permission: karyawan.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmergencyContactInput' }
+      responses:
+        '200': { description: Kontak darurat diubah dan diaudit }
+        '404': { description: Karyawan atau kontak di luar scope }
+    delete:
+      tags: [Employees]
+      operationId: deleteEmployeeEmergencyContact
+      x-permission: karyawan.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Kontak darurat dihapus dan diaudit }
+        '404': { description: Karyawan atau kontak di luar scope }
   /api/v1/ess/me/employee:
     get:
       tags: [Employees]
@@ -1195,6 +1316,95 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Employee' }
         '403': { description: Akun tidak terhubung ke karyawan aktif }
+  /api/v1/admin/contracts:
+    get:
+      tags: [Employees]
+      operationId: listContracts
+      x-permission: kontrak.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: contract_type, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: end_from, schema: { type: string, format: date } }
+        - { in: query, name: end_to, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Daftar kontrak dalam scope karyawan }
+    post:
+      tags: [Employees]
+      operationId: createContract
+      x-permission: kontrak.buat
+      summary: Buat kontrak draft untuk karyawan dalam scope
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContractInput' }
+      responses:
+        '201': { description: Kontrak draft dibuat dan diaudit }
+        '400': { description: Jenis atau tanggal kontrak tidak valid }
+        '404': { description: Berkas belum aman atau tidak ada }
+  /api/v1/admin/contracts/expiring:
+    get:
+      tags: [Employees]
+      operationId: listExpiringContracts
+      x-permission: kontrak.lihat
+      parameters:
+        - { in: query, name: days, schema: { type: integer, minimum: 0, maximum: 365, default: 30 } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Kontrak aktif yang berakhir dalam rentang hari tersebut }
+  /api/v1/admin/contracts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: getContract
+      x-permission: kontrak.lihat
+      responses:
+        '200': { description: Detail kontrak dalam scope karyawan }
+        '404': { description: Kontrak di luar tenant atau scope }
+    patch:
+      tags: [Employees]
+      operationId: updateContract
+      x-permission: kontrak.ubah
+      summary: Ubah draft atau aktifkan bila tidak bertumpang tindih
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContractInput' }
+      responses:
+        '200': { description: Draft diperbarui atau diaktifkan }
+        '409': { description: Kontrak terkunci atau masa aktif bertumpang tindih }
+    delete:
+      tags: [Employees]
+      operationId: deleteContract
+      x-permission: kontrak.hapus
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Draft dihapus dan diaudit }
+        '409': { description: Hanya draft dapat dihapus }
+  /api/v1/admin/employees/{id}/contracts:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: listEmployeeContracts
+      x-permission: kontrak.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Kontrak milik karyawan dalam scope }
+        '404': { description: Karyawan di luar tenant atau scope }
   /api/v1/platform/tenants:
     get:
       tags: [Platform]
@@ -2024,6 +2234,99 @@ paths:
           schema: { type: string, pattern: '^\d{4}-\d{2}$', example: '2026-11' }
       responses:
         '200': { description: Ringkasan dihitung dari attendance_daily }
+  /api/v1/admin/approvals/inbox:
+    get:
+      tags: [Approvals]
+      operationId: getApprovalInbox
+      x-permission: persetujuan.lihat
+      summary: Pengajuan dengan tugas yang ditugaskan kepada pengguna Admin saat ini
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: request_type, schema: { type: string } }
+        - { in: query, name: task_status, schema: { type: string, enum: [pending, approved, rejected, skipped, cancelled] } }
+      responses:
+        '200': { description: Inbox dibatasi permission, scope, dan assignee }
+  /api/v1/admin/approval-flows:
+    get:
+      tags: [Approvals]
+      operationId: listApprovalFlows
+      x-permission: pengaturan.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: request_type, schema: { type: string } }
+      responses:
+        '200': { description: Daftar alur approval tenant }
+  /api/v1/admin/approval-flows/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Approvals]
+      operationId: getApprovalFlow
+      x-permission: pengaturan.lihat
+      responses:
+        '200': { description: Alur beserta seluruh tahap }
+        '404': { description: Alur tidak ada dalam tenant }
+  /api/v1/admin/approvals/summary:
+    get:
+      tags: [Approvals]
+      operationId: getApprovalSummary
+      x-permission: persetujuan.lihat
+      responses:
+        '200': { description: Total tugas pending milik pengguna, dikelompokkan menurut jenis pengajuan }
+  /api/v1/admin/approvals:
+    get:
+      tags: [Approvals]
+      operationId: listApprovals
+      x-permission: persetujuan.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: request_type, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Semua pengajuan dalam scope karyawan; pengajuan tanpa subjek hanya untuk scope seluruh tenant }
+  /api/v1/admin/approvals/{requestId}:
+    parameters:
+      - in: path
+        name: requestId
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    get:
+      tags: [Approvals]
+      operationId: getApproval
+      x-permission: persetujuan.lihat
+      responses:
+        '200': { description: Pengajuan, approval instance, tugas, dan riwayat aksi }
+        '404': { description: Pengajuan di luar tenant atau scope }
+  /api/v1/ess/requests:
+    get:
+      tags: [Approvals]
+      operationId: listEssRequests
+      summary: Pengajuan yang dibuat akun ESS saat ini
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: request_type, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: Pengajuan pribadi lintas modul }
+  /api/v1/ess/requests/{requestId}:
+    parameters:
+      - in: path
+        name: requestId
+        required: true
+        schema: { type: string, minLength: 26, maxLength: 26 }
+    get:
+      tags: [Approvals]
+      operationId: getEssRequest
+      summary: Status dan tahap pengajuan pribadi
+      responses:
+        '200': { description: Detail status pengajuan pribadi }
+        '404': { description: Pengajuan bukan milik akun saat ini }
   /api/v1/realtime/ws:
     get:
       tags: [Realtime]
@@ -2234,6 +2537,68 @@ components:
             employee_id: { type: string }
             office_name: { type: string }
             revoked_at: { type: string, format: date-time, nullable: true }
+    EmployeeFamilyInput:
+      type: object
+      properties:
+        relation: { type: string, maxLength: 32 }
+        name: { type: string, maxLength: 200 }
+        birth_date: { type: string, format: date, nullable: true }
+        is_dependent: { type: boolean }
+    EmployeeFamily:
+      allOf:
+        - $ref: '#/components/schemas/EmployeeFamilyInput'
+        - type: object
+          properties:
+            id: { type: string }
+            employee_id: { type: string }
+    EmployeeAssignment:
+      type: object
+      properties:
+        id: { type: string }
+        employee_id: { type: string }
+        region_id: { type: string }
+        office_id: { type: string }
+        division_id: { type: string }
+        department_id: { type: string }
+        position_id: { type: string }
+        reports_to_employee_id: { type: string, nullable: true }
+        grade: { type: string, nullable: true }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time, nullable: true }
+        current: { type: boolean }
+    Contract:
+      type: object
+      properties:
+        id: { type: string }
+        employee_id: { type: string }
+        contract_type: { type: string, enum: [PKWT, PKWTT, PROBASI] }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date, nullable: true }
+        status: { type: string }
+        file_id: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+    ContractInput:
+      type: object
+      properties:
+        employee_id: { type: string, description: Wajib saat membuat; tidak dapat diubah }
+        contract_type: { type: string, enum: [PKWT, PKWTT, PROBASI] }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date, nullable: true }
+        file_id: { type: string, nullable: true, description: Berkas purpose contract dan hasil scan clean }
+        status: { type: string, enum: [draft, active], description: Hanya PATCH draft ke active }
+    EmergencyContactInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 200 }
+        relation: { type: string, maxLength: 32 }
+        phone: { type: string, maxLength: 32 }
+    EmergencyContact:
+      allOf:
+        - $ref: '#/components/schemas/EmergencyContactInput'
+        - type: object
+          properties:
+            id: { type: string }
+            employee_id: { type: string }
     Notification:
       type: object
       properties:

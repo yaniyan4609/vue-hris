@@ -5,7 +5,7 @@ Repositori produk berdasarkan empat dokumen di `full-docs/`: PRD v2.3, Matriks M
 ## Struktur
 
 - `frontend/` — template Vue/Vite dan komponen Base dengan login morphing, panel Platform/Admin, serta ESS mobile. View demonstrasi tersedia melalui menu Template khusus Superadmin.
-- `backend/` — API Go/Chi, sesi login, seed staging, evaluasi permission/scope, organisasi/karyawan, shift, pola, roster, baca presensi ESS, inbox notifikasi, dan WebSocket notifikasi awal.
+- `backend/` — API Go/Chi, sesi login, seed staging, evaluasi permission/scope, organisasi/karyawan, kontrak, shift, pola, roster, baca pengajuan/presensi ESS, inbox notifikasi, dan WebSocket notifikasi awal.
 - `docs/IMPLEMENTATION_PLAN.md` — urutan fase, keputusan, dan isu produk yang masih terbuka.
 - `full-docs/` — kebutuhan produk dan rancangan lengkap dari Product Owner.
 - `docs/BACKEND_API_IMPLEMENTATION_PLAN.md` — peta kesenjangan API dan urutan implementasi penuh backend.

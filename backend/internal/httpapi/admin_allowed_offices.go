@@ -50,7 +50,7 @@ func scanAllowedOffice(row interface{ Scan(...any) error }) (allowedOffice, erro
 const allowedOfficeColumns = `ao.id,ao.employee_id,ao.office_id,o.name,ao.valid_from,ao.valid_to,ao.reason,ao.revoked_at`
 const allowedOfficeJoin = ` FROM employee_allowed_offices ao JOIN offices o ON o.tenant_id=ao.tenant_id AND o.id=ao.office_id`
 
-func (a adminAPI) allowedOfficeEmployee(w http.ResponseWriter, r *http.Request, c adminContext) (string, bool) {
+func (a adminAPI) scopedEmployee(w http.ResponseWriter, r *http.Request, c adminContext) (string, bool) {
 	id := chi.URLParam(r, "id")
 	if len(id) != 26 {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Karyawan tidak ditemukan dalam scope.")
@@ -76,7 +76,7 @@ func (a adminAPI) listAllowedOffices(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	id, ok := a.allowedOfficeEmployee(w, r, c)
+	id, ok := a.scopedEmployee(w, r, c)
 	if !ok {
 		return
 	}
@@ -107,7 +107,7 @@ func (a adminAPI) createAllowedOffice(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	employeeID, ok := a.allowedOfficeEmployee(w, r, c)
+	employeeID, ok := a.scopedEmployee(w, r, c)
 	if !ok {
 		return
 	}
@@ -198,7 +198,7 @@ func (a adminAPI) revokeAllowedOffice(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	employeeID, ok := a.allowedOfficeEmployee(w, r, c)
+	employeeID, ok := a.scopedEmployee(w, r, c)
 	if !ok {
 		return
 	}
