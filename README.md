@@ -1,11 +1,11 @@
 # vue-hris — digaji.id SaaS HRIS
 
-Repositori produk berdasarkan empat dokumen di `full-docs/`: PRD v2.3, Matriks Menu/Role/Fungsional, Desain Database, dan Spesifikasi API REST + WebSocket. Frontend memakai template Vue 3 milik pemilik proyek dari [ui-ux-vue-v1.0](https://github.com/yaniyan4609/ui-ux-vue-v1.0), commit `31411c9`. Panduan UI berada di `frontend/aturan-ui.md` dan `frontend/desain-ui.md`.
+Repositori produk berdasarkan empat dokumen di `full-docs/`: PRD v2.3, Matriks Menu/Role/Fungsional, Desain Database, dan Spesifikasi API REST + WebSocket. Frontend memakai template Vue 3 milik pemilik proyek dari [ui-ux-vue-v1.0](https://github.com/yaniyan4609/ui-ux-vue-v1.0), commit `31411c9`. Panduan UI berada di `frontend/aturan-ui.md` dan `frontend/desain-ui.md`. Cakupan endpoint terhadap spesifikasi dipantau di `docs/API_ENDPOINT_COVERAGE.md`.
 
 ## Struktur
 
 - `frontend/` — template Vue/Vite dan komponen Base dengan login morphing, panel Platform/Admin, serta ESS mobile. View demonstrasi tersedia melalui menu Template khusus Superadmin.
-- `backend/` — API Go/Chi, sesi login, seed staging, evaluasi permission/scope, organisasi/karyawan, inbox notifikasi, dan WebSocket notifikasi awal.
+- `backend/` — API Go/Chi, sesi login, seed staging, evaluasi permission/scope, organisasi/karyawan, shift, pola, roster, baca presensi ESS, inbox notifikasi, dan WebSocket notifikasi awal.
 - `docs/IMPLEMENTATION_PLAN.md` — urutan fase, keputusan, dan isu produk yang masih terbuka.
 - `full-docs/` — kebutuhan produk dan rancangan lengkap dari Product Owner.
 - `docs/BACKEND_API_IMPLEMENTATION_PLAN.md` — peta kesenjangan API dan urutan implementasi penuh backend.

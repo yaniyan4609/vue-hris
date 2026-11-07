@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.7.0
+  version: 0.8.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -22,6 +22,10 @@ tags:
     description: Permission, scope, dan hak efektif
   - name: Organization
     description: Master organisasi tenant
+  - name: Lookups
+    description: Pilihan ringan dengan permission dan scope
+  - name: Schedule
+    description: Master shift, pola jadwal, dan hari libur
   - name: Employees
     description: Data karyawan dan profil ESS
   - name: Platform
@@ -1332,6 +1336,628 @@ paths:
         - { $ref: '#/components/parameters/CSRFToken' }
       responses:
         '204': { description: Semua notifikasi dalam filter ditandai terbaca }
+  /api/v1/admin/organization/tree:
+    get:
+      tags: [Organization]
+      operationId: getOrganizationTree
+      summary: Pohon Divisi, Departemen, Jabatan
+      x-permission: organisasi.lihat
+      responses:
+        '200': { description: Pohon organisasi tenant }
+  /api/v1/admin/locations/tree:
+    get:
+      tags: [Organization]
+      operationId: getLocationsTree
+      summary: Pohon Wilayah dan Kantor
+      x-permission: organisasi.lihat
+      responses:
+        '200': { description: Pohon lokasi tenant }
+  /api/v1/admin/offices/{id}/geofences:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Organization]
+      operationId: listOfficeGeofences
+      summary: Daftar polygon kantor
+      x-permission: organisasi.lihat
+      responses:
+        '200': { description: Geofence kantor dalam tenant }
+        '404': { description: Kantor tidak ditemukan }
+    post:
+      tags: [Organization]
+      operationId: createOfficeGeofence
+      summary: Tambah polygon kantor
+      x-permission: organisasi.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Geofence' }
+      responses:
+        '201': { description: Geofence dibuat }
+        '400': { description: Polygon tidak tertutup, berpotongan, atau di luar rentang koordinat }
+        '404': { description: Kantor tidak ditemukan }
+  /api/v1/admin/geofences/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Organization]
+      operationId: getGeofence
+      x-permission: organisasi.lihat
+      responses:
+        '200': { description: Detail geofence }
+        '404': { description: Geofence tidak ditemukan dalam tenant }
+    patch:
+      tags: [Organization]
+      operationId: updateGeofence
+      x-permission: organisasi.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Geofence' }
+      responses:
+        '200': { description: Geofence diperbarui }
+        '400': { description: Geometri tidak valid }
+        '404': { description: Geofence tidak ditemukan dalam tenant }
+    delete:
+      tags: [Organization]
+      operationId: deactivateGeofence
+      summary: Nonaktifkan geofence sambil mempertahankan riwayat
+      x-permission: organisasi.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Geofence dinonaktifkan }
+        '404': { description: Geofence tidak ditemukan dalam tenant }
+  /api/v1/admin/geofences/test-point:
+    post:
+      tags: [Organization]
+      operationId: testGeofencePoint
+      summary: Uji titik terhadap polygon aktif tenant
+      x-permission: organisasi.lihat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat: { type: number, minimum: -90, maximum: 90 }
+                lng: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        '200': { description: inside dan daftar polygon yang cocok }
+  /api/v1/lookups/{type}:
+    parameters:
+      - $ref: '#/components/parameters/LookupType'
+      - $ref: '#/components/parameters/PerPage'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Search'
+    get:
+      tags: [Lookups]
+      operationId: lookupCatalog
+      summary: Pilihan master sesuai permission modul
+      description: Bank berasal dari kode rekening yang telah ada dan hanya terlihat dalam scope karyawan sensitif pemanggil. Jenis cuti dapat diakses ESS yang berhak mengajukan cuti.
+      responses:
+        '200': { description: Item id, label, badge dan meta paginasi }
+        '403': { description: Permission atau entitlement tidak ada }
+        '404': { description: Jenis lookup tidak tersedia }
+  /api/v1/lookups/employees:
+    get:
+      tags: [Lookups]
+      operationId: lookupEmployees
+      summary: Cari karyawan sesuai permission dan scope tujuan
+      parameters:
+        - in: query
+          name: for
+          required: true
+          schema: { type: string, enum: [broadcast, roster, approval, leave, contract, document] }
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200': { description: Hanya karyawan aktif dalam scope tujuan }
+        '400': { description: Parameter for kosong atau tidak dikenal }
+        '403': { description: Permission atau entitlement tidak ada }
+  /api/v1/admin/shift-templates:
+    get:
+      tags: [Schedule]
+      operationId: listShiftTemplates
+      x-permission: jadwal.lihat
+      parameters:
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200': { description: Shift; yang dipin tampil lebih dulu menurut pin_order }
+    post:
+      tags: [Schedule]
+      operationId: createShiftTemplate
+      x-permission: jadwal.buat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShiftTemplate' }
+      responses:
+        '201': { description: Shift dibuat }
+        '400': { description: Waktu, pin, atau warna tidak valid }
+        '409': { description: Kode atau urutan pin duplikat }
+  /api/v1/admin/shift-templates/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Schedule]
+      operationId: getShiftTemplate
+      x-permission: jadwal.lihat
+      responses:
+        '200': { description: Detail shift }
+        '404': { description: Shift tidak ditemukan dalam tenant }
+    patch:
+      tags: [Schedule]
+      operationId: updateShiftTemplate
+      summary: Ubah master; instance lama tetap memakai snapshot
+      x-permission: jadwal.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShiftTemplate' }
+      responses:
+        '200': { description: Shift diperbarui }
+        '400': { description: Data shift tidak valid }
+        '404': { description: Shift tidak ditemukan dalam tenant }
+    delete:
+      tags: [Schedule]
+      operationId: deactivateShiftTemplate
+      x-permission: jadwal.hapus
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Shift dinonaktifkan, instance lama tetap utuh }
+  /api/v1/admin/shift-templates/{id}/duplicate:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Schedule]
+      operationId: duplicateShiftTemplate
+      x-permission: jadwal.buat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string }
+                name: { type: string }
+      responses:
+        '201': { description: Salinan shift tidak dipin }
+  /api/v1/admin/schedule-patterns:
+    get:
+      tags: [Schedule]
+      operationId: listSchedulePatterns
+      x-permission: jadwal.lihat
+      parameters:
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200': { description: Pola mingguan dan bulanan }
+    post:
+      tags: [Schedule]
+      operationId: createSchedulePattern
+      x-permission: jadwal.buat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SchedulePattern' }
+      responses:
+        '201': { description: Pola dan seluruh slot dibuat atomik }
+        '400': { description: Slot tidak lengkap atau shift tidak aktif }
+  /api/v1/admin/schedule-patterns/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Schedule]
+      operationId: getSchedulePattern
+      x-permission: jadwal.lihat
+      responses:
+        '200': { description: Pola beserta seluruh slot }
+    patch:
+      tags: [Schedule]
+      operationId: updateSchedulePattern
+      x-permission: jadwal.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SchedulePattern' }
+      responses:
+        '200': { description: Metadata pola diperbarui dan version bertambah }
+        '409': { description: Versi pola telah berubah }
+    delete:
+      tags: [Schedule]
+      operationId: deactivateSchedulePattern
+      x-permission: jadwal.hapus
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Pola dinonaktifkan; roster lama tidak berubah }
+  /api/v1/admin/schedule-patterns/{id}/slots:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Schedule]
+      operationId: getSchedulePatternSlots
+      x-permission: jadwal.lihat
+      responses:
+        '200': { description: Version dan slot pola }
+    put:
+      tags: [Schedule]
+      operationId: replaceSchedulePatternSlots
+      x-permission: jadwal.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, slots]
+              properties:
+                version: { type: integer, minimum: 1 }
+                slots:
+                  type: array
+                  items: { $ref: '#/components/schemas/SchedulePatternSlot' }
+      responses:
+        '200': { description: Seluruh slot diganti dan version bertambah }
+        '409': { description: Versi pola telah berubah }
+  /api/v1/admin/schedule-patterns/{id}/duplicate:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Schedule]
+      operationId: duplicateSchedulePattern
+      x-permission: jadwal.buat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string }
+                name: { type: string }
+      responses:
+        '201': { description: Salinan pola dan slot dengan version 1 }
+  /api/v1/admin/schedule-patterns/{id}/preview:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Schedule]
+      operationId: previewSchedulePattern
+      summary: Pratinjau satu bulan; pekan keenam mengulang W5
+      x-permission: jadwal.lihat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [month]
+              properties:
+                month: { type: string, example: '2026-08' }
+      responses:
+        '200': { description: Tanggal, slot, dan shift yang akan diterapkan }
+        '409': { description: Pola tidak lengkap }
+  /api/v1/admin/holidays:
+    get:
+      tags: [Schedule]
+      operationId: listAdminHolidays
+      x-permission: jadwal.lihat
+      parameters:
+        - in: query
+          name: year
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200': { description: Hari libur tenant dalam tahun yang dipilih }
+    post:
+      tags: [Schedule]
+      operationId: createHoliday
+      x-permission: jadwal.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Holiday' }
+      responses:
+        '201': { description: Hari libur dibuat }
+  /api/v1/admin/holidays/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    patch:
+      tags: [Schedule]
+      operationId: updateHoliday
+      x-permission: jadwal.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Holiday' }
+      responses:
+        '200': { description: Hari libur diperbarui }
+        '404': { description: Hari libur tidak ditemukan dalam tenant }
+    delete:
+      tags: [Schedule]
+      operationId: deleteHoliday
+      x-permission: jadwal.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Hari libur dihapus }
+  /api/v1/holidays:
+    get:
+      tags: [Schedule]
+      operationId: listCalendarHolidays
+      summary: Hari libur global dan wilayah karyawan untuk kalender
+      parameters:
+        - in: query
+          name: year
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+      responses:
+        '200': { description: Hari libur untuk tenant dan wilayah karyawan saat ini }
+  /api/v1/admin/work-schedules:
+    get:
+      tags: [Schedule]
+      operationId: listWorkSchedules
+      x-permission: jadwal.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - in: query
+          name: employee_id
+          schema: { type: string }
+        - in: query
+          name: office_id
+          schema: { type: string }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: status
+          schema: { type: string, enum: [draft, published, cancelled] }
+      responses:
+        '200': { description: Roster dalam scope karyawan; cancelled tersembunyi bila status kosong }
+    post:
+      tags: [Schedule]
+      operationId: createWorkSchedule
+      x-permission: jadwal.buat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkScheduleInput' }
+      responses:
+        '201': { description: Satu draft roster dibuat }
+        '409': { description: Karyawan sudah memiliki roster pada tanggal tersebut }
+  /api/v1/admin/work-schedules/bulk:
+    post:
+      tags: [Schedule]
+      operationId: bulkWorkSchedules
+      summary: Terapkan pola ke roster draft; dry_run mendeteksi konflik tanpa menulis
+      x-permission: jadwal.buat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_ids, pattern_id, from, to]
+              properties:
+                employee_ids: { type: array, minItems: 1, maxItems: 50, items: { type: string } }
+                pattern_id: { type: string }
+                office_id: { type: string, nullable: true }
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+                dry_run: { type: boolean, default: false }
+      responses:
+        '200': { description: Hasil dry_run atau draft berhasil dibuat, maksimal 200 sel }
+        '409': { description: Ada roster pada tanggal tujuan atau pola tidak tersedia }
+  /api/v1/admin/work-schedules/publish:
+    post:
+      tags: [Schedule]
+      operationId: publishWorkSchedules
+      summary: Terbitkan draft dan materialisasi shift instance serta snapshot aturan
+      x-permission: jadwal.publikasi
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+                employee_ids: { type: array, maxItems: 100, items: { type: string } }
+      responses:
+        '200': { description: Daftar roster dan instance yang diterbitkan, maksimal 200 roster }
+        '404': { description: Tidak ada draft dalam rentang dan scope }
+        '409': { description: Shift, kantor, atau versi draft berubah }
+  /api/v1/admin/work-schedules/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Schedule]
+      operationId: getWorkSchedule
+      x-permission: jadwal.lihat
+      responses:
+        '200': { description: Detail roster dalam scope }
+        '404': { description: Tidak ditemukan dalam tenant atau scope }
+    patch:
+      tags: [Schedule]
+      operationId: updateWorkSchedule
+      x-permission: jadwal.ubah
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WorkScheduleInput'
+                - type: object
+                  required: [version]
+                  properties:
+                    version: { type: integer, minimum: 1 }
+                    reason: { type: string, maxLength: 500 }
+      responses:
+        '200': { description: Draft diperbarui }
+        '409': { description: Versi berubah atau roster sudah diterbitkan }
+    delete:
+      tags: [Schedule]
+      operationId: cancelWorkSchedule
+      x-permission: jadwal.hapus
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Draft dibatalkan }
+        '409': { description: Roster sudah diterbitkan }
+  /api/v1/admin/shift-instances:
+    get:
+      tags: [Schedule]
+      operationId: listShiftInstances
+      x-permission: jadwal.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - in: query
+          name: employee_id
+          schema: { type: string }
+        - in: query
+          name: office_id
+          schema: { type: string }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Instance shift terbit dalam scope, termasuk waktu UTC dan snapshot }
+  /api/v1/admin/shift-instances/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Schedule]
+      operationId: getShiftInstance
+      x-permission: jadwal.lihat
+      responses:
+        '200': { description: Detail instance dan snapshot aturan saat publikasi }
+        '404': { description: Tidak ditemukan dalam tenant atau scope }
+  /api/v1/ess/schedule:
+    get:
+      tags: [Schedule]
+      operationId: getEssSchedule
+      summary: Jadwal terbit milik karyawan yang sedang masuk
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Roster dan instance milik karyawan, maksimum 91 hari }
+        '403': { description: Keanggotaan ESS tidak tersedia }
+  /api/v1/ess/attendance/today:
+    get:
+      tags: [Schedule]
+      operationId: getEssAttendanceToday
+      summary: Shift aktif, event presensi, dan kantor yang diizinkan untuk karyawan saat ini
+      responses:
+        '200': { description: Tanggal lokal, shift instance bila ada, event, dan kantor diizinkan }
+        '404': { description: Akun ESS belum memiliki profil karyawan aktif }
+  /api/v1/ess/attendance/history:
+    get:
+      tags: [Schedule]
+      operationId: getEssAttendanceHistory
+      summary: Event presensi milik sendiri berdasarkan tanggal kerja instance
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Event milik karyawan, rentang maksimal 93 hari }
+  /api/v1/ess/attendance/calendar:
+    get:
+      tags: [Schedule]
+      operationId: getEssAttendanceCalendar
+      summary: Status presensi harian milik sendiri
+      parameters:
+        - in: query
+          name: month
+          schema: { type: string, pattern: '^\d{4}-\d{2}$', example: '2026-11' }
+      responses:
+        '200': { description: Data attendance_daily untuk bulan tersebut }
+  /api/v1/ess/attendance/summary:
+    get:
+      tags: [Schedule]
+      operationId: getEssAttendanceSummary
+      summary: Jumlah hari tercatat, hadir, terlambat, dan menit kerja milik sendiri
+      parameters:
+        - in: query
+          name: month
+          schema: { type: string, pattern: '^\d{4}-\d{2}$', example: '2026-11' }
+      responses:
+        '200': { description: Ringkasan dihitung dari attendance_daily }
   /api/v1/realtime/ws:
     get:
       tags: [Realtime]
@@ -1347,6 +1973,18 @@ paths:
         '403': { description: Origin, permission, atau entitlement ditolak }
 components:
   parameters:
+    ResourceID:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, minLength: 26, maxLength: 26 }
+    LookupType:
+      in: path
+      name: type
+      required: true
+      schema:
+        type: string
+        enum: [regions, offices, divisions, departments, positions, roles, leave-types, shift-templates, document-types, reimbursement-categories, pay-components, banks]
     UserID:
       in: path
       name: id
@@ -1394,6 +2032,125 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    Geofence:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        office_id: { type: string, readOnly: true }
+        name: { type: string, maxLength: 160 }
+        polygon:
+          type: object
+          required: [type, coordinates]
+          properties:
+            type: { type: string, enum: [Polygon] }
+            coordinates:
+              type: array
+              description: Satu cincin tertutup; setiap titik [longitude, latitude]. Lubang polygon belum didukung.
+              items:
+                type: array
+                items:
+                  type: array
+                  minItems: 2
+                  maxItems: 2
+                  items: { type: number }
+        is_active: { type: boolean, default: true }
+    ShiftTemplate:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        code: { type: string, maxLength: 48 }
+        name: { type: string, maxLength: 160 }
+        start_time: { type: string, example: '09:00:00' }
+        end_time: { type: string, example: '17:00:00' }
+        crosses_midnight: { type: boolean }
+        clock_in_window_start_time: { type: string, example: '08:00:00' }
+        clock_in_window_start_day_offset: { type: integer, minimum: -1, maximum: 2 }
+        clock_in_window_end_time: { type: string, example: '09:30:00' }
+        clock_in_window_end_day_offset: { type: integer, minimum: -1, maximum: 2 }
+        clock_out_window_start_time: { type: string, example: '16:30:00' }
+        clock_out_window_start_day_offset: { type: integer, minimum: -1, maximum: 2 }
+        clock_out_window_end_time: { type: string, example: '19:00:00' }
+        clock_out_window_end_day_offset: { type: integer, minimum: -1, maximum: 2 }
+        late_tolerance_min: { type: integer, minimum: 0 }
+        break_minutes: { type: integer, minimum: 0 }
+        target_work_minutes: { type: integer, nullable: true }
+        flex_time: { type: boolean }
+        flex_location: { type: boolean }
+        require_location: { type: boolean }
+        require_selfie: { type: boolean }
+        require_face_recognition: { type: boolean }
+        is_pinned: { type: boolean }
+        pin_order: { type: integer, nullable: true }
+        color_hex: { type: string, pattern: '^#[0-9A-Fa-f]{6}$' }
+        is_active: { type: boolean }
+    SchedulePatternSlot:
+      type: object
+      required: [week_no, weekday, day_type]
+      properties:
+        week_no: { type: integer, minimum: 1, maximum: 5 }
+        weekday: { type: integer, minimum: 1, maximum: 7, description: '1=Senin, 7=Minggu' }
+        day_type: { type: string, enum: [shift, 'off'] }
+        shift_template_id: { type: string, nullable: true }
+    SchedulePattern:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        code: { type: string, maxLength: 48 }
+        name: { type: string, maxLength: 160 }
+        pattern_type: { type: string, enum: [weekly, monthly] }
+        version: { type: integer, minimum: 1 }
+        is_pinned: { type: boolean }
+        pin_order: { type: integer, nullable: true }
+        is_active: { type: boolean }
+        slots:
+          type: array
+          description: Tepat 7 slot mingguan atau 35 slot bulanan.
+          items: { $ref: '#/components/schemas/SchedulePatternSlot' }
+    Holiday:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        holiday_date: { type: string, format: date }
+        name: { type: string, maxLength: 160 }
+        holiday_type: { type: string, maxLength: 24 }
+        region_id: { type: string, nullable: true }
+    WorkScheduleInput:
+      type: object
+      properties:
+        employee_id: { type: string, description: Wajib saat membuat draft; tidak dapat diubah }
+        work_date: { type: string, format: date }
+        day_type: { type: string, enum: [shift, 'off'] }
+        shift_template_id: { type: string, nullable: true }
+        office_id: { type: string, nullable: true }
+    WorkSchedule:
+      allOf:
+        - $ref: '#/components/schemas/WorkScheduleInput'
+        - type: object
+          properties:
+            id: { type: string }
+            source_pattern_id: { type: string, nullable: true }
+            source_pattern_version: { type: integer, nullable: true }
+            status: { type: string, enum: [draft, published, cancelled] }
+            version: { type: integer }
+            published_at: { type: string, format: date-time, nullable: true }
+    ShiftInstance:
+      type: object
+      properties:
+        id: { type: string }
+        employee_id: { type: string }
+        work_schedule_id: { type: string }
+        shift_template_id: { type: string }
+        office_id: { type: string }
+        work_date: { type: string, format: date }
+        timezone: { type: string }
+        expected_start: { type: string, format: date-time }
+        expected_end: { type: string, format: date-time }
+        clock_in_window_start_at: { type: string, format: date-time }
+        clock_in_window_end_at: { type: string, format: date-time }
+        clock_out_window_start_at: { type: string, format: date-time }
+        clock_out_window_end_at: { type: string, format: date-time }
+        rule_snapshot: { type: object, description: Aturan shift saat roster diterbitkan }
+        status: { type: string }
     Notification:
       type: object
       properties:

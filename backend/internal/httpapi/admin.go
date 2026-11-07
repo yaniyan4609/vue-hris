@@ -32,6 +32,8 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 	a := adminAPI{db: db, auth: auth.Service{DB: db}, access: access.Store{DB: db}}
 	r.Route("/api/v1/admin", func(r chi.Router) {
 		a.mountOrganizationContract(r, config)
+		a.mountOrganizationExtras(r, config)
+		a.mountScheduleMasters(r, config)
 		a.mountAccessContract(r, config)
 		r.Get("/capabilities", a.capabilities)
 		r.Get("/organization/{kind}", a.listOrganization)
@@ -52,6 +54,11 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 		r.With(checkOrigin(config)).Delete("/access/users/{id}/scopes/{code}", a.clearUserScope)
 		r.With(checkOrigin(config)).Post("/access/preview", a.previewUserAccess)
 	})
+	r.Get("/api/v1/lookups/employees", a.lookupEmployees)
+	r.Get("/api/v1/lookups/{type}", a.lookupCatalog)
+	r.Get("/api/v1/holidays", a.calendarHolidays)
+	r.Get("/api/v1/ess/schedule", a.essSchedule)
+	a.mountEssAttendance(r)
 }
 
 func (a adminAPI) authorize(w http.ResponseWriter, r *http.Request, code string) (adminContext, bool) {

@@ -1,0 +1,507 @@
+method,path,section,status
+DELETE,/api/v1/admin/agenda-events/{id},12.3 Agenda,planned
+DELETE,/api/v1/admin/api-keys/{id},14.5 Pengaturan tenant dan langganan,planned
+DELETE,/api/v1/admin/approval-delegations/{id},10.3 Pengaturan alur approval,planned
+DELETE,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,planned
+DELETE,/api/v1/admin/assets/{id},7.7 Aset karyawan,planned
+DELETE,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
+DELETE,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
+DELETE,/api/v1/admin/contracts/{id},7.3 Kontrak,planned
+DELETE,/api/v1/admin/departments/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
+DELETE,/api/v1/admin/divisions/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
+DELETE,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
+DELETE,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
+DELETE,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
+DELETE,/api/v1/admin/employees/{id},7.1 Karyawan,planned
+DELETE,/api/v1/admin/employees/{id}/allowed-offices/{allowedId},7.2 Data pendukung karyawan,planned
+DELETE,/api/v1/admin/employees/{id}/bank-accounts/{accountId},7.2 Data pendukung karyawan,planned
+DELETE,/api/v1/admin/employees/{id}/emergency-contacts/{contactId},7.2 Data pendukung karyawan,planned
+DELETE,/api/v1/admin/employees/{id}/families/{familyId},7.2 Data pendukung karyawan,planned
+DELETE,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
+DELETE,/api/v1/admin/holidays/{id},"8.3 Admin: master shift, roster, dan libur",active
+DELETE,/api/v1/admin/leave-policies/{id},9.2 Admin: cuti dan izin,planned
+DELETE,/api/v1/admin/leave-types/{id},9.2 Admin: cuti dan izin,planned
+DELETE,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
+DELETE,/api/v1/admin/payroll/runs/{id}/items/{itemId}/lines/{lineId},11.2 Periode dan payroll run,planned
+DELETE,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,planned
+DELETE,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
+DELETE,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
+DELETE,/api/v1/admin/users/{id}/roles/{userRoleId},5.3 Hak akses per pengguna,planned
+DELETE,/api/v1/admin/users/{id}/scopes/{module},5.3 Hak akses per pengguna,planned
+DELETE,/api/v1/admin/users/{id}/sessions,5.1 Pengguna,active
+DELETE,/api/v1/admin/users/{id}/sessions/{sessionId},5.1 Pengguna,active
+DELETE,/api/v1/admin/webhooks/{id},14.5 Pengaturan tenant dan langganan,planned
+DELETE,/api/v1/admin/work-schedules/{id},"8.3 Admin: master shift, roster, dan libur",active
+DELETE,/api/v1/ess/profile/change-requests/{id},7.8 ESS: profil sendiri,planned
+DELETE,/api/v1/ess/profile/emergency-contacts/{id},7.8 ESS: profil sendiri,planned
+DELETE,/api/v1/files/{id},12.1 Berkas,planned
+DELETE,/api/v1/jobs/{id},14.3 Ekspor dan impor (job generik),planned
+DELETE,/api/v1/me/sessions/{id},"4. Autentikasi, akun, dan sesi",active
+DELETE,/api/v1/platform/plans/{id},"15.2 Paket, langganan, dan billing",planned
+DELETE,/api/v1/platform/staff/{id},"15.3 Staf, tiket, analitik, pengaturan",planned
+DELETE,/api/v1/platform/support-sessions/{id},"15.1 Dashboard, tenant, dan dukungan",planned
+DELETE,/api/v1/push/subscriptions/{id},13.1 Inbox dan preferensi (semua pengguna),planned
+GET,/api/v1/admin/access-reviews,5.3 Hak akses per pengguna,planned
+GET,/api/v1/admin/agenda-events,12.3 Agenda,planned
+GET,/api/v1/admin/api-keys,14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/approval-delegations,10.3 Pengaturan alur approval,planned
+GET,/api/v1/admin/approval-flows,10.3 Pengaturan alur approval,planned
+GET,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,planned
+GET,/api/v1/admin/approvals,10.1 Admin: inbox dan keputusan,planned
+GET,/api/v1/admin/approvals/inbox,10.1 Admin: inbox dan keputusan,planned
+GET,/api/v1/admin/approvals/summary,10.1 Admin: inbox dan keputusan,planned
+GET,/api/v1/admin/approvals/{requestId},10.1 Admin: inbox dan keputusan,planned
+GET,/api/v1/admin/assets,7.7 Aset karyawan,planned
+GET,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/attendance/corrections/{id},8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/attendance/daily,8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/attendance/events,8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/attendance/events/{id},8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/attendance/not-yet,8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/attendance/summary,8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/attendance/today,8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/audit-logs,14.4 Audit dan keamanan,planned
+GET,/api/v1/admin/audit-logs/{id},14.4 Audit dan keamanan,planned
+GET,/api/v1/admin/broadcasts,13.3 Broadcast / pengumuman,planned
+GET,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
+GET,/api/v1/admin/broadcasts/{id}/recipients,13.3 Broadcast / pengumuman,planned
+GET,/api/v1/admin/broadcasts/{id}/stats,13.3 Broadcast / pengumuman,planned
+GET,/api/v1/admin/company-documents,12.2 Dokumen,planned
+GET,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
+GET,/api/v1/admin/company-profile,14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/contracts,7.3 Kontrak,planned
+GET,/api/v1/admin/contracts/expiring,7.3 Kontrak,planned
+GET,/api/v1/admin/contracts/{id},7.3 Kontrak,planned
+GET,/api/v1/admin/dashboard/attendance-trend,14.1 Dashboard,planned
+GET,/api/v1/admin/dashboard/expiring,14.1 Dashboard,planned
+GET,/api/v1/admin/dashboard/headcount,14.1 Dashboard,planned
+GET,/api/v1/admin/dashboard/payroll-cost,14.1 Dashboard,planned
+GET,/api/v1/admin/dashboard/summary,14.1 Dashboard,planned
+GET,/api/v1/admin/departments,6.1 Master organisasi,planned
+GET,/api/v1/admin/departments/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,planned
+GET,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
+GET,/api/v1/admin/divisions,6.1 Master organisasi,planned
+GET,/api/v1/admin/divisions/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/document-templates,12.2 Dokumen,planned
+GET,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
+GET,/api/v1/admin/document-types,12.2 Dokumen,planned
+GET,/api/v1/admin/employee-assets,7.7 Aset karyawan,planned
+GET,/api/v1/admin/employee-changes,"7.4 Mutasi, promosi, dan demosi",planned
+GET,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
+GET,/api/v1/admin/employee-documents,12.2 Dokumen,planned
+GET,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
+GET,/api/v1/admin/employees,7.1 Karyawan,active
+GET,/api/v1/admin/employees/next-number,7.1 Karyawan,planned
+GET,/api/v1/admin/employees/{id},7.1 Karyawan,active
+GET,/api/v1/admin/employees/{id}/allowed-offices,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/assignments,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/bank-accounts,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/contracts,7.3 Kontrak,planned
+GET,/api/v1/admin/employees/{id}/documents,12.2 Dokumen,planned
+GET,/api/v1/admin/employees/{id}/emergency-contacts,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/families,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/leave-balances,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/employees/{id}/summary,7.1 Karyawan,planned
+GET,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/timeline,7.1 Karyawan,planned
+GET,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
+GET,/api/v1/admin/holidays,"8.3 Admin: master shift, roster, dan libur",active
+GET,/api/v1/admin/imports/templates/{type},14.3 Ekspor dan impor (job generik),planned
+GET,/api/v1/admin/imports/{id},14.3 Ekspor dan impor (job generik),planned
+GET,/api/v1/admin/imports/{id}/errors,14.3 Ekspor dan impor (job generik),planned
+GET,/api/v1/admin/imports/{id}/preview,14.3 Ekspor dan impor (job generik),planned
+GET,/api/v1/admin/leave-balances,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/leave-balances/ledger,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/leave-calendar,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/leave-policies,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/leave-requests,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/leave-types,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/loan-policies,9.4 Kasbon,planned
+GET,/api/v1/admin/loans,9.4 Kasbon,planned
+GET,/api/v1/admin/loans/{id},9.4 Kasbon,planned
+GET,/api/v1/admin/locations/tree,6.1 Master organisasi,active
+GET,/api/v1/admin/login-events,14.4 Audit dan keamanan,planned
+GET,/api/v1/admin/notification-deliveries,"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/notification-event-types,"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/notification-rules,"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/notification-stats,"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/notification-templates,"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/offices,6.1 Master organisasi,planned
+GET,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
+GET,/api/v1/admin/organization/tree,6.1 Master organisasi,active
+GET,/api/v1/admin/overtime-requests,9.3 Lembur,planned
+GET,/api/v1/admin/overtime-requests/{id},9.3 Lembur,planned
+GET,/api/v1/admin/overtime-summary,9.3 Lembur,planned
+GET,/api/v1/admin/payroll/bank-formats,11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/periods/{id},11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/rules/bpjs,11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/payroll/rules/tax,11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/payroll/runs,11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/runs/{id},11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/runs/{id}/adjustments,11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/runs/{id}/items,11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/runs/{id}/items/{itemId},11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/runs/{id}/summary,11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/runs/{id}/validation,11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/payslips,11.3 Slip gaji,planned
+GET,/api/v1/admin/payslips/{id},11.3 Slip gaji,planned
+GET,/api/v1/admin/payslips/{id}/download,11.3 Slip gaji,planned
+GET,/api/v1/admin/permissions,5.2 Role dan registry permission,active
+GET,/api/v1/admin/position-role-suggestions,5.3 Hak akses per pengguna,planned
+GET,/api/v1/admin/positions,6.1 Master organisasi,planned
+GET,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/regions,6.1 Master organisasi,planned
+GET,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,planned
+GET,/api/v1/admin/reimbursements,9.5 Reimbursement,planned
+GET,/api/v1/admin/reimbursements/{id},9.5 Reimbursement,planned
+GET,/api/v1/admin/reminders/summary,"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/reports,14.2 Laporan,planned
+GET,/api/v1/admin/reports/{key},14.2 Laporan,planned
+GET,/api/v1/admin/roles,5.2 Role dan registry permission,active
+GET,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
+GET,/api/v1/admin/roles/{id}/scopes,5.2 Role dan registry permission,active
+GET,/api/v1/admin/roster,"8.3 Admin: master shift, roster, dan libur",planned
+GET,/api/v1/admin/security/overview,14.4 Audit dan keamanan,planned
+GET,/api/v1/admin/settings/{group},14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/shift-instances,"8.3 Admin: master shift, roster, dan libur",active
+GET,/api/v1/admin/shift-instances/{id},"8.3 Admin: master shift, roster, dan libur",active
+GET,/api/v1/admin/shift-swaps,"8.3 Admin: master shift, roster, dan libur",planned
+GET,/api/v1/admin/shift-templates,"8.3 Admin: master shift, roster, dan libur",active
+GET,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
+GET,/api/v1/admin/subscription,14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/subscription/usage,14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/support/tickets,14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/support/tickets/{id},14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/terminations,7.6 Resign dan terminasi,planned
+GET,/api/v1/admin/terminations/{id},7.6 Resign dan terminasi,planned
+GET,/api/v1/admin/users,5.1 Pengguna,active
+GET,/api/v1/admin/users/{id},5.1 Pengguna,active
+GET,/api/v1/admin/users/{id}/access-history,5.3 Hak akses per pengguna,active
+GET,/api/v1/admin/users/{id}/effective-access,5.3 Hak akses per pengguna,active
+GET,/api/v1/admin/users/{id}/permission-overrides,5.3 Hak akses per pengguna,active
+GET,/api/v1/admin/users/{id}/roles,5.3 Hak akses per pengguna,active
+GET,/api/v1/admin/users/{id}/scopes,5.3 Hak akses per pengguna,active
+GET,/api/v1/admin/users/{id}/sessions,5.1 Pengguna,active
+GET,/api/v1/admin/webhooks,14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/webhooks/{id}/deliveries,14.5 Pengaturan tenant dan langganan,planned
+GET,/api/v1/admin/work-schedules,"8.3 Admin: master shift, roster, dan libur",active
+GET,/api/v1/agenda,12.3 Agenda,planned
+GET,/api/v1/auth/csrf,"4. Autentikasi, akun, dan sesi",active
+GET,/api/v1/auth/me,"4. Autentikasi, akun, dan sesi",active
+GET,/api/v1/auth/oauth/google/callback,"4. Autentikasi, akun, dan sesi",planned
+GET,/api/v1/auth/oauth/google/start,"4. Autentikasi, akun, dan sesi",planned
+GET,/api/v1/directory/employees,7.9 Direktori (Teman Kantor),planned
+GET,/api/v1/directory/employees/{id},7.9 Direktori (Teman Kantor),planned
+GET,/api/v1/ess/announcements,13.3 Broadcast / pengumuman,planned
+GET,/api/v1/ess/announcements/{id},13.3 Broadcast / pengumuman,planned
+GET,/api/v1/ess/attendance/calendar,8.1 ESS: absensi dan jadwal pribadi,active
+GET,/api/v1/ess/attendance/corrections,8.1 ESS: absensi dan jadwal pribadi,planned
+GET,/api/v1/ess/attendance/history,8.1 ESS: absensi dan jadwal pribadi,active
+GET,/api/v1/ess/attendance/summary,8.1 ESS: absensi dan jadwal pribadi,active
+GET,/api/v1/ess/attendance/today,8.1 ESS: absensi dan jadwal pribadi,active
+GET,/api/v1/ess/company-documents,12.2 Dokumen,planned
+GET,/api/v1/ess/company-documents/{id},12.2 Dokumen,planned
+GET,/api/v1/ess/documents,12.2 Dokumen,planned
+GET,/api/v1/ess/documents/{id},12.2 Dokumen,planned
+GET,/api/v1/ess/home,14.1 Dashboard,planned
+GET,/api/v1/ess/leave-requests,9.1 ESS: cuti dan izin,planned
+GET,/api/v1/ess/leave-requests/{id},9.1 ESS: cuti dan izin,planned
+GET,/api/v1/ess/leave/balances,9.1 ESS: cuti dan izin,planned
+GET,/api/v1/ess/leave/balances/{leaveTypeId}/ledger,9.1 ESS: cuti dan izin,planned
+GET,/api/v1/ess/leave/types,9.1 ESS: cuti dan izin,planned
+GET,/api/v1/ess/loans,9.4 Kasbon,planned
+GET,/api/v1/ess/loans/{id},9.4 Kasbon,planned
+GET,/api/v1/ess/overtime-requests,9.3 Lembur,planned
+GET,/api/v1/ess/overtime-requests/{id},9.3 Lembur,planned
+GET,/api/v1/ess/payslips,11.3 Slip gaji,planned
+GET,/api/v1/ess/payslips/{id},11.3 Slip gaji,planned
+GET,/api/v1/ess/payslips/{id}/download,11.3 Slip gaji,planned
+GET,/api/v1/ess/profile,7.8 ESS: profil sendiri,planned
+GET,/api/v1/ess/profile/change-requests,7.8 ESS: profil sendiri,planned
+GET,/api/v1/ess/profile/emergency-contacts,7.8 ESS: profil sendiri,planned
+GET,/api/v1/ess/reimbursements,9.5 Reimbursement,planned
+GET,/api/v1/ess/reimbursements/{id},9.5 Reimbursement,planned
+GET,/api/v1/ess/requests,10.2 ESS: pengajuan saya,planned
+GET,/api/v1/ess/requests/{requestId},10.2 ESS: pengajuan saya,planned
+GET,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
+GET,/api/v1/ess/schedule,8.1 ESS: absensi dan jadwal pribadi,active
+GET,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
+GET,/api/v1/files/{id},12.1 Berkas,planned
+GET,/api/v1/files/{id}/download,12.1 Berkas,planned
+GET,/api/v1/holidays,"8.3 Admin: master shift, roster, dan libur",active
+GET,/api/v1/jobs,14.3 Ekspor dan impor (job generik),planned
+GET,/api/v1/jobs/{id},14.3 Ekspor dan impor (job generik),planned
+GET,/api/v1/jobs/{id}/download,14.3 Ekspor dan impor (job generik),planned
+GET,/api/v1/lookups/employees,6.3 Lookup untuk dropdown,active
+GET,/api/v1/lookups/{type},6.3 Lookup untuk dropdown,active
+GET,/api/v1/me/access,"4. Autentikasi, akun, dan sesi",active
+GET,/api/v1/me/preferences,"4. Autentikasi, akun, dan sesi",active
+GET,/api/v1/me/sessions,"4. Autentikasi, akun, dan sesi",active
+GET,/api/v1/notifications,13.1 Inbox dan preferensi (semua pengguna),active
+GET,/api/v1/notifications/preferences,13.1 Inbox dan preferensi (semua pengguna),planned
+GET,/api/v1/notifications/sync,13.1 Inbox dan preferensi (semua pengguna),active
+GET,/api/v1/notifications/unread-count,13.1 Inbox dan preferensi (semua pengguna),active
+GET,/api/v1/notifications/{id},13.1 Inbox dan preferensi (semua pengguna),active
+GET,/api/v1/platform/analytics/{metric},"15.3 Staf, tiket, analitik, pengaturan",planned
+GET,/api/v1/platform/announcements,"15.3 Staf, tiket, analitik, pengaturan",planned
+GET,/api/v1/platform/audit-logs,"15.3 Staf, tiket, analitik, pengaturan",planned
+GET,/api/v1/platform/dashboard,"15.1 Dashboard, tenant, dan dukungan",planned
+GET,/api/v1/platform/invoices,"15.2 Paket, langganan, dan billing",planned
+GET,/api/v1/platform/invoices/{id},"15.2 Paket, langganan, dan billing",planned
+GET,/api/v1/platform/payments,"15.2 Paket, langganan, dan billing",planned
+GET,/api/v1/platform/payments/{id},"15.2 Paket, langganan, dan billing",planned
+GET,/api/v1/platform/plans,"15.2 Paket, langganan, dan billing",planned
+GET,/api/v1/platform/plans/{id},"15.2 Paket, langganan, dan billing",planned
+GET,/api/v1/platform/settings,"15.3 Staf, tiket, analitik, pengaturan",planned
+GET,/api/v1/platform/settings/{key},"15.3 Staf, tiket, analitik, pengaturan",planned
+GET,/api/v1/platform/staff,"15.3 Staf, tiket, analitik, pengaturan",active
+GET,/api/v1/platform/staff/{id},"15.3 Staf, tiket, analitik, pengaturan",active
+GET,/api/v1/platform/subscriptions,"15.2 Paket, langganan, dan billing",planned
+GET,/api/v1/platform/support-sessions,"15.1 Dashboard, tenant, dan dukungan",planned
+GET,/api/v1/platform/tenants,"15.1 Dashboard, tenant, dan dukungan",active
+GET,/api/v1/platform/tenants/{id},"15.1 Dashboard, tenant, dan dukungan",planned
+GET,/api/v1/platform/tenants/{id}/timeline,"15.1 Dashboard, tenant, dan dukungan",planned
+GET,/api/v1/platform/tenants/{id}/usage,"15.1 Dashboard, tenant, dan dukungan",planned
+GET,/api/v1/platform/tickets,"15.3 Staf, tiket, analitik, pengaturan",planned
+GET,/api/v1/platform/tickets/{id},"15.3 Staf, tiket, analitik, pengaturan",planned
+GET,/api/v1/push/subscriptions,13.1 Inbox dan preferensi (semua pengguna),planned
+GET,/api/v1/push/vapid-public-key,13.1 Inbox dan preferensi (semua pengguna),planned
+GET,/api/v1/search,14.6 Pencarian global (Command Palette),planned
+GET,/api/v1/version,16. Webhook dan kesehatan layanan,planned
+GET,/healthz,16. Webhook dan kesehatan layanan,active
+GET,/readyz,16. Webhook dan kesehatan layanan,active
+PATCH,/api/v1/admin/agenda-events/{id},12.3 Agenda,planned
+PATCH,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,planned
+PATCH,/api/v1/admin/assets/{id},7.7 Aset karyawan,planned
+PATCH,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
+PATCH,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
+PATCH,/api/v1/admin/company-profile,14.5 Pengaturan tenant dan langganan,planned
+PATCH,/api/v1/admin/contracts/{id},7.3 Kontrak,planned
+PATCH,/api/v1/admin/departments/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
+PATCH,/api/v1/admin/divisions/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
+PATCH,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
+PATCH,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
+PATCH,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
+PATCH,/api/v1/admin/employees/{id},7.1 Karyawan,active
+PATCH,/api/v1/admin/employees/{id}/bank-accounts/{accountId},7.2 Data pendukung karyawan,planned
+PATCH,/api/v1/admin/employees/{id}/emergency-contacts/{contactId},7.2 Data pendukung karyawan,planned
+PATCH,/api/v1/admin/employees/{id}/families/{familyId},7.2 Data pendukung karyawan,planned
+PATCH,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
+PATCH,/api/v1/admin/holidays/{id},"8.3 Admin: master shift, roster, dan libur",active
+PATCH,/api/v1/admin/leave-policies/{id},9.2 Admin: cuti dan izin,planned
+PATCH,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,planned
+PATCH,/api/v1/admin/leave-types/{id},9.2 Admin: cuti dan izin,planned
+PATCH,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/overtime-requests/{id},9.3 Lembur,planned
+PATCH,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
+PATCH,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,planned
+PATCH,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
+PATCH,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
+PATCH,/api/v1/admin/terminations/{id},7.6 Resign dan terminasi,planned
+PATCH,/api/v1/admin/users/{id},5.1 Pengguna,active
+PATCH,/api/v1/admin/users/{id}/roles/{userRoleId},5.3 Hak akses per pengguna,planned
+PATCH,/api/v1/admin/webhooks/{id},14.5 Pengaturan tenant dan langganan,planned
+PATCH,/api/v1/admin/work-schedules/{id},"8.3 Admin: master shift, roster, dan libur",active
+PATCH,/api/v1/ess/profile/emergency-contacts/{id},7.8 ESS: profil sendiri,planned
+PATCH,/api/v1/me/preferences,"4. Autentikasi, akun, dan sesi",active
+PATCH,/api/v1/platform/plans/{id},"15.2 Paket, langganan, dan billing",planned
+PATCH,/api/v1/platform/staff/{id},"15.3 Staf, tiket, analitik, pengaturan",planned
+PATCH,/api/v1/platform/tenants/{id},"15.1 Dashboard, tenant, dan dukungan",planned
+PATCH,/api/v1/platform/tickets/{id},"15.3 Staf, tiket, analitik, pengaturan",planned
+POST,/api/v1/admin/access-reviews,5.3 Hak akses per pengguna,planned
+POST,/api/v1/admin/agenda-events,12.3 Agenda,planned
+POST,/api/v1/admin/api-keys,14.5 Pengaturan tenant dan langganan,planned
+POST,/api/v1/admin/approval-delegations,10.3 Pengaturan alur approval,planned
+POST,/api/v1/admin/approval-flows,10.3 Pengaturan alur approval,planned
+POST,/api/v1/admin/approval-flows/simulate,10.3 Pengaturan alur approval,planned
+POST,/api/v1/admin/approval-flows/{id}/set-default,10.3 Pengaturan alur approval,planned
+POST,/api/v1/admin/approvals/bulk-actions,10.1 Admin: inbox dan keputusan,planned
+POST,/api/v1/admin/approvals/{requestId}/actions,10.1 Admin: inbox dan keputusan,planned
+POST,/api/v1/admin/approvals/{requestId}/reassign,10.1 Admin: inbox dan keputusan,planned
+POST,/api/v1/admin/assets,7.7 Aset karyawan,planned
+POST,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,planned
+POST,/api/v1/admin/attendance/recalculate,8.2 Admin: monitor dan rekap,planned
+POST,/api/v1/admin/audit-logs/export,14.4 Audit dan keamanan,planned
+POST,/api/v1/admin/broadcasts,13.3 Broadcast / pengumuman,planned
+POST,/api/v1/admin/broadcasts/audience-preview,13.3 Broadcast / pengumuman,planned
+POST,/api/v1/admin/broadcasts/{id}/attachments,13.3 Broadcast / pengumuman,planned
+POST,/api/v1/admin/broadcasts/{id}/audience-preview,13.3 Broadcast / pengumuman,planned
+POST,/api/v1/admin/broadcasts/{id}/cancel,13.3 Broadcast / pengumuman,planned
+POST,/api/v1/admin/broadcasts/{id}/schedule,13.3 Broadcast / pengumuman,planned
+POST,/api/v1/admin/broadcasts/{id}/send,13.3 Broadcast / pengumuman,planned
+POST,/api/v1/admin/company-documents,12.2 Dokumen,planned
+POST,/api/v1/admin/company-documents/{id}/publish,12.2 Dokumen,planned
+POST,/api/v1/admin/company-profile/logo,14.5 Pengaturan tenant dan langganan,planned
+POST,/api/v1/admin/contracts,7.3 Kontrak,planned
+POST,/api/v1/admin/contracts/{id}/renew,7.3 Kontrak,planned
+POST,/api/v1/admin/departments,6.1 Master organisasi,planned
+POST,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,planned
+POST,/api/v1/admin/divisions,6.1 Master organisasi,planned
+POST,/api/v1/admin/document-templates,12.2 Dokumen,planned
+POST,/api/v1/admin/document-templates/{id}/render,12.2 Dokumen,planned
+POST,/api/v1/admin/document-types,12.2 Dokumen,planned
+POST,/api/v1/admin/employee-assets,7.7 Aset karyawan,planned
+POST,/api/v1/admin/employee-assets/{id}/return,7.7 Aset karyawan,planned
+POST,/api/v1/admin/employee-changes,"7.4 Mutasi, promosi, dan demosi",planned
+POST,/api/v1/admin/employee-changes/{id}/submit,"7.4 Mutasi, promosi, dan demosi",planned
+POST,/api/v1/admin/employee-documents,12.2 Dokumen,planned
+POST,/api/v1/admin/employee-documents/{id}/verify,12.2 Dokumen,planned
+POST,/api/v1/admin/employees,7.1 Karyawan,active
+POST,/api/v1/admin/employees/bulk-archive,7.1 Karyawan,planned
+POST,/api/v1/admin/employees/{id}/account,7.1 Karyawan,planned
+POST,/api/v1/admin/employees/{id}/allowed-offices,7.2 Data pendukung karyawan,planned
+POST,/api/v1/admin/employees/{id}/assignments,7.2 Data pendukung karyawan,planned
+POST,/api/v1/admin/employees/{id}/bank-accounts,7.2 Data pendukung karyawan,planned
+POST,/api/v1/admin/employees/{id}/emergency-contacts,7.2 Data pendukung karyawan,planned
+POST,/api/v1/admin/employees/{id}/families,7.2 Data pendukung karyawan,planned
+POST,/api/v1/admin/employees/{id}/restore,7.1 Karyawan,planned
+POST,/api/v1/admin/exports,14.3 Ekspor dan impor (job generik),planned
+POST,/api/v1/admin/geofences/test-point,6.2 Geofence kantor,active
+POST,/api/v1/admin/holidays,"8.3 Admin: master shift, roster, dan libur",active
+POST,/api/v1/admin/holidays/seed-national,"8.3 Admin: master shift, roster, dan libur",planned
+POST,/api/v1/admin/imports,14.3 Ekspor dan impor (job generik),planned
+POST,/api/v1/admin/imports/{id}/commit,14.3 Ekspor dan impor (job generik),planned
+POST,/api/v1/admin/leave-balances/accrual-run,9.2 Admin: cuti dan izin,planned
+POST,/api/v1/admin/leave-balances/adjustments,9.2 Admin: cuti dan izin,planned
+POST,/api/v1/admin/leave-policies,9.2 Admin: cuti dan izin,planned
+POST,/api/v1/admin/leave-requests,9.2 Admin: cuti dan izin,planned
+POST,/api/v1/admin/leave-types,9.2 Admin: cuti dan izin,planned
+POST,/api/v1/admin/loans,9.4 Kasbon,planned
+POST,/api/v1/admin/loans/{id}/disburse,9.4 Kasbon,planned
+POST,/api/v1/admin/loans/{id}/installments/{seq}/waive,9.4 Kasbon,planned
+POST,/api/v1/admin/loans/{id}/settle,9.4 Kasbon,planned
+POST,/api/v1/admin/notification-deliveries/{id}/retry,"13.2 Admin: aturan, template, dan log",planned
+POST,/api/v1/admin/notification-templates/{id}/preview,"13.2 Admin: aturan, template, dan log",planned
+POST,/api/v1/admin/offices,6.1 Master organisasi,planned
+POST,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
+POST,/api/v1/admin/overtime-requests,9.3 Lembur,planned
+POST,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
+POST,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/periods/{id}/close,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/periods/{id}/runs,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/runs/{id}/adjustments,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/runs/{id}/bank-export,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/runs/{id}/finalize,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/runs/{id}/items/{itemId}/lines,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/runs/{id}/payslips/publish,11.3 Slip gaji,planned
+POST,/api/v1/admin/payroll/runs/{id}/recalculate,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/runs/{id}/submit,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/positions,6.1 Master organisasi,planned
+POST,/api/v1/admin/regions,6.1 Master organisasi,planned
+POST,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,planned
+POST,/api/v1/admin/reimbursements/{id}/pay,9.5 Reimbursement,planned
+POST,/api/v1/admin/reports/{key}/export,14.2 Laporan,planned
+POST,/api/v1/admin/roles,5.2 Role dan registry permission,active
+POST,/api/v1/admin/shift-instances/generate,"8.3 Admin: master shift, roster, dan libur",planned
+POST,/api/v1/admin/shift-instances/{id}/cancel,"8.3 Admin: master shift, roster, dan libur",planned
+POST,/api/v1/admin/shift-templates,"8.3 Admin: master shift, roster, dan libur",active
+POST,/api/v1/admin/shift-templates/{id}/duplicate,"8.3 Admin: master shift, roster, dan libur",active
+POST,/api/v1/admin/support/tickets,14.5 Pengaturan tenant dan langganan,planned
+POST,/api/v1/admin/support/tickets/{id}/messages,14.5 Pengaturan tenant dan langganan,planned
+POST,/api/v1/admin/terminations,7.6 Resign dan terminasi,planned
+POST,/api/v1/admin/terminations/{id}/cancel,7.6 Resign dan terminasi,planned
+POST,/api/v1/admin/terminations/{id}/submit,7.6 Resign dan terminasi,planned
+POST,/api/v1/admin/users,5.1 Pengguna,active
+POST,/api/v1/admin/users/{id}/disable,5.1 Pengguna,active
+POST,/api/v1/admin/users/{id}/effective-access/preview,5.3 Hak akses per pengguna,active
+POST,/api/v1/admin/users/{id}/enable,5.1 Pengguna,active
+POST,/api/v1/admin/users/{id}/reset-password,5.1 Pengguna,active
+POST,/api/v1/admin/users/{id}/roles,5.3 Hak akses per pengguna,active
+POST,/api/v1/admin/webhooks,14.5 Pengaturan tenant dan langganan,planned
+POST,/api/v1/admin/work-schedules,"8.3 Admin: master shift, roster, dan libur",active
+POST,/api/v1/admin/work-schedules/bulk,"8.3 Admin: master shift, roster, dan libur",active
+POST,/api/v1/admin/work-schedules/publish,"8.3 Admin: master shift, roster, dan libur",active
+POST,/api/v1/auth/login,"4. Autentikasi, akun, dan sesi",active
+POST,/api/v1/auth/logout,"4. Autentikasi, akun, dan sesi",active
+POST,/api/v1/auth/logout-all,"4. Autentikasi, akun, dan sesi",active
+POST,/api/v1/auth/password/change,"4. Autentikasi, akun, dan sesi",active
+POST,/api/v1/auth/password/forgot,"4. Autentikasi, akun, dan sesi",active
+POST,/api/v1/auth/password/reset,"4. Autentikasi, akun, dan sesi",active
+POST,/api/v1/auth/reauth,"4. Autentikasi, akun, dan sesi",active
+POST,/api/v1/auth/switch-tenant,"4. Autentikasi, akun, dan sesi",active
+POST,/api/v1/ess/attendance/clock-in,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/ess/attendance/clock-out,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/ess/attendance/corrections,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/ess/attendance/location-check,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/ess/documents,12.2 Dokumen,planned
+POST,/api/v1/ess/leave-requests,9.1 ESS: cuti dan izin,planned
+POST,/api/v1/ess/leave-requests/preview,9.1 ESS: cuti dan izin,planned
+POST,/api/v1/ess/loans,9.4 Kasbon,planned
+POST,/api/v1/ess/loans/simulate,9.4 Kasbon,planned
+POST,/api/v1/ess/overtime-requests,9.3 Lembur,planned
+POST,/api/v1/ess/profile/change-requests,7.8 ESS: profil sendiri,planned
+POST,/api/v1/ess/profile/emergency-contacts,7.8 ESS: profil sendiri,planned
+POST,/api/v1/ess/profile/photo,7.8 ESS: profil sendiri,planned
+POST,/api/v1/ess/reimbursements,9.5 Reimbursement,planned
+POST,/api/v1/ess/reimbursements/{id}/receipts,9.5 Reimbursement,planned
+POST,/api/v1/ess/requests/{requestId}/cancel,10.2 ESS: pengajuan saya,planned
+POST,/api/v1/ess/requests/{requestId}/resubmit,10.2 ESS: pengajuan saya,planned
+POST,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
+POST,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/ess/shift-swaps/{id}/respond,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/files/uploads,12.1 Berkas,planned
+POST,/api/v1/files/{id}/complete,12.1 Berkas,planned
+POST,/api/v1/notifications/read-all,13.1 Inbox dan preferensi (semua pengguna),active
+POST,/api/v1/notifications/{id}/archive,13.1 Inbox dan preferensi (semua pengguna),active
+POST,/api/v1/notifications/{id}/read,13.1 Inbox dan preferensi (semua pengguna),active
+POST,/api/v1/platform/announcements,"15.3 Staf, tiket, analitik, pengaturan",planned
+POST,/api/v1/platform/invoices/{id}/send,"15.2 Paket, langganan, dan billing",planned
+POST,/api/v1/platform/invoices/{id}/void,"15.2 Paket, langganan, dan billing",planned
+POST,/api/v1/platform/payments/{id}/refund,"15.2 Paket, langganan, dan billing",planned
+POST,/api/v1/platform/plans,"15.2 Paket, langganan, dan billing",planned
+POST,/api/v1/platform/settings/smtp/test,"15.3 Staf, tiket, analitik, pengaturan",planned
+POST,/api/v1/platform/staff,"15.3 Staf, tiket, analitik, pengaturan",active
+POST,/api/v1/platform/subscriptions/{id}/cancel,"15.2 Paket, langganan, dan billing",planned
+POST,/api/v1/platform/subscriptions/{id}/change-plan,"15.2 Paket, langganan, dan billing",planned
+POST,/api/v1/platform/subscriptions/{id}/renew,"15.2 Paket, langganan, dan billing",planned
+POST,/api/v1/platform/tenants,"15.1 Dashboard, tenant, dan dukungan",planned
+POST,/api/v1/platform/tenants/{id}/close,"15.1 Dashboard, tenant, dan dukungan",planned
+POST,/api/v1/platform/tenants/{id}/reactivate,"15.1 Dashboard, tenant, dan dukungan",planned
+POST,/api/v1/platform/tenants/{id}/subscription,"15.2 Paket, langganan, dan billing",planned
+POST,/api/v1/platform/tenants/{id}/support-sessions,"15.1 Dashboard, tenant, dan dukungan",planned
+POST,/api/v1/platform/tenants/{id}/suspend,"15.1 Dashboard, tenant, dan dukungan",planned
+POST,/api/v1/platform/tenants/{id}/verify,"15.1 Dashboard, tenant, dan dukungan",planned
+POST,/api/v1/platform/tickets,"15.3 Staf, tiket, analitik, pengaturan",planned
+POST,/api/v1/platform/tickets/{id}/assign,"15.3 Staf, tiket, analitik, pengaturan",planned
+POST,/api/v1/platform/tickets/{id}/close,"15.3 Staf, tiket, analitik, pengaturan",planned
+POST,/api/v1/platform/tickets/{id}/messages,"15.3 Staf, tiket, analitik, pengaturan",planned
+POST,/api/v1/push/subscriptions,13.1 Inbox dan preferensi (semua pengguna),planned
+POST,/api/v1/push/test,13.1 Inbox dan preferensi (semua pengguna),planned
+POST,/api/v1/webhooks/payments/{gateway},16. Webhook dan kesehatan layanan,planned
+PUT,/api/v1/admin/approval-flows/{id}/steps,10.3 Pengaturan alur approval,planned
+PUT,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,planned
+PUT,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
+PUT,/api/v1/admin/loan-policies,9.4 Kasbon,planned
+PUT,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
+PUT,/api/v1/admin/notification-templates/{id},"13.2 Admin: aturan, template, dan log",planned
+PUT,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,planned
+PUT,/api/v1/admin/position-role-suggestions,5.3 Hak akses per pengguna,planned
+PUT,/api/v1/admin/roles/{id}/permissions,5.2 Role dan registry permission,active
+PUT,/api/v1/admin/roles/{id}/scopes,5.2 Role dan registry permission,active
+PUT,/api/v1/admin/settings/{group},14.5 Pengaturan tenant dan langganan,planned
+PUT,/api/v1/admin/terminations/{id}/checklist,7.6 Resign dan terminasi,planned
+PUT,/api/v1/admin/users/{id}/permission-overrides,5.3 Hak akses per pengguna,active
+PUT,/api/v1/admin/users/{id}/scopes/{module},5.3 Hak akses per pengguna,planned
+PUT,/api/v1/notifications/preferences,13.1 Inbox dan preferensi (semua pengguna),planned
+PUT,/api/v1/platform/plans/{id}/entitlements,"15.2 Paket, langganan, dan billing",planned
+PUT,/api/v1/platform/settings/{key},"15.3 Staf, tiket, analitik, pengaturan",planned
+PUT,/api/v1/platform/tenants/{id}/branding,"15.1 Dashboard, tenant, dan dukungan",planned
