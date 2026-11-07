@@ -52,6 +52,7 @@ func (a adminAPI) mountContracts(r chi.Router, config Options) {
 	r.Get("/contracts/{id}", a.getContract)
 	r.With(checkOrigin(config)).Patch("/contracts/{id}", a.updateContract)
 	r.With(checkOrigin(config)).Delete("/contracts/{id}", a.deleteContract)
+	r.With(checkOrigin(config)).Post("/contracts/{id}/renew", a.renewContract)
 	r.Get("/employees/{id}/contracts", a.listEmployeeContracts)
 }
 

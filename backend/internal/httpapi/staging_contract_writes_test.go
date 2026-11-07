@@ -81,5 +81,24 @@ func TestStagingContractDraftAndActivation(t *testing.T) {
 		t.Fatalf("draft update: %#v", draft.Data)
 	}
 	doJSON(t, admin, "DELETE", base+"/"+draft.Data.ID, nil, 204, nil)
+	var renewed struct {
+		Data struct {
+			Old contract `json:"old_contract"`
+			New contract `json:"new_contract"`
+		} `json:"data"`
+	}
+	doJSON(t, admin, "POST", base+"/"+active.Data.ID+"/renew", map[string]any{"contract_type": "PKWT", "start_date": "2099-07-01", "end_date": "2100-06-30"}, 201, &renewed)
+	defer func() {
+		if _, err := db.Exec(`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='contracts' AND entity_id=?`, adminState.SelectedTenantID, renewed.Data.New.ID); err != nil {
+			t.Errorf("cleanup renewal audit: %v", err)
+		}
+		if _, err := db.Exec(`DELETE FROM contracts WHERE tenant_id=? AND id=?`, adminState.SelectedTenantID, renewed.Data.New.ID); err != nil {
+			t.Errorf("cleanup renewal contract: %v", err)
+		}
+	}()
+	if renewed.Data.Old.EndDate == nil || *renewed.Data.Old.EndDate != "2099-06-30" || renewed.Data.New.Status != "active" {
+		t.Fatalf("renewal: %#v", renewed.Data)
+	}
+	doJSON(t, admin, "POST", base+"/"+active.Data.ID+"/renew", map[string]any{"contract_type": "PKWT", "start_date": "2099-07-01", "end_date": "2100-06-30"}, 409, nil)
 	doJSON(t, ess, "POST", base, map[string]any{"employee_id": employeeID, "contract_type": "PKWTT", "start_date": "2099-01-01"}, 403, nil)
 }

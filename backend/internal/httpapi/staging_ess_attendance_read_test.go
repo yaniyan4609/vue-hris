@@ -68,6 +68,10 @@ func TestStagingEssAttendanceReads(t *testing.T) {
 	if location.Data.Status != "inside" && location.Data.Status != "outside" && location.Data.Status != "flexible" && location.Data.Status != "unknown" {
 		t.Fatalf("location status: %#v", location)
 	}
+	doJSON(t, client, "POST", server.URL+"/api/v1/ess/attendance/location-check", map[string]any{"lat": -6.2, "lng": 106.8, "accuracy_m": 101}, 200, &location)
+	if location.Data.Status != "unknown" {
+		t.Fatalf("inaccurate GPS accepted: %#v", location)
+	}
 	doJSON(t, client, "POST", server.URL+"/api/v1/ess/attendance/location-check", map[string]any{"lat": -91, "lng": 106.8, "accuracy_m": 12.5}, 400, nil)
 	doJSON(t, client, "GET", server.URL+"/api/v1/ess/attendance/history?from=2099-11-11&to=2099-01-01", nil, 400, nil)
 }

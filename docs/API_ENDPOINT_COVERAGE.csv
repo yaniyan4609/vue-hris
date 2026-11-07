@@ -2,7 +2,7 @@ method,path,section,status
 DELETE,/api/v1/admin/agenda-events/{id},12.3 Agenda,planned
 DELETE,/api/v1/admin/api-keys/{id},14.5 Pengaturan tenant dan langganan,planned
 DELETE,/api/v1/admin/approval-delegations/{id},10.3 Pengaturan alur approval,planned
-DELETE,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,planned
+DELETE,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,active
 DELETE,/api/v1/admin/assets/{id},7.7 Aset karyawan,planned
 DELETE,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
 DELETE,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
@@ -286,7 +286,7 @@ GET,/api/v1/version,16. Webhook dan kesehatan layanan,planned
 GET,/healthz,16. Webhook dan kesehatan layanan,active
 GET,/readyz,16. Webhook dan kesehatan layanan,active
 PATCH,/api/v1/admin/agenda-events/{id},12.3 Agenda,planned
-PATCH,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,planned
+PATCH,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,active
 PATCH,/api/v1/admin/assets/{id},7.7 Aset karyawan,planned
 PATCH,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
 PATCH,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
@@ -331,9 +331,9 @@ POST,/api/v1/admin/access-reviews,5.3 Hak akses per pengguna,planned
 POST,/api/v1/admin/agenda-events,12.3 Agenda,planned
 POST,/api/v1/admin/api-keys,14.5 Pengaturan tenant dan langganan,planned
 POST,/api/v1/admin/approval-delegations,10.3 Pengaturan alur approval,planned
-POST,/api/v1/admin/approval-flows,10.3 Pengaturan alur approval,planned
-POST,/api/v1/admin/approval-flows/simulate,10.3 Pengaturan alur approval,planned
-POST,/api/v1/admin/approval-flows/{id}/set-default,10.3 Pengaturan alur approval,planned
+POST,/api/v1/admin/approval-flows,10.3 Pengaturan alur approval,active
+POST,/api/v1/admin/approval-flows/simulate,10.3 Pengaturan alur approval,active
+POST,/api/v1/admin/approval-flows/{id}/set-default,10.3 Pengaturan alur approval,active
 POST,/api/v1/admin/approvals/bulk-actions,10.1 Admin: inbox dan keputusan,planned
 POST,/api/v1/admin/approvals/{requestId}/actions,10.1 Admin: inbox dan keputusan,planned
 POST,/api/v1/admin/approvals/{requestId}/reassign,10.1 Admin: inbox dan keputusan,planned
@@ -352,7 +352,7 @@ POST,/api/v1/admin/company-documents,12.2 Dokumen,planned
 POST,/api/v1/admin/company-documents/{id}/publish,12.2 Dokumen,planned
 POST,/api/v1/admin/company-profile/logo,14.5 Pengaturan tenant dan langganan,planned
 POST,/api/v1/admin/contracts,7.3 Kontrak,active
-POST,/api/v1/admin/contracts/{id}/renew,7.3 Kontrak,planned
+POST,/api/v1/admin/contracts/{id}/renew,7.3 Kontrak,active
 POST,/api/v1/admin/departments,6.1 Master organisasi,planned
 POST,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,planned
 POST,/api/v1/admin/divisions,6.1 Master organisasi,planned
@@ -487,7 +487,7 @@ POST,/api/v1/platform/tickets/{id}/messages,"15.3 Staf, tiket, analitik, pengatu
 POST,/api/v1/push/subscriptions,13.1 Inbox dan preferensi (semua pengguna),planned
 POST,/api/v1/push/test,13.1 Inbox dan preferensi (semua pengguna),planned
 POST,/api/v1/webhooks/payments/{gateway},16. Webhook dan kesehatan layanan,planned
-PUT,/api/v1/admin/approval-flows/{id}/steps,10.3 Pengaturan alur approval,planned
+PUT,/api/v1/admin/approval-flows/{id}/steps,10.3 Pengaturan alur approval,active
 PUT,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,planned
 PUT,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
 PUT,/api/v1/admin/loan-policies,9.4 Kasbon,planned

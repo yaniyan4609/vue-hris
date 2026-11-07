@@ -16,6 +16,7 @@ type approvalState struct {
 	CurrentLevel int    `json:"current_level"`
 	Status       string `json:"status"`
 	Version      uint64 `json:"version"`
+	AttemptNo    uint64 `json:"attempt_no"`
 }
 type requestView struct {
 	ID                string         `json:"id"`
@@ -25,13 +26,15 @@ type requestView struct {
 	RefTable          *string        `json:"ref_table"`
 	RefID             *string        `json:"ref_id"`
 	Status            string         `json:"status"`
+	AttemptNo         uint64         `json:"attempt_no"`
+	Version           uint64         `json:"version"`
 	SubmittedAt       *time.Time     `json:"submitted_at"`
 	FinalAt           *time.Time     `json:"final_at"`
 	CreatedAt         time.Time      `json:"created_at"`
 	Approval          *approvalState `json:"approval"`
 }
 
-const requestColumns = `q.id,q.request_type,q.subject_employee_id,q.requested_by,q.ref_table,q.ref_id,q.status,q.submitted_at,q.final_at,q.created_at,i.id,i.flow_id,i.current_level,i.status,i.version`
+const requestColumns = `q.id,q.request_type,q.subject_employee_id,q.requested_by,q.ref_table,q.ref_id,q.status,q.attempt_no,q.version,q.submitted_at,q.final_at,q.created_at,i.id,i.flow_id,i.current_level,i.status,i.version,i.attempt_no`
 const requestJoin = ` FROM requests q LEFT JOIN approval_instances i ON i.tenant_id=q.tenant_id AND i.request_id=q.id LEFT JOIN employees e ON e.tenant_id=q.tenant_id AND e.id=q.subject_employee_id LEFT JOIN employee_assignments a ON a.tenant_id=e.tenant_id AND a.employee_id=e.id AND a.current_flag=TRUE`
 
 func scanRequest(row interface{ Scan(...any) error }) (requestView, error) {
@@ -39,8 +42,8 @@ func scanRequest(row interface{ Scan(...any) error }) (requestView, error) {
 	var subject, refTable, refID sql.NullString
 	var submitted, final sql.NullTime
 	var instanceID, flowID, instanceStatus sql.NullString
-	var level, version sql.NullInt64
-	err := row.Scan(&item.ID, &item.RequestType, &subject, &item.RequestedBy, &refTable, &refID, &item.Status, &submitted, &final, &item.CreatedAt, &instanceID, &flowID, &level, &instanceStatus, &version)
+	var level, version, attempt sql.NullInt64
+	err := row.Scan(&item.ID, &item.RequestType, &subject, &item.RequestedBy, &refTable, &refID, &item.Status, &item.AttemptNo, &item.Version, &submitted, &final, &item.CreatedAt, &instanceID, &flowID, &level, &instanceStatus, &version, &attempt)
 	if err != nil {
 		return item, err
 	}
@@ -60,7 +63,7 @@ func scanRequest(row interface{ Scan(...any) error }) (requestView, error) {
 		item.FinalAt = &final.Time
 	}
 	if instanceID.Valid {
-		item.Approval = &approvalState{ID: instanceID.String, FlowID: flowID.String, CurrentLevel: int(level.Int64), Status: instanceStatus.String, Version: uint64(version.Int64)}
+		item.Approval = &approvalState{ID: instanceID.String, FlowID: flowID.String, CurrentLevel: int(level.Int64), Status: instanceStatus.String, Version: uint64(version.Int64), AttemptNo: uint64(attempt.Int64)}
 	}
 	return item, nil
 }
@@ -178,7 +181,7 @@ func (a adminAPI) approvalInbox(w http.ResponseWriter, r *http.Request) {
 	if status == "" {
 		status = "pending"
 	}
-	if status != "pending" && status != "approved" && status != "rejected" && status != "skipped" && status != "cancelled" {
+	if status != "pending" && status != "approved" && status != "rejected" && status != "returned" && status != "skipped" && status != "cancelled" {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Status tugas tidak valid.")
 		return
 	}
@@ -244,17 +247,17 @@ func (a adminAPI) getApproval(w http.ResponseWriter, r *http.Request) {
 	var tasks []map[string]any = []map[string]any{}
 	var actions []map[string]any = []map[string]any{}
 	if item.Approval != nil {
-		rows, err := a.db.QueryContext(r.Context(), `SELECT id,level_no,assignee_user_id,status,created_at,decided_at FROM approval_tasks WHERE tenant_id=? AND instance_id=? ORDER BY level_no,created_at,id`, c.tenant.ID, item.Approval.ID)
+		rows, err := a.db.QueryContext(r.Context(), `SELECT id,attempt_no,level_no,assignee_user_id,status,created_at,decided_at FROM approval_tasks WHERE tenant_id=? AND instance_id=? ORDER BY attempt_no,level_no,created_at,id`, c.tenant.ID, item.Approval.ID)
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca tahapan approval.")
 			return
 		}
 		for rows.Next() {
 			var id, user, status string
-			var level int
+			var level, attemptNo int
 			var created time.Time
 			var decided sql.NullTime
-			if err := rows.Scan(&id, &level, &user, &status, &created, &decided); err != nil {
+			if err := rows.Scan(&id, &attemptNo, &level, &user, &status, &created, &decided); err != nil {
 				rows.Close()
 				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca tahapan approval.")
 				return
@@ -263,7 +266,7 @@ func (a adminAPI) getApproval(w http.ResponseWriter, r *http.Request) {
 			if decided.Valid {
 				decidedAt = decided.Time
 			}
-			tasks = append(tasks, map[string]any{"id": id, "level_no": level, "assignee_user_id": user, "status": status, "created_at": created, "decided_at": decidedAt})
+			tasks = append(tasks, map[string]any{"id": id, "attempt_no": attemptNo, "level_no": level, "assignee_user_id": user, "status": status, "created_at": created, "decided_at": decidedAt})
 		}
 		if rows.Err() != nil {
 			rows.Close()

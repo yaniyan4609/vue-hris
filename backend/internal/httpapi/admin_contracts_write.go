@@ -300,3 +300,129 @@ func (a adminAPI) deleteContract(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(204)
 }
+
+func (a adminAPI) renewContract(w http.ResponseWriter, r *http.Request) {
+	c, ok := a.authorize(w, r, "kontrak.buat")
+	if !ok {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if len(id) != 26 {
+		writeAPIError(w, r, 404, "NOT_FOUND", "Kontrak tidak ditemukan.")
+		return
+	}
+	var body struct {
+		ContractType string  `json:"contract_type"`
+		StartDate    string  `json:"start_date"`
+		EndDate      *string `json:"end_date"`
+		FileID       *string `json:"file_id"`
+	}
+	if !readJSON(w, r, &body) {
+		return
+	}
+	newContract := contract{ContractType: body.ContractType, StartDate: body.StartDate, EndDate: body.EndDate, Status: "active", FileID: body.FileID}
+	if !validContract(newContract) {
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Jenis atau tanggal kontrak baru tidak valid.")
+		return
+	}
+	zone, err := time.LoadLocation(c.tenant.Timezone)
+	if err != nil {
+		zone = time.UTC
+	}
+	start, _ := time.Parse("2006-01-02", newContract.StartDate)
+	if newContract.StartDate < time.Now().In(zone).Format("2006-01-02") {
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perpanjangan tidak boleh berlaku surut.")
+		return
+	}
+	fileAllowed, err := a.contractFileAllowed(r, c.tenant.ID, newContract.FileID)
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa berkas.")
+		return
+	}
+	if !fileAllowed {
+		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas kontrak belum tersedia atau belum aman.")
+		return
+	}
+	filter, scopeArgs := access.EmployeeWhere(c.subject, c.effective)
+	params := append([]any{c.tenant.ID, id}, scopeArgs...)
+	tx, err := a.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memperpanjang kontrak.")
+		return
+	}
+	defer tx.Rollback()
+	old, err := scanContract(tx.QueryRowContext(r.Context(), `SELECT `+contractColumns+contractJoin+` WHERE c.tenant_id=? AND c.id=? AND `+filter+` FOR UPDATE`, params...))
+	if errors.Is(err, sql.ErrNoRows) {
+		writeAPIError(w, r, 404, "NOT_FOUND", "Kontrak tidak ditemukan dalam scope.")
+		return
+	}
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca kontrak.")
+		return
+	}
+	if old.Status != "active" {
+		writeAPIError(w, r, 409, "CONTRACT_NOT_ACTIVE", "Hanya kontrak aktif dapat diperpanjang.")
+		return
+	}
+	oldStart, _ := time.Parse("2006-01-02", old.StartDate)
+	if !start.After(oldStart) {
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Tanggal kontrak baru harus setelah awal kontrak lama.")
+		return
+	}
+	if old.EndDate != nil {
+		oldEnd, _ := time.Parse("2006-01-02", *old.EndDate)
+		if start.After(oldEnd.AddDate(0, 0, 1)) {
+			writeAPIError(w, r, 409, "CONTRACT_GAP", "Ada jeda setelah kontrak lama; buat kontrak baru.")
+			return
+		}
+	}
+	var locked string
+	if err := tx.QueryRowContext(r.Context(), `SELECT id FROM employees WHERE tenant_id=? AND id=? FOR UPDATE`, c.tenant.ID, old.EmployeeID).Scan(&locked); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengunci karyawan.")
+		return
+	}
+	var overlap int
+	if err := tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM contracts WHERE tenant_id=? AND employee_id=? AND id<>? AND status='active' AND (end_date IS NULL OR end_date>=?) AND (? IS NULL OR start_date<=?)`, c.tenant.ID, old.EmployeeID, old.ID, newContract.StartDate, newContract.EndDate, newContract.EndDate).Scan(&overlap); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa kontrak.")
+		return
+	}
+	if overlap != 0 {
+		writeAPIError(w, r, 409, "DATE_OVERLAP", "Sudah ada kontrak aktif pada periode baru.")
+		return
+	}
+	oldAfter := old
+	endOld := start.AddDate(0, 0, -1).Format("2006-01-02")
+	oldAfter.EndDate = &endOld
+	if _, err := tx.ExecContext(r.Context(), `UPDATE contracts SET end_date=? WHERE tenant_id=? AND id=? AND status='active'`, endOld, c.tenant.ID, old.ID); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menutup periode kontrak lama.")
+		return
+	}
+	newID, err := ids.New()
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membuat kontrak baru.")
+		return
+	}
+	newContract.ID = newID
+	newContract.EmployeeID = old.EmployeeID
+	if _, err := tx.ExecContext(r.Context(), `INSERT INTO contracts (tenant_id,id,employee_id,contract_type,start_date,end_date,status,file_id) VALUES (?,?,?,?,?,?,'active',?)`, c.tenant.ID, newID, newContract.EmployeeID, newContract.ContractType, newContract.StartDate, newContract.EndDate, newContract.FileID); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membuat kontrak baru.")
+		return
+	}
+	if err := tx.QueryRowContext(r.Context(), `SELECT created_at FROM contracts WHERE tenant_id=? AND id=?`, c.tenant.ID, newID).Scan(&newContract.CreatedAt); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca kontrak baru.")
+		return
+	}
+	if err := audit(r.Context(), tx, c.tenant.ID, c.state.User.ID, "renew_close", "contracts", old.ID, old, oldAfter); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mencatat audit.")
+		return
+	}
+	if err := audit(r.Context(), tx, c.tenant.ID, c.state.User.ID, "renew_create", "contracts", newID, nil, newContract); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mencatat audit.")
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memperpanjang kontrak.")
+		return
+	}
+	writeAPIData(w, 201, map[string]any{"old_contract": oldAfter, "new_contract": newContract}, nil)
+}

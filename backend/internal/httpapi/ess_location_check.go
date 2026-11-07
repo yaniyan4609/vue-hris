@@ -15,6 +15,8 @@ type locationMatch struct {
 	OfficeName string `json:"office_name"`
 }
 
+const maxAttendanceAccuracyM = 100.0
+
 func (a adminAPI) essLocationCheck(w http.ResponseWriter, r *http.Request) {
 	c, ok := a.essAttendanceContext(w, r)
 	if !ok {
@@ -30,6 +32,10 @@ func (a adminAPI) essLocationCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Lat == nil || body.Lng == nil || body.AccuracyM == nil || math.IsNaN(*body.Lat) || math.IsNaN(*body.Lng) || math.IsNaN(*body.AccuracyM) || math.IsInf(*body.Lat, 0) || math.IsInf(*body.Lng, 0) || math.IsInf(*body.AccuracyM, 0) || *body.Lat < -90 || *body.Lat > 90 || *body.Lng < -180 || *body.Lng > 180 || *body.AccuracyM <= 0 || *body.AccuracyM > 999999.99 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Koordinat atau akurasi tidak valid.")
+		return
+	}
+	if *body.AccuracyM > maxAttendanceAccuracyM {
+		writeAPIData(w, 200, map[string]any{"status": "unknown", "matches": []locationMatch{}, "reason": "GPS_ACCURACY_TOO_LOW", "accuracy_m": *body.AccuracyM, "max_accuracy_m": maxAttendanceAccuracyM}, nil)
 		return
 	}
 	now := time.Now().UTC()

@@ -115,7 +115,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 		Data requestView `json:"data"`
 	}
 	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/requests/"+requestID, nil, 200, &detail)
-	if detail.Data.ID != requestID || detail.Data.Approval == nil {
+	if detail.Data.ID != requestID || detail.Data.AttemptNo != 1 || detail.Data.Version != 1 || detail.Data.Approval == nil || detail.Data.Approval.AttemptNo != 1 {
 		t.Fatalf("ESS detail: %#v", detail.Data)
 	}
 	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/approvals/inbox?request_type=leave", nil, 200, &page)

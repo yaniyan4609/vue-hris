@@ -13,7 +13,7 @@ type approvalFlowStep struct {
 	ID                 string  `json:"id"`
 	LevelNo            int     `json:"level_no"`
 	ApproverKind       string  `json:"approver_kind"`
-	ApproverRefID      *string `json:"approver_ref_id"`
+	ApproverRefID      *string `json:"approver_ref"`
 	RequiredPermission *string `json:"required_permission"`
 	SLAHours           *int    `json:"sla_hours"`
 }
@@ -22,6 +22,8 @@ type approvalFlow struct {
 	RequestType    string             `json:"request_type"`
 	Name           string             `json:"name"`
 	IsDefault      bool               `json:"is_default"`
+	IsActive       bool               `json:"is_active"`
+	Version        uint64             `json:"version"`
 	ValidFrom      string             `json:"valid_from"`
 	ValidTo        *string            `json:"valid_to"`
 	FallbackRoleID *string            `json:"fallback_role_id"`
@@ -29,14 +31,14 @@ type approvalFlow struct {
 	Steps          []approvalFlowStep `json:"steps"`
 }
 
-const flowColumns = `id,request_type,name,is_default,valid_from,valid_to,fallback_role_id,created_at`
+const flowColumns = `id,request_type,name,is_default,is_active,version,valid_from,valid_to,fallback_role_id,created_at`
 
 func scanFlow(row interface{ Scan(...any) error }) (approvalFlow, error) {
 	var item approvalFlow
 	var from time.Time
 	var to sql.NullTime
 	var fallback sql.NullString
-	err := row.Scan(&item.ID, &item.RequestType, &item.Name, &item.IsDefault, &from, &to, &fallback, &item.CreatedAt)
+	err := row.Scan(&item.ID, &item.RequestType, &item.Name, &item.IsDefault, &item.IsActive, &item.Version, &from, &to, &fallback, &item.CreatedAt)
 	if err != nil {
 		return item, err
 	}
@@ -131,6 +133,7 @@ func (a adminAPI) getApprovalFlow(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca tahap approval.")
 			return
 		}
+		step.ApproverKind = externalApproverKind(step.ApproverKind)
 		if ref.Valid {
 			step.ApproverRefID = &ref.String
 		}

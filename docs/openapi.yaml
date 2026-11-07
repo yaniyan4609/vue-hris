@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.9.0
+  version: 0.10.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -1392,6 +1392,25 @@ paths:
       responses:
         '204': { description: Draft dihapus dan diaudit }
         '409': { description: Hanya draft dapat dihapus }
+  /api/v1/admin/contracts/{id}/renew:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Employees]
+      operationId: renewContract
+      x-permission: kontrak.buat
+      summary: Perpanjang kontrak aktif secara atomik tanpa periode tumpang tindih
+      description: Kontrak lama berakhir sehari sebelum kontrak baru mulai; kontrak baru aktif pada tanggal mulainya. Tidak menerima tanggal berlaku surut atau jeda dari kontrak lama.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContractRenewInput' }
+      responses:
+        '201': { description: old_contract dan new_contract, keduanya tercatat di audit }
+        '409': { description: Kontrak lama tidak aktif, ada jeda, atau periode baru bertumpang tindih }
   /api/v1/admin/employees/{id}/contracts:
     parameters:
       - $ref: '#/components/parameters/ResourceID'
@@ -2179,7 +2198,7 @@ paths:
       tags: [Schedule]
       operationId: checkEssAttendanceLocation
       summary: Uji titik GPS pada geofence kantor yang sedang diizinkan tanpa menulis event
-      description: Ambang akurasi GPS masih keputusan terbuka T-08; respons ini hanya hasil geometri dan tidak memberi izin untuk mencatat presensi.
+      description: Akurasi GPS di atas 100 meter memberi status unknown dengan reason GPS_ACCURACY_TOO_LOW. Respons ini tidak mencatat presensi.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -2192,7 +2211,7 @@ paths:
               properties:
                 lat: { type: number, minimum: -90, maximum: 90 }
                 lng: { type: number, minimum: -180, maximum: 180 }
-                accuracy_m: { type: number, exclusiveMinimum: 0 }
+                accuracy_m: { type: number, exclusiveMinimum: 0, description: Maksimum 100 meter untuk presensi awal }
       responses:
         '200': { description: Status inside, outside, flexible, atau unknown }
         '400': { description: Koordinat atau akurasi tidak valid }
@@ -2244,7 +2263,7 @@ paths:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
         - { in: query, name: request_type, schema: { type: string } }
-        - { in: query, name: task_status, schema: { type: string, enum: [pending, approved, rejected, skipped, cancelled] } }
+        - { in: query, name: task_status, schema: { type: string, enum: [pending, approved, rejected, returned, skipped, cancelled] } }
       responses:
         '200': { description: Inbox dibatasi permission, scope, dan assignee }
   /api/v1/admin/approval-flows:
@@ -2258,6 +2277,41 @@ paths:
         - { in: query, name: request_type, schema: { type: string } }
       responses:
         '200': { description: Daftar alur approval tenant }
+    post:
+      tags: [Approvals]
+      operationId: createApprovalFlow
+      x-permission: pengaturan.kelola
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalFlowInput' }
+      responses:
+        '201': { description: Alur aktif baru, belum menjadi default dan belum memiliki tahap }
+  /api/v1/admin/approval-flows/simulate:
+    post:
+      tags: [Approvals]
+      operationId: simulateApprovalFlow
+      x-permission: pengaturan.kelola
+      summary: Pratinjau approver efektif, termasuk fallback dan penolakan self approval
+      description: Selain pengaturan.kelola, pengguna memerlukan karyawan.lihat dengan scope mencakup employee_id.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_type, employee_id]
+              properties:
+                request_type: { type: string }
+                employee_id: { type: string }
+      responses:
+        '200': { description: Tahap, kandidat yang berhak, fallback, dan flag resolvable }
+        '404': { description: Tidak ada alur default berlaku atau karyawan di luar scope }
   /api/v1/admin/approval-flows/{id}:
     parameters:
       - $ref: '#/components/parameters/ResourceID'
@@ -2268,6 +2322,65 @@ paths:
       responses:
         '200': { description: Alur beserta seluruh tahap }
         '404': { description: Alur tidak ada dalam tenant }
+    patch:
+      tags: [Approvals]
+      operationId: updateApprovalFlow
+      x-permission: pengaturan.kelola
+      summary: Ubah metadata alur dengan versi optimistik
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalFlowPatch' }
+      responses:
+        '200': { description: Alur diperbarui dan diaudit }
+        '409': { description: Versi berubah }
+    delete:
+      tags: [Approvals]
+      operationId: deactivateApprovalFlow
+      x-permission: pengaturan.kelola
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Alur dinonaktifkan, riwayat instance tetap utuh }
+  /api/v1/admin/approval-flows/{id}/steps:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    put:
+      tags: [Approvals]
+      operationId: replaceApprovalFlowSteps
+      x-permission: pengaturan.kelola
+      summary: Ganti seluruh tahap pada alur yang belum dipakai
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, steps]
+              properties:
+                version: { type: integer, minimum: 1 }
+                steps: { type: array, minItems: 1, maxItems: 10, items: { $ref: '#/components/schemas/ApprovalFlowStep' } }
+      responses:
+        '200': { description: Versi dan tahap baru }
+        '409': { description: Versi berubah atau alur sudah dipakai }
+  /api/v1/admin/approval-flows/{id}/set-default:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Approvals]
+      operationId: setDefaultApprovalFlow
+      x-permission: pengaturan.kelola
+      summary: Jadikan alur aktif dan lengkap sebagai default untuk jenis pengajuan
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '200': { description: Alur default baru; alur default sebelumnya dilepas dan diaudit }
+        '409': { description: Alur tidak aktif atau belum memiliki tahap }
   /api/v1/admin/approvals/summary:
     get:
       tags: [Approvals]
@@ -2586,6 +2699,42 @@ components:
         end_date: { type: string, format: date, nullable: true }
         file_id: { type: string, nullable: true, description: Berkas purpose contract dan hasil scan clean }
         status: { type: string, enum: [draft, active], description: Hanya PATCH draft ke active }
+    ContractRenewInput:
+      type: object
+      required: [contract_type, start_date]
+      properties:
+        contract_type: { type: string, enum: [PKWT, PKWTT, PROBASI] }
+        start_date: { type: string, format: date, description: Kontrak lama tetap aktif sampai sehari sebelum tanggal ini }
+        end_date: { type: string, format: date, nullable: true }
+        file_id: { type: string, nullable: true }
+    ApprovalFlowInput:
+      type: object
+      required: [request_type, name, valid_from]
+      properties:
+        request_type: { type: string }
+        name: { type: string, maxLength: 160 }
+        valid_from: { type: string, format: date }
+        valid_to: { type: string, format: date, nullable: true }
+        fallback_role_id: { type: string, nullable: true }
+    ApprovalFlowPatch:
+      type: object
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 1 }
+        name: { type: string, maxLength: 160 }
+        valid_from: { type: string, format: date }
+        valid_to: { type: string, format: date, nullable: true }
+        fallback_role_id: { type: string, nullable: true }
+        is_active: { type: boolean }
+    ApprovalFlowStep:
+      type: object
+      required: [level_no, approver_kind]
+      properties:
+        level_no: { type: integer, minimum: 1, maximum: 10 }
+        approver_kind: { type: string, enum: [reports_to, role, position, membership] }
+        approver_ref: { type: string, nullable: true, description: ID role, jabatan, atau anggota; null untuk reports_to }
+        required_permission: { type: string, description: Harus sesuai permission approve jenis pengajuan }
+        sla_hours: { type: integer, minimum: 1, maximum: 720, nullable: true }
     EmergencyContactInput:
       type: object
       properties:
