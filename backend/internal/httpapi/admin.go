@@ -55,6 +55,7 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 		r.With(checkOrigin(config)).Delete("/employees/{id}/emergency-contacts/{contactId}", a.deleteEmployeeEmergencyContact)
 		a.mountContracts(r, config)
 		a.mountApprovalReads(r)
+		r.With(checkOrigin(config)).Post("/approvals/{requestId}/actions", a.returnApprovalRequest)
 		r.Get("/approval-flows", a.listApprovalFlows)
 		r.With(checkOrigin(config)).Post("/approval-flows", a.createApprovalFlow)
 		r.With(checkOrigin(config)).Post("/approval-flows/simulate", a.simulateApprovalFlow)
@@ -82,6 +83,7 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 	r.Get("/api/v1/ess/schedule", a.essSchedule)
 	r.Get("/api/v1/ess/requests", a.listEssRequests)
 	r.Get("/api/v1/ess/requests/{requestId}", a.getEssRequest)
+	r.With(checkOrigin(config)).Post("/api/v1/ess/requests/{requestId}/resubmit", a.resubmitEssRequest)
 	a.mountEssAttendance(r)
 	r.With(checkOrigin(config)).Post("/api/v1/ess/attendance/location-check", a.essLocationCheck)
 }

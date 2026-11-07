@@ -92,7 +92,7 @@ func (a adminAPI) stepApproverCandidates(r *http.Request, tenantID, date string,
 	}
 }
 
-func (a adminAPI) eligibleApprovers(r *http.Request, c adminContext, employee employee, target access.Target, permission string, candidates []string) ([]string, error) {
+func (a adminAPI) eligibleApprovers(r *http.Request, tenantID, timezone string, employee employee, target access.Target, permission string, candidates []string) ([]string, error) {
 	if len(candidates) > 200 {
 		return nil, errors.New("too many candidate approvers")
 	}
@@ -103,7 +103,7 @@ func (a adminAPI) eligibleApprovers(r *http.Request, c adminContext, employee em
 			continue
 		}
 		seen[userID] = true
-		subject, decision, err := a.access.Decide(r.Context(), c.tenant.ID, userID, c.tenant.Timezone, permission)
+		subject, decision, err := a.access.Decide(r.Context(), tenantID, userID, timezone, permission)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +210,7 @@ func (a adminAPI) simulateApprovalFlow(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan approver.")
 			return
 		}
-		eligible, err := a.eligibleApprovers(r, c, employee, target, permission, candidates)
+		eligible, err := a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, permission, candidates)
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak approver.")
 			return
@@ -222,7 +222,7 @@ func (a adminAPI) simulateApprovalFlow(w http.ResponseWriter, r *http.Request) {
 				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan fallback.")
 				return
 			}
-			eligible, err = a.eligibleApprovers(r, c, employee, target, permission, candidates)
+			eligible, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, permission, candidates)
 			if err != nil {
 				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak fallback.")
 				return

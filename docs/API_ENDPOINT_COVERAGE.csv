@@ -335,7 +335,7 @@ POST,/api/v1/admin/approval-flows,10.3 Pengaturan alur approval,active
 POST,/api/v1/admin/approval-flows/simulate,10.3 Pengaturan alur approval,active
 POST,/api/v1/admin/approval-flows/{id}/set-default,10.3 Pengaturan alur approval,active
 POST,/api/v1/admin/approvals/bulk-actions,10.1 Admin: inbox dan keputusan,planned
-POST,/api/v1/admin/approvals/{requestId}/actions,10.1 Admin: inbox dan keputusan,planned
+POST,/api/v1/admin/approvals/{requestId}/actions,10.1 Admin: inbox dan keputusan,active
 POST,/api/v1/admin/approvals/{requestId}/reassign,10.1 Admin: inbox dan keputusan,planned
 POST,/api/v1/admin/assets,7.7 Aset karyawan,planned
 POST,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,planned
@@ -454,7 +454,7 @@ POST,/api/v1/ess/profile/photo,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/reimbursements,9.5 Reimbursement,planned
 POST,/api/v1/ess/reimbursements/{id}/receipts,9.5 Reimbursement,planned
 POST,/api/v1/ess/requests/{requestId}/cancel,10.2 ESS: pengajuan saya,planned
-POST,/api/v1/ess/requests/{requestId}/resubmit,10.2 ESS: pengajuan saya,planned
+POST,/api/v1/ess/requests/{requestId}/resubmit,10.2 ESS: pengajuan saya,active
 POST,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
 POST,/api/v1/ess/shift-swaps/{id}/respond,8.1 ESS: absensi dan jadwal pribadi,planned

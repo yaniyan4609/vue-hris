@@ -46,12 +46,21 @@ func TestStagingApprovalReadScope(t *testing.T) {
 	requestID, _ := ids.New()
 	instanceID, _ := ids.New()
 	taskID, _ := ids.New()
+	stepID, _ := ids.New()
 	if _, err := db.Exec(`INSERT INTO approval_flows (tenant_id,id,request_type,name,valid_from) VALUES (?,?,'leave','QA Read Flow','2000-01-01')`, adminState.SelectedTenantID, flowID); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		if _, err := db.Exec(`DELETE FROM approval_flows WHERE tenant_id=? AND id=?`, adminState.SelectedTenantID, flowID); err != nil {
 			t.Errorf("cleanup flow: %v", err)
+		}
+	}()
+	if _, err := db.Exec(`INSERT INTO approval_flow_steps (tenant_id,id,flow_id,level_no,approver_kind,approver_ref_id,required_permission) VALUES (?,?,?,1,'user',?,'cuti.approve')`, adminState.SelectedTenantID, stepID, flowID, adminState.User.ID); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := db.Exec(`DELETE FROM approval_flow_steps WHERE tenant_id=? AND id=?`, adminState.SelectedTenantID, stepID); err != nil {
+			t.Errorf("cleanup step: %v", err)
 		}
 	}()
 	if _, err := db.Exec(`INSERT INTO requests (tenant_id,id,request_type,subject_employee_id,requested_by,status,submitted_at) VALUES (?,?,'leave',?,?,'in_review',UTC_TIMESTAMP(6))`, adminState.SelectedTenantID, requestID, employeeID, essState.User.ID); err != nil {
@@ -74,7 +83,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		if _, err := db.Exec(`DELETE FROM approval_tasks WHERE tenant_id=? AND id=?`, adminState.SelectedTenantID, taskID); err != nil {
+		if _, err := db.Exec(`DELETE FROM approval_tasks WHERE tenant_id=? AND instance_id=?`, adminState.SelectedTenantID, instanceID); err != nil {
 			t.Errorf("cleanup task: %v", err)
 		}
 	}()
@@ -158,4 +167,73 @@ func TestStagingApprovalReadScope(t *testing.T) {
 		t.Fatalf("admin detail: %#v", adminDetail.Data)
 	}
 	doJSON(t, ess, "GET", server.URL+"/api/v1/admin/approvals/"+requestID, nil, 403, nil)
+	doJSON(t, ess, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki pengajuan", "level_no": 1, "version": 1}, 403, nil)
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki pengajuan", "level_no": 1, "version": 2}, 409, nil)
+	var returned struct {
+		Data struct {
+			Status          string `json:"status"`
+			AttemptNo       int    `json:"attempt_no"`
+			ApprovalVersion int    `json:"approval_version"`
+		} `json:"data"`
+	}
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki pengajuan", "level_no": 1, "version": 1}, 200, &returned)
+	defer func() {
+		for _, entry := range []struct{ table, column string }{{"audit_logs", "entity_id"}, {"notification_outbox", "aggregate_id"}, {"approval_actions", "instance_id"}} {
+			id := requestID
+			if entry.table == "approval_actions" {
+				id = instanceID
+			}
+			if _, err := db.Exec(`DELETE FROM `+entry.table+` WHERE tenant_id=? AND `+entry.column+`=?`, adminState.SelectedTenantID, id); err != nil {
+				t.Errorf("cleanup %s: %v", entry.table, err)
+			}
+		}
+	}()
+	if returned.Data.Status != "returned" || returned.Data.AttemptNo != 1 || returned.Data.ApprovalVersion != 2 {
+		t.Fatalf("unexpected return response: %#v", returned.Data)
+	}
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Ulang", "level_no": 1, "version": 1}, 409, nil)
+	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/requests/"+requestID, nil, 200, &detail)
+	if detail.Data.Status != "returned" || detail.Data.AttemptNo != 1 || detail.Data.Approval == nil || detail.Data.Approval.Status != "returned" {
+		t.Fatalf("ESS return detail: %#v", detail.Data)
+	}
+	defer func() {
+		if _, err := db.Exec(`DELETE FROM request_revisions WHERE tenant_id=? AND request_id=?`, adminState.SelectedTenantID, requestID); err != nil {
+			t.Errorf("cleanup revisions: %v", err)
+		}
+	}()
+	var resubmitted struct {
+		Data struct {
+			RequestID       string `json:"request_id"`
+			Status          string `json:"status"`
+			AttemptNo       int    `json:"attempt_no"`
+			ApprovalVersion int    `json:"approval_version"`
+		} `json:"data"`
+	}
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+requestID+"/resubmit", map[string]any{"version": 1, "correction": map[string]any{"note": "Sudah diperbaiki"}}, 409, nil)
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+requestID+"/resubmit", map[string]any{"version": 2, "correction": map[string]any{"note": "Sudah diperbaiki"}}, 200, &resubmitted)
+	if resubmitted.Data.RequestID != requestID || resubmitted.Data.Status != "in_review" || resubmitted.Data.AttemptNo != 2 || resubmitted.Data.ApprovalVersion != 3 {
+		t.Fatalf("unexpected resubmit response: %#v", resubmitted.Data)
+	}
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+requestID+"/resubmit", map[string]any{"version": 2, "correction": map[string]any{"note": "Ulang"}}, 409, nil)
+	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/requests/"+requestID, nil, 200, &detail)
+	if detail.Data.ID != requestID || detail.Data.AttemptNo != 2 || detail.Data.Status != "in_review" || string(detail.Data.LatestCorrection) != `{"note":"Sudah diperbaiki"}` {
+		t.Fatalf("ESS resubmit detail: %#v", detail.Data)
+	}
+	var retryTasks int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM approval_tasks WHERE tenant_id=? AND instance_id=? AND attempt_no=2 AND status='pending'`, adminState.SelectedTenantID, instanceID).Scan(&retryTasks); err != nil || retryTasks != 1 {
+		t.Fatalf("retry tasks: count=%d err=%v", retryTasks, err)
+	}
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Perlu perbaikan lagi", "level_no": 1, "version": 3}, 200, &returned)
+	if returned.Data.Status != "returned" || returned.Data.AttemptNo != 2 || returned.Data.ApprovalVersion != 4 {
+		t.Fatalf("second return response: %#v", returned.Data)
+	}
+	var actionCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM approval_actions WHERE tenant_id=? AND instance_id=? AND action='return'`, adminState.SelectedTenantID, instanceID).Scan(&actionCount); err != nil || actionCount != 2 {
+		t.Fatalf("return actions: count=%d err=%v", actionCount, err)
+	}
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+requestID+"/resubmit", map[string]any{"version": 4, "correction": map[string]any{"note": "Perbaikan kedua"}}, 200, &resubmitted)
+	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/requests/"+requestID, nil, 200, &detail)
+	if detail.Data.AttemptNo != 3 || len(detail.Data.Revisions) != 2 || detail.Data.Revisions[0].AttemptNo != 2 || detail.Data.Revisions[1].AttemptNo != 3 || string(detail.Data.LatestCorrection) != `{"note":"Perbaikan kedua"}` {
+		t.Fatalf("revision history: %#v", detail.Data)
+	}
 }

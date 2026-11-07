@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.10.0
+  version: 0.11.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2413,8 +2413,34 @@ paths:
       operationId: getApproval
       x-permission: persetujuan.lihat
       responses:
-        '200': { description: Pengajuan, approval instance, tugas, dan riwayat aksi }
+        '200': { description: Pengajuan, approval instance, tugas, riwayat aksi, dan seluruh revisi per percobaan }
         '404': { description: Pengajuan di luar tenant atau scope }
+  /api/v1/admin/approvals/{requestId}/actions:
+    parameters:
+      - { in: path, name: requestId, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
+    post:
+      tags: [Approvals]
+      operationId: returnApprovalRequest
+      summary: Kembalikan pengajuan untuk perbaikan
+      description: Saat ini hanya action=return yang tersedia; approve dan reject menunggu handler domain atomik. Memerlukan tugas pending pada tahap, permission approve jenis pengajuan, dan scope karyawan. Aksi, audit, dan outbox dicatat dalam satu transaksi.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, reason, level_no, version]
+              properties:
+                action: { type: string, enum: [return] }
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+                level_no: { type: integer, minimum: 1 }
+                version: { type: integer, minimum: 1, description: Versi approval instance }
+      responses:
+        '200': { description: Pengajuan berstatus returned, versi naik, tugas lain ditutup }
+        '403': { description: Bukan assignee atau tanpa permission }
+        '409': { description: Versi atau tahap berubah }
   /api/v1/ess/requests:
     get:
       tags: [Approvals]
@@ -2438,8 +2464,37 @@ paths:
       operationId: getEssRequest
       summary: Status dan tahap pengajuan pribadi
       responses:
-        '200': { description: Detail status pengajuan pribadi }
+        '200': { description: Detail status dan seluruh revisi pengajuan pribadi }
         '404': { description: Pengajuan bukan milik akun saat ini }
+  /api/v1/ess/requests/{requestId}/resubmit:
+    parameters:
+      - { in: path, name: requestId, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
+    post:
+      tags: [Approvals]
+      operationId: resubmitEssRequest
+      summary: Kirim ulang pengajuan returned dengan ID yang sama
+      description: Menyimpan catatan perbaikan per percobaan dan membentuk ulang tugas tahap pertama dari alur asli. Perubahan field domain belum diterapkan oleh endpoint ini.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, correction]
+              properties:
+                version: { type: integer, minimum: 1, description: Versi request }
+                correction:
+                  type: object
+                  required: [note]
+                  additionalProperties: false
+                  properties:
+                    note: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '200': { description: Percobaan dan versi baru pada request yang sama }
+        '404': { description: Pengajuan bukan milik karyawan }
+        '409': { description: Pengajuan belum returned atau tidak ada approver yang berhak }
   /api/v1/realtime/ws:
     get:
       tags: [Realtime]

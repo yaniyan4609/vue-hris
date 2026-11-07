@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -18,20 +19,29 @@ type approvalState struct {
 	Version      uint64 `json:"version"`
 	AttemptNo    uint64 `json:"attempt_no"`
 }
+type requestRevision struct {
+	ID          string          `json:"id"`
+	AttemptNo   uint64          `json:"attempt_no"`
+	Correction  json.RawMessage `json:"correction"`
+	SubmittedBy string          `json:"submitted_by"`
+	SubmittedAt time.Time       `json:"submitted_at"`
+}
 type requestView struct {
-	ID                string         `json:"id"`
-	RequestType       string         `json:"request_type"`
-	SubjectEmployeeID *string        `json:"subject_employee_id"`
-	RequestedBy       string         `json:"requested_by"`
-	RefTable          *string        `json:"ref_table"`
-	RefID             *string        `json:"ref_id"`
-	Status            string         `json:"status"`
-	AttemptNo         uint64         `json:"attempt_no"`
-	Version           uint64         `json:"version"`
-	SubmittedAt       *time.Time     `json:"submitted_at"`
-	FinalAt           *time.Time     `json:"final_at"`
-	CreatedAt         time.Time      `json:"created_at"`
-	Approval          *approvalState `json:"approval"`
+	ID                string            `json:"id"`
+	RequestType       string            `json:"request_type"`
+	SubjectEmployeeID *string           `json:"subject_employee_id"`
+	RequestedBy       string            `json:"requested_by"`
+	RefTable          *string           `json:"ref_table"`
+	RefID             *string           `json:"ref_id"`
+	Status            string            `json:"status"`
+	AttemptNo         uint64            `json:"attempt_no"`
+	Version           uint64            `json:"version"`
+	LatestCorrection  json.RawMessage   `json:"latest_correction,omitempty"`
+	Revisions         []requestRevision `json:"revisions,omitempty"`
+	SubmittedAt       *time.Time        `json:"submitted_at"`
+	FinalAt           *time.Time        `json:"final_at"`
+	CreatedAt         time.Time         `json:"created_at"`
+	Approval          *approvalState    `json:"approval"`
 }
 
 const requestColumns = `q.id,q.request_type,q.subject_employee_id,q.requested_by,q.ref_table,q.ref_id,q.status,q.attempt_no,q.version,q.submitted_at,q.final_at,q.created_at,i.id,i.flow_id,i.current_level,i.status,i.version,i.attempt_no`
@@ -66,6 +76,26 @@ func scanRequest(row interface{ Scan(...any) error }) (requestView, error) {
 		item.Approval = &approvalState{ID: instanceID.String, FlowID: flowID.String, CurrentLevel: int(level.Int64), Status: instanceStatus.String, Version: uint64(version.Int64), AttemptNo: uint64(attempt.Int64)}
 	}
 	return item, nil
+}
+
+func (a adminAPI) attachRequestRevisions(r *http.Request, tenantID string, item *requestView) error {
+	rows, err := a.db.QueryContext(r.Context(), `SELECT id,attempt_no,correction_json,submitted_by,submitted_at FROM request_revisions WHERE tenant_id=? AND request_id=? ORDER BY attempt_no,id`, tenantID, item.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	item.Revisions = []requestRevision{}
+	for rows.Next() {
+		var revision requestRevision
+		var raw []byte
+		if err := rows.Scan(&revision.ID, &revision.AttemptNo, &raw, &revision.SubmittedBy, &revision.SubmittedAt); err != nil {
+			return err
+		}
+		revision.Correction = json.RawMessage(raw)
+		item.LatestCorrection = revision.Correction
+		item.Revisions = append(item.Revisions, revision)
+	}
+	return rows.Err()
 }
 
 func approvalScope(c adminContext) (string, []any) {
@@ -244,6 +274,10 @@ func (a adminAPI) getApproval(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca pengajuan.")
 		return
 	}
+	if err := a.attachRequestRevisions(r, c.tenant.ID, &item); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca revisi pengajuan.")
+		return
+	}
 	var tasks []map[string]any = []map[string]any{}
 	var actions []map[string]any = []map[string]any{}
 	if item.Approval != nil {
@@ -335,6 +369,10 @@ func (a adminAPI) getEssRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca pengajuan.")
+		return
+	}
+	if err := a.attachRequestRevisions(r, c.state.SelectedTenantID, &item); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca revisi pengajuan.")
 		return
 	}
 	writeAPIData(w, 200, item, nil)
