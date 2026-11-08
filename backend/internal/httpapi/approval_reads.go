@@ -308,7 +308,7 @@ func (a adminAPI) getApproval(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rows.Close()
-		rows, err = a.db.QueryContext(r.Context(), `SELECT id,task_id,level_no,actor_user_id,action,reason,created_at FROM approval_actions WHERE tenant_id=? AND instance_id=? ORDER BY created_at,id`, c.tenant.ID, item.Approval.ID)
+		rows, err = a.db.QueryContext(r.Context(), `SELECT id,task_id,level_no,actor_user_id,action,reason,data_json,created_at FROM approval_actions WHERE tenant_id=? AND instance_id=? ORDER BY created_at,id`, c.tenant.ID, item.Approval.ID)
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca aksi approval.")
 			return
@@ -317,8 +317,9 @@ func (a adminAPI) getApproval(w http.ResponseWriter, r *http.Request) {
 			var id, taskID, actor, action string
 			var level int
 			var reason sql.NullString
+			var actionData []byte
 			var created time.Time
-			if err := rows.Scan(&id, &taskID, &level, &actor, &action, &reason, &created); err != nil {
+			if err := rows.Scan(&id, &taskID, &level, &actor, &action, &reason, &actionData, &created); err != nil {
 				rows.Close()
 				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca aksi approval.")
 				return
@@ -327,7 +328,11 @@ func (a adminAPI) getApproval(w http.ResponseWriter, r *http.Request) {
 			if reason.Valid {
 				reasonValue = reason.String
 			}
-			actions = append(actions, map[string]any{"id": id, "task_id": taskID, "level_no": level, "actor_user_id": actor, "action": action, "reason": reasonValue, "created_at": created})
+			var dataValue any
+			if len(actionData) > 0 {
+				dataValue = json.RawMessage(actionData)
+			}
+			actions = append(actions, map[string]any{"id": id, "task_id": taskID, "level_no": level, "actor_user_id": actor, "action": action, "reason": reasonValue, "data": dataValue, "created_at": created})
 		}
 		if rows.Err() != nil {
 			rows.Close()

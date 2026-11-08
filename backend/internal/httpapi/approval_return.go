@@ -11,9 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// Return is the first decision that can be made safely before domain-specific
-// final approval handlers are available. Other actions fail closed.
-func (a adminAPI) returnApprovalRequest(w http.ResponseWriter, r *http.Request) {
+func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) {
 	c, ok := a.authorize(w, r, "persetujuan.lihat")
 	if !ok {
 		return
@@ -24,20 +22,21 @@ func (a adminAPI) returnApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var body struct {
-		Action  string `json:"action"`
-		Reason  string `json:"reason"`
-		LevelNo int    `json:"level_no"`
-		Version uint64 `json:"version"`
+		Action  string          `json:"action"`
+		Reason  string          `json:"reason"`
+		LevelNo int             `json:"level_no"`
+		Version uint64          `json:"version"`
+		Data    json.RawMessage `json:"data"`
 	}
 	if !readJSON(w, r, &body) {
 		return
 	}
 	body.Reason = strings.TrimSpace(body.Reason)
-	if body.Action != "return" {
-		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Keputusan ini menunggu handler domain atomik.")
+	if body.Action != "return" && body.Action != "approve" && body.Action != "reject" {
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Keputusan tidak valid.")
 		return
 	}
-	if body.Reason == "" || len([]rune(body.Reason)) > 2000 || body.LevelNo < 1 || body.Version == 0 {
+	if ((body.Action == "return" || body.Action == "reject") && body.Reason == "") || len([]rune(body.Reason)) > 2000 || body.LevelNo < 1 || body.Version == 0 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Alasan, tahap, atau versi tidak valid.")
 		return
 	}
@@ -48,9 +47,9 @@ func (a adminAPI) returnApprovalRequest(w http.ResponseWriter, r *http.Request) 
 	}
 	defer tx.Rollback()
 	var kind, requester, requestStatus string
-	var subjectID sql.NullString
+	var subjectID, refTable, refID sql.NullString
 	var attemptNo, requestVersion uint64
-	err = tx.QueryRowContext(r.Context(), `SELECT request_type,subject_employee_id,requested_by,status,attempt_no,version FROM requests WHERE tenant_id=? AND id=? FOR UPDATE`, c.tenant.ID, requestID).Scan(&kind, &subjectID, &requester, &requestStatus, &attemptNo, &requestVersion)
+	err = tx.QueryRowContext(r.Context(), `SELECT request_type,subject_employee_id,requested_by,ref_table,ref_id,status,attempt_no,version FROM requests WHERE tenant_id=? AND id=? FOR UPDATE`, c.tenant.ID, requestID).Scan(&kind, &subjectID, &requester, &refTable, &refID, &requestStatus, &attemptNo, &requestVersion)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Pengajuan tidak ditemukan.")
 		return
@@ -72,10 +71,10 @@ func (a adminAPI) returnApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Pengajuan tidak memiliki jenis atau karyawan yang dapat dievaluasi.")
 		return
 	}
-	var instanceID, instanceStatus string
+	var instanceID, flowID, instanceStatus string
 	var level int
 	var instanceVersion, instanceAttempt uint64
-	err = tx.QueryRowContext(r.Context(), `SELECT id,current_level,status,version,attempt_no FROM approval_instances WHERE tenant_id=? AND request_id=? FOR UPDATE`, c.tenant.ID, requestID).Scan(&instanceID, &level, &instanceStatus, &instanceVersion, &instanceAttempt)
+	err = tx.QueryRowContext(r.Context(), `SELECT id,flow_id,current_level,status,version,attempt_no FROM approval_instances WHERE tenant_id=? AND request_id=? FOR UPDATE`, c.tenant.ID, requestID).Scan(&instanceID, &flowID, &level, &instanceStatus, &instanceVersion, &instanceAttempt)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Pengajuan belum memiliki proses persetujuan.")
 		return
@@ -128,6 +127,31 @@ func (a adminAPI) returnApprovalRequest(w http.ResponseWriter, r *http.Request) 
 	if !decision.Includes(subject, target) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Pengajuan tidak ditemukan dalam scope.")
 		return
+	}
+	if body.Action != "return" {
+		if kind != "overtime" || !refTable.Valid || refTable.String != "overtime_requests" || !refID.Valid {
+			writeAPIError(w, r, 409, "ACTION_NOT_READY", "Keputusan akhir jenis pengajuan ini menunggu handler domain.")
+			return
+		}
+		a.decideOvertimeApproval(w, r, tx, c, overtimeDecision{
+			Action: body.Action, Reason: body.Reason, Data: body.Data, RequestID: requestID,
+			RefID: refID.String, InstanceID: instanceID, FlowID: flowID, TaskID: taskID,
+			Requester: requester, Employee: employee, Target: target, Level: level,
+			AttemptNo: attemptNo, RequestVersion: requestVersion, InstanceVersion: instanceVersion,
+		})
+		return
+	}
+	if kind == "overtime" && refTable.Valid && refTable.String == "overtime_requests" && refID.Valid {
+		result, err := tx.ExecContext(r.Context(), `UPDATE overtime_requests SET status='returned' WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='in_review'`, c.tenant.ID, refID.String, requestID, subjectID.String)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengembalikan data lembur.")
+			return
+		}
+		rows, _ := result.RowsAffected()
+		if rows != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
+			return
+		}
 	}
 	if _, err := tx.ExecContext(r.Context(), `UPDATE approval_tasks SET status='returned',decided_at=UTC_TIMESTAMP(6) WHERE tenant_id=? AND id=? AND status='pending'`, c.tenant.ID, taskID); err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menutup tugas persetujuan.")

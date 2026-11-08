@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.11.0
+  version: 0.12.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2420,9 +2420,9 @@ paths:
       - { in: path, name: requestId, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
     post:
       tags: [Approvals]
-      operationId: returnApprovalRequest
-      summary: Kembalikan pengajuan untuk perbaikan
-      description: Saat ini hanya action=return yang tersedia; approve dan reject menunggu handler domain atomik. Memerlukan tugas pending pada tahap, permission approve jenis pengajuan, dan scope karyawan. Aksi, audit, dan outbox dicatat dalam satu transaksi.
+      operationId: decideApprovalRequest
+      summary: Putuskan tugas approval yang ditugaskan kepada pengguna saat ini
+      description: Return tersedia untuk semua jenis. Approve bertahap, approve akhir, dan reject saat ini tersedia untuk lembur; jenis lain menunggu handler domain. Memerlukan tugas pending pada tahap, permission approve jenis pengajuan, dan scope karyawan. Aksi, domain, audit, dan outbox dicatat dalam satu transaksi.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -2431,14 +2431,19 @@ paths:
           application/json:
             schema:
               type: object
-              required: [action, reason, level_no, version]
+              required: [action, level_no, version]
               properties:
-                action: { type: string, enum: [return] }
-                reason: { type: string, minLength: 1, maxLength: 2000 }
+                action: { type: string, enum: [return, approve, reject] }
+                reason: { type: string, maxLength: 2000, description: Wajib untuk return dan reject }
                 level_no: { type: integer, minimum: 1 }
                 version: { type: integer, minimum: 1, description: Versi approval instance }
+                data:
+                  type: object
+                  description: Untuk approve akhir lembur wajib berisi approved_minutes
+                  properties:
+                    approved_minutes: { type: integer, minimum: 1 }
       responses:
-        '200': { description: Pengajuan berstatus returned, versi naik, tugas lain ditutup }
+        '200': { description: Versi naik; tugas lain ditutup; tahap berikutnya atau status akhir terisi }
         '403': { description: Bukan assignee atau tanpa permission }
         '409': { description: Versi atau tahap berubah }
   /api/v1/ess/requests:
@@ -2473,7 +2478,7 @@ paths:
       tags: [Approvals]
       operationId: resubmitEssRequest
       summary: Kirim ulang pengajuan returned dengan ID yang sama
-      description: Menyimpan catatan perbaikan per percobaan dan membentuk ulang tugas tahap pertama dari alur asli. Perubahan field domain belum diterapkan oleh endpoint ini.
+      description: Menyimpan catatan perbaikan per percobaan dan membentuk ulang tugas tahap pertama dari alur asli. Untuk lembur, proposed_minutes dan reason dapat diperbaiki atomik. Jenis lain saat ini hanya menerima note.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -2491,10 +2496,80 @@ paths:
                   additionalProperties: false
                   properties:
                     note: { type: string, minLength: 1, maxLength: 2000 }
+                    proposed_minutes: { type: integer, minimum: 1, maximum: 1440, description: Khusus lembur }
+                    reason: { type: string, minLength: 1, maxLength: 2000, description: Khusus lembur }
       responses:
         '200': { description: Percobaan dan versi baru pada request yang sama }
         '404': { description: Pengajuan bukan milik karyawan }
         '409': { description: Pengajuan belum returned atau tidak ada approver yang berhak }
+  /api/v1/ess/overtime-requests:
+    get:
+      tags: [Approvals]
+      operationId: listEssOvertimeRequests
+      summary: Daftar lembur milik karyawan aktif
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Daftar lembur pribadi dengan proposed, approved, dan paid minutes }
+    post:
+      tags: [Approvals]
+      operationId: submitEssOvertimeRequest
+      x-permission: lembur.buat
+      summary: Ajukan lembur dan mulai alur approval dalam satu transaksi
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [work_date, proposed_minutes, reason]
+              properties:
+                work_date: { type: string, format: date }
+                proposed_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+                shift_instance_id: { type: string, nullable: true }
+      responses:
+        '201': { description: Lembur, request, instance, tugas, audit, dan outbox dibuat }
+        '409': { description: Pengajuan aktif sudah ada pada tanggal itu atau approver tidak tersedia }
+  /api/v1/ess/overtime-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Approvals]
+      operationId: getEssOvertimeRequest
+      responses:
+        '200': { description: Detail lembur pribadi }
+        '404': { description: Di luar karyawan atau tenant saat ini }
+  /api/v1/admin/overtime-requests:
+    get:
+      tags: [Approvals]
+      operationId: listAdminOvertimeRequests
+      x-permission: lembur.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Lembur dalam scope pengguna Admin }
+  /api/v1/admin/overtime-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Approvals]
+      operationId: getAdminOvertimeRequest
+      x-permission: lembur.lihat
+      responses:
+        '200': { description: Detail lembur dalam scope }
+        '404': { description: Di luar tenant atau scope }
   /api/v1/realtime/ws:
     get:
       tags: [Realtime]

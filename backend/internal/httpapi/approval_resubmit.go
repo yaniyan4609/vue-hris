@@ -30,7 +30,7 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var correction map[string]any
-	if body.Version == 0 || len(body.Correction) > 8192 || json.Unmarshal(body.Correction, &correction) != nil || len(correction) != 1 {
+	if body.Version == 0 || len(body.Correction) > 8192 || json.Unmarshal(body.Correction, &correction) != nil || len(correction) < 1 || len(correction) > 3 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Versi dan catatan perbaikan pengajuan wajib diisi.")
 		return
 	}
@@ -40,7 +40,31 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Catatan perbaikan tidak valid.")
 		return
 	}
-	correctionJSON, _ := json.Marshal(map[string]string{"note": note})
+	normalized := map[string]any{"note": note}
+	for key, value := range correction {
+		switch key {
+		case "note":
+		case "proposed_minutes":
+			minutes, ok := value.(float64)
+			if !ok || minutes < 1 || minutes > 1440 || minutes != float64(int(minutes)) {
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Menit lembur perbaikan tidak valid.")
+				return
+			}
+			normalized[key] = int(minutes)
+		case "reason":
+			reason, ok := value.(string)
+			reason = strings.TrimSpace(reason)
+			if !ok || reason == "" || len([]rune(reason)) > 2000 {
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Alasan lembur perbaikan tidak valid.")
+				return
+			}
+			normalized[key] = reason
+		default:
+			writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field perbaikan tidak dikenal.")
+			return
+		}
+	}
+	correctionJSON, _ := json.Marshal(normalized)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengirim ulang pengajuan.")
@@ -48,9 +72,9 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var kind, requester, status string
-	var subjectID sql.NullString
+	var subjectID, refTable, refID sql.NullString
 	var attemptNo, version uint64
-	err = tx.QueryRowContext(r.Context(), `SELECT request_type,subject_employee_id,requested_by,status,attempt_no,version FROM requests WHERE tenant_id=? AND id=? FOR UPDATE`, c.state.SelectedTenantID, requestID).Scan(&kind, &subjectID, &requester, &status, &attemptNo, &version)
+	err = tx.QueryRowContext(r.Context(), `SELECT request_type,subject_employee_id,requested_by,ref_table,ref_id,status,attempt_no,version FROM requests WHERE tenant_id=? AND id=? FOR UPDATE`, c.state.SelectedTenantID, requestID).Scan(&kind, &subjectID, &requester, &refTable, &refID, &status, &attemptNo, &version)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && (requester != c.state.User.ID || !subjectID.Valid || subjectID.String != c.employeeID)) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Pengajuan tidak ditemukan.")
 		return
@@ -69,6 +93,14 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if approvalPermissions[kind] == "" || attemptNo >= 100 {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Jenis atau jumlah kirim ulang pengajuan tidak valid.")
+		return
+	}
+	if kind != "overtime" && len(normalized) > 1 {
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perbaikan field domain belum tersedia untuk jenis pengajuan ini.")
+		return
+	}
+	if kind == "overtime" && (!refTable.Valid || refTable.String != "overtime_requests" || !refID.Valid) {
+		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi data lembur tidak valid.")
 		return
 	}
 	var instanceID, flowID, instanceStatus string
@@ -124,6 +156,32 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 	if len(eligible) == 0 {
 		writeAPIError(w, r, 409, "NO_APPROVER", "Belum ada approver yang berhak untuk tahap awal.")
 		return
+	}
+	if kind == "overtime" {
+		var proposed int
+		var overtimeReason sql.NullString
+		var overtimeStatus string
+		if err := tx.QueryRowContext(r.Context(), `SELECT proposed_minutes,reason,status FROM overtime_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.state.SelectedTenantID, refID.String, requestID, subjectID.String).Scan(&proposed, &overtimeReason, &overtimeStatus); err != nil || overtimeStatus != "returned" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
+			return
+		}
+		if value, ok := normalized["proposed_minutes"]; ok {
+			proposed = value.(int)
+		}
+		reason := overtimeReason.String
+		if value, ok := normalized["reason"]; ok {
+			reason = value.(string)
+		}
+		result, err := tx.ExecContext(r.Context(), `UPDATE overtime_requests SET proposed_minutes=?,reason=?,status='in_review' WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='returned'`, proposed, reason, c.state.SelectedTenantID, refID.String, requestID, subjectID.String)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membuka ulang data lembur.")
+			return
+		}
+		rows, _ := result.RowsAffected()
+		if rows != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
+			return
+		}
 	}
 	nextAttempt := attemptNo + 1
 	revisionID, err := ids.New()

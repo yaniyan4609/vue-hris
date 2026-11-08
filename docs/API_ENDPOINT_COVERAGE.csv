@@ -139,8 +139,8 @@ GET,/api/v1/admin/offices,6.1 Master organisasi,planned
 GET,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
 GET,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
 GET,/api/v1/admin/organization/tree,6.1 Master organisasi,active
-GET,/api/v1/admin/overtime-requests,9.3 Lembur,planned
-GET,/api/v1/admin/overtime-requests/{id},9.3 Lembur,planned
+GET,/api/v1/admin/overtime-requests,9.3 Lembur,active
+GET,/api/v1/admin/overtime-requests/{id},9.3 Lembur,active
 GET,/api/v1/admin/overtime-summary,9.3 Lembur,planned
 GET,/api/v1/admin/payroll/bank-formats,11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
@@ -226,8 +226,8 @@ GET,/api/v1/ess/leave/balances/{leaveTypeId}/ledger,9.1 ESS: cuti dan izin,plann
 GET,/api/v1/ess/leave/types,9.1 ESS: cuti dan izin,planned
 GET,/api/v1/ess/loans,9.4 Kasbon,planned
 GET,/api/v1/ess/loans/{id},9.4 Kasbon,planned
-GET,/api/v1/ess/overtime-requests,9.3 Lembur,planned
-GET,/api/v1/ess/overtime-requests/{id},9.3 Lembur,planned
+GET,/api/v1/ess/overtime-requests,9.3 Lembur,active
+GET,/api/v1/ess/overtime-requests/{id},9.3 Lembur,active
 GET,/api/v1/ess/payslips,11.3 Slip gaji,planned
 GET,/api/v1/ess/payslips/{id},11.3 Slip gaji,planned
 GET,/api/v1/ess/payslips/{id}/download,11.3 Slip gaji,planned
@@ -447,7 +447,7 @@ POST,/api/v1/ess/leave-requests,9.1 ESS: cuti dan izin,planned
 POST,/api/v1/ess/leave-requests/preview,9.1 ESS: cuti dan izin,planned
 POST,/api/v1/ess/loans,9.4 Kasbon,planned
 POST,/api/v1/ess/loans/simulate,9.4 Kasbon,planned
-POST,/api/v1/ess/overtime-requests,9.3 Lembur,planned
+POST,/api/v1/ess/overtime-requests,9.3 Lembur,active
 POST,/api/v1/ess/profile/change-requests,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/profile/emergency-contacts,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/profile/photo,7.8 ESS: profil sendiri,planned
