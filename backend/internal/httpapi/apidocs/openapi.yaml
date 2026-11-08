@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.26.0
+  version: 0.27.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -949,6 +949,7 @@ paths:
       tags: [Organization]
       summary: Daftar organisasi dengan respons data dan meta
       operationId: listOrganizationCanonical
+      description: Default hanya node aktif. status/filter[status] menerima active, archived, atau all; filter induk memakai filter[region_id], filter[division_id], atau filter[department_id].
       parameters:
         - $ref: '#/components/parameters/Page'
         - in: query
@@ -958,6 +959,9 @@ paths:
         - in: query
           name: parent_id
           schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, archived, all] }
         - in: query
           name: sort
           schema: { type: string, enum: [name, -name, code, -code] }
@@ -998,6 +1002,18 @@ paths:
       operationId: updateOrganizationCanonical
       responses:
         '200': { description: Node diubah dan diaudit }
+        '409': { description: Node atau induk telah diarsipkan }
+    delete:
+      tags: [Organization]
+      summary: Arsip node organisasi tanpa menghapus riwayat
+      operationId: archiveOrganizationCanonical
+      x-permission: organisasi.hapus
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Node diarsipkan atau sudah terarsip }
+        '404': { description: Node tidak ditemukan dalam tenant }
+        '409': { description: Masih memiliki anak atau penugasan aktif }
   /api/v1/admin/organization/{kind}:
     parameters:
       - in: path
@@ -4236,6 +4252,7 @@ components:
         id: { type: string, readOnly: true }
         code: { type: string }
         name: { type: string }
+        status: { type: string, enum: [active, archived], readOnly: true }
         parentId: { type: string, description: Diperlukan untuk kantor, departemen, dan jabatan }
         timezone: { type: string, description: Khusus kantor }
     OrganizationPage:

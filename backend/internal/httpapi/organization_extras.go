@@ -39,7 +39,7 @@ func (a adminAPI) treeNodes(r *http.Request, tenantID, table, parentColumn strin
 	if parentColumn != "" {
 		columns += "," + parentColumn
 	}
-	rows, err := a.db.QueryContext(r.Context(), "SELECT "+columns+" FROM "+table+" WHERE tenant_id=? ORDER BY name,id", tenantID)
+	rows, err := a.db.QueryContext(r.Context(), "SELECT "+columns+" FROM "+table+" WHERE tenant_id=? AND deleted_at IS NULL ORDER BY name,id", tenantID)
 	if err != nil {
 		return nil, nil, err
 	}

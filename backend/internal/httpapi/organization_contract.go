@@ -23,6 +23,7 @@ func (a adminAPI) mountOrganizationContract(r chi.Router, config Options) {
 		r.Get(base+"/{id}", a.getOrganizationContract(kind))
 		r.With(checkOrigin(config)).Post(base, a.orgContract(kind, a.createOrganization))
 		r.With(checkOrigin(config)).Patch(base+"/{id}", a.orgContract(kind, a.updateOrganization))
+		r.With(checkOrigin(config)).Delete(base+"/{id}", a.archiveOrganization(kind))
 	}
 }
 
@@ -40,6 +41,12 @@ func (a adminAPI) orgContract(kind string, legacy http.HandlerFunc) http.Handler
 		if sort := query.Get("sort"); strings.HasPrefix(sort, "-") {
 			query.Set("sort", strings.TrimPrefix(sort, "-"))
 			query.Set("order", "desc")
+		}
+		if status := query.Get("filter[status]"); status != "" {
+			query.Set("status", status)
+		}
+		if parent := query.Get("filter[" + orgKinds[kind].parentColumn + "]"); parent != "" {
+			query.Set("parentId", parent)
 		}
 		urlCopy.RawQuery = query.Encode()
 		request.URL = &urlCopy
@@ -98,7 +105,7 @@ func (a adminAPI) getOrganizationContract(kind string) http.HandlerFunc {
 			return
 		}
 		config := orgKinds[kind]
-		columns := "id,code,name"
+		columns := "id,code,name,IF(deleted_at IS NULL,'active','archived')"
 		if config.parentColumn != "" {
 			columns += "," + config.parentColumn
 		}
@@ -106,7 +113,7 @@ func (a adminAPI) getOrganizationContract(kind string) http.HandlerFunc {
 			columns += ",timezone"
 		}
 		var item orgNode
-		dest := []any{&item.ID, &item.Code, &item.Name}
+		dest := []any{&item.ID, &item.Code, &item.Name, &item.Status}
 		if config.parentColumn != "" {
 			dest = append(dest, &item.ParentID)
 		}
@@ -127,7 +134,11 @@ func (a adminAPI) getOrganizationContract(kind string) http.HandlerFunc {
 }
 
 func organizationData(item orgNode) map[string]any {
-	result := map[string]any{"id": item.ID, "code": item.Code, "name": item.Name}
+	status := item.Status
+	if status == "" {
+		status = "active"
+	}
+	result := map[string]any{"id": item.ID, "code": item.Code, "name": item.Name, "status": status}
 	if item.ParentID != "" {
 		result["parent_id"] = item.ParentID
 	}

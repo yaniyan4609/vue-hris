@@ -159,8 +159,13 @@ func validateEmployee(e employee) bool {
 
 func (a adminAPI) targetFor(ctx context.Context, tenantID string, e employee) (access.Target, error) {
 	t := access.Target{TenantID: tenantID, EmployeeID: e.ID, UserID: e.UserID, ReportsToID: e.ReportsToID, BaseOfficeID: e.BaseOfficeID, PositionID: e.PositionID}
-	err := a.db.QueryRowContext(ctx, `SELECT o.region_id,p.department_id,d.division_id FROM offices o JOIN positions p ON p.tenant_id=o.tenant_id AND p.id=? JOIN departments d ON d.tenant_id=p.tenant_id AND d.id=p.department_id WHERE o.tenant_id=? AND o.id=?`, e.PositionID, tenantID, e.BaseOfficeID).Scan(&t.RegionID, &t.DepartmentID, &t.DivisionID)
+	err := a.db.QueryRowContext(ctx, `SELECT o.region_id,p.department_id,d.division_id FROM offices o JOIN regions r ON r.tenant_id=o.tenant_id AND r.id=o.region_id JOIN positions p ON p.tenant_id=o.tenant_id AND p.id=? JOIN departments d ON d.tenant_id=p.tenant_id AND d.id=p.department_id JOIN divisions v ON v.tenant_id=d.tenant_id AND v.id=d.division_id WHERE o.tenant_id=? AND o.id=? AND o.deleted_at IS NULL AND o.is_active=TRUE AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND d.deleted_at IS NULL AND v.deleted_at IS NULL`, e.PositionID, tenantID, e.BaseOfficeID).Scan(&t.RegionID, &t.DepartmentID, &t.DivisionID)
 	return t, err
+}
+
+func lockEmployeeOrganization(ctx context.Context, tx *sql.Tx, tenantID, officeID, positionID string) error {
+	var found string
+	return tx.QueryRowContext(ctx, `SELECT o.id FROM offices o JOIN regions r ON r.tenant_id=o.tenant_id AND r.id=o.region_id JOIN positions p ON p.tenant_id=o.tenant_id AND p.id=? JOIN departments d ON d.tenant_id=p.tenant_id AND d.id=p.department_id JOIN divisions v ON v.tenant_id=d.tenant_id AND v.id=d.division_id WHERE o.tenant_id=? AND o.id=? AND o.deleted_at IS NULL AND o.is_active=TRUE AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND d.deleted_at IS NULL AND v.deleted_at IS NULL FOR UPDATE`, positionID, tenantID, officeID).Scan(&found)
 }
 
 func (a adminAPI) createEmployee(w http.ResponseWriter, r *http.Request) {
@@ -206,6 +211,14 @@ func (a adminAPI) createEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+	if err = lockEmployeeOrganization(r.Context(), tx, c.tenant.ID, e.BaseOfficeID, e.PositionID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeAPIError(w, r, 409, "ORGANIZATION_UNAVAILABLE", "Kantor atau jabatan sudah diarsipkan.")
+		} else {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa organisasi.")
+		}
+		return
+	}
 	_, err = tx.ExecContext(r.Context(), `INSERT INTO employees (tenant_id,id,user_id,employee_number,display_name,status,base_office_id,position_id,reports_to_id) VALUES (?,?,?,?,?,?,?,?,?)`, c.tenant.ID, id, nullID(e.UserID), e.EmployeeNumber, e.DisplayName, e.Status, e.BaseOfficeID, e.PositionID, nullID(e.ReportsToID))
 	if err != nil {
 		writeJSON(w, 400, map[string]string{"error": "Nomor karyawan duplikat atau referensi tidak tersedia"})
@@ -288,6 +301,14 @@ func (a adminAPI) updateEmployee(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 403, map[string]string{"error": "Penempatan di luar cakupan akses"})
 		return
 	}
+	if err = lockEmployeeOrganization(r.Context(), tx, c.tenant.ID, next.BaseOfficeID, next.PositionID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeAPIError(w, r, 409, "ORGANIZATION_UNAVAILABLE", "Kantor atau jabatan sudah diarsipkan.")
+		} else {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa organisasi.")
+		}
+		return
+	}
 	_, err = tx.ExecContext(r.Context(), `UPDATE employees SET employee_number=?,display_name=?,status=?,base_office_id=?,position_id=?,reports_to_id=? WHERE tenant_id=? AND id=?`, next.EmployeeNumber, next.DisplayName, next.Status, next.BaseOfficeID, next.PositionID, nullID(next.ReportsToID), c.tenant.ID, id)
 	if err != nil {
 		writeJSON(w, 400, map[string]string{"error": "Nomor karyawan duplikat atau referensi tidak tersedia"})
@@ -340,9 +361,9 @@ func insertAssignment(ctx context.Context, tx *sql.Tx, tenantID string, e employ
 	}
 	result, err := tx.ExecContext(ctx, `INSERT INTO employee_assignments (tenant_id,id,employee_id,region_id,office_id,division_id,department_id,position_id,reports_to_employee_id,grade,valid_from,current_flag,source_history_id)
 		SELECT ?,?,?,o.region_id,o.id,d.division_id,p.department_id,p.id,?,p.grade,h.valid_from,1,?
-		FROM offices o JOIN positions p ON p.tenant_id=o.tenant_id AND p.id=? JOIN departments d ON d.tenant_id=p.tenant_id AND d.id=p.department_id
+		FROM offices o JOIN regions r ON r.tenant_id=o.tenant_id AND r.id=o.region_id JOIN positions p ON p.tenant_id=o.tenant_id AND p.id=? JOIN departments d ON d.tenant_id=p.tenant_id AND d.id=p.department_id JOIN divisions v ON v.tenant_id=d.tenant_id AND v.id=d.division_id
 		JOIN employee_assignment_history h ON h.tenant_id=o.tenant_id AND h.id=?
-		WHERE o.tenant_id=? AND o.id=?`, tenantID, assignmentID, e.ID, nullID(e.ReportsToID), historyID, e.PositionID, historyID, tenantID, e.BaseOfficeID)
+		WHERE o.tenant_id=? AND o.id=? AND o.deleted_at IS NULL AND o.is_active=TRUE AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND d.deleted_at IS NULL AND v.deleted_at IS NULL`, tenantID, assignmentID, e.ID, nullID(e.ReportsToID), historyID, e.PositionID, historyID, tenantID, e.BaseOfficeID)
 	if err != nil {
 		return err
 	}

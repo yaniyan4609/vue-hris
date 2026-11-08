@@ -251,6 +251,7 @@ type orgNode struct {
 	ID       string `json:"id"`
 	Code     string `json:"code"`
 	Name     string `json:"name"`
+	Status   string `json:"status,omitempty"`
 	ParentID string `json:"parentId,omitempty"`
 	Timezone string `json:"timezone,omitempty"`
 }
@@ -298,6 +299,16 @@ func (a adminAPI) listOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 	where := "tenant_id=?"
 	args := []any{c.tenant.ID}
+	switch r.URL.Query().Get("status") {
+	case "", "active":
+		where += " AND deleted_at IS NULL"
+	case "archived":
+		where += " AND deleted_at IS NOT NULL"
+	case "all":
+	default:
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Status organisasi tidak valid.")
+		return
+	}
 	if q != "" {
 		where += " AND (LOCATE(LOWER(?), LOWER(code))>0 OR LOCATE(LOWER(?), LOWER(name))>0)"
 		args = append(args, q, q)
@@ -315,7 +326,7 @@ func (a adminAPI) listOrganization(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]string{"error": "Gagal membaca jumlah data"})
 		return
 	}
-	columns := "id, code, name"
+	columns := "id, code, name, IF(deleted_at IS NULL,'active','archived')"
 	if kind.parentColumn != "" {
 		columns += ", " + kind.parentColumn
 	}
@@ -331,7 +342,7 @@ func (a adminAPI) listOrganization(w http.ResponseWriter, r *http.Request) {
 	nodes := []orgNode{}
 	for rows.Next() {
 		var n orgNode
-		dest := []any{&n.ID, &n.Code, &n.Name}
+		dest := []any{&n.ID, &n.Code, &n.Name, &n.Status}
 		if kind.parentColumn != "" {
 			dest = append(dest, &n.ParentID)
 		}
@@ -417,6 +428,15 @@ func (a adminAPI) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+	activeParent, err := activeOrganizationParent(r.Context(), tx, c.tenant.ID, kind, n.ParentID)
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa induk organisasi.")
+		return
+	}
+	if !activeParent {
+		writeAPIError(w, r, 409, "PARENT_ARCHIVED", "Induk organisasi tidak tersedia atau sudah diarsipkan.")
+		return
+	}
 	_, err = tx.ExecContext(r.Context(), "INSERT INTO "+kind.table+" ("+columns+") VALUES ("+marks+")", args...)
 	if err != nil {
 		writeJSON(w, 400, map[string]string{"error": "Kode duplikat atau induk tidak tersedia"})
@@ -470,7 +490,7 @@ func (a adminAPI) updateOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	columns := "id,code,name"
+	columns := "id,code,name,deleted_at"
 	if kind.parentColumn != "" {
 		columns += "," + kind.parentColumn
 	}
@@ -478,7 +498,8 @@ func (a adminAPI) updateOrganization(w http.ResponseWriter, r *http.Request) {
 		columns += ",timezone"
 	}
 	var old orgNode
-	dest := []any{&old.ID, &old.Code, &old.Name}
+	var archived sql.NullTime
+	dest := []any{&old.ID, &old.Code, &old.Name, &archived}
 	if kind.parentColumn != "" {
 		dest = append(dest, &old.ParentID)
 	}
@@ -492,6 +513,19 @@ func (a adminAPI) updateOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "Gagal membaca data"})
+		return
+	}
+	if archived.Valid {
+		writeAPIError(w, r, 409, "ARCHIVED", "Data organisasi sudah diarsipkan.")
+		return
+	}
+	activeParent, err := activeOrganizationParent(r.Context(), tx, c.tenant.ID, kind, n.ParentID)
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa induk organisasi.")
+		return
+	}
+	if !activeParent {
+		writeAPIError(w, r, 409, "PARENT_ARCHIVED", "Induk organisasi tidak tersedia atau sudah diarsipkan.")
 		return
 	}
 	sets := "code=?,name=?"

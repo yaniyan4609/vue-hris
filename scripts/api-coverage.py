@@ -26,7 +26,9 @@ def active_operations():
             continue
         match = re.match(r"^    (get|post|put|patch|delete):\s*$", line)
         if path and match:
-            operations.add((match.group(1).upper(), path))
+            expanded = [path.replace("{kind}", name) for name in RESOURCES] if path.startswith("/api/v1/admin/{kind}") else [path]
+            for actual_path in expanded:
+                operations.add((match.group(1).upper(), actual_path))
     return operations
 
 

@@ -20,11 +20,11 @@ type lookupSource struct {
 }
 
 var lookupSources = map[string]lookupSource{
-	"regions":                  {"regions", "organisasi.lihat", ""},
-	"offices":                  {"offices", "organisasi.lihat", ""},
-	"divisions":                {"divisions", "organisasi.lihat", ""},
-	"departments":              {"departments", "organisasi.lihat", ""},
-	"positions":                {"positions", "organisasi.lihat", ""},
+	"regions":                  {"regions", "organisasi.lihat", "deleted_at IS NULL"},
+	"offices":                  {"offices", "organisasi.lihat", "deleted_at IS NULL AND is_active=TRUE"},
+	"divisions":                {"divisions", "organisasi.lihat", "deleted_at IS NULL"},
+	"departments":              {"departments", "organisasi.lihat", "deleted_at IS NULL"},
+	"positions":                {"positions", "organisasi.lihat", "deleted_at IS NULL"},
 	"roles":                    {"roles", "pengguna.lihat", ""},
 	"leave-types":              {"leave_types", "cuti.lihat", "is_active=TRUE"},
 	"shift-templates":          {"shift_templates", "jadwal.lihat", "is_active=TRUE"},

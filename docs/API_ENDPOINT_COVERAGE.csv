@@ -7,9 +7,9 @@ DELETE,/api/v1/admin/assets/{id},7.7 Aset karyawan,planned
 DELETE,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
 DELETE,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/contracts/{id},7.3 Kontrak,active
-DELETE,/api/v1/admin/departments/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/departments/{id},6.1 Master organisasi,active
 DELETE,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
-DELETE,/api/v1/admin/divisions/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 DELETE,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
@@ -23,11 +23,11 @@ DELETE,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
 DELETE,/api/v1/admin/holidays/{id},"8.3 Admin: master shift, roster, dan libur",active
 DELETE,/api/v1/admin/leave-policies/{id},9.2 Admin: cuti dan izin,active
 DELETE,/api/v1/admin/leave-types/{id},9.2 Admin: cuti dan izin,active
-DELETE,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/offices/{id},6.1 Master organisasi,active
 DELETE,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,active
 DELETE,/api/v1/admin/payroll/runs/{id}/items/{itemId}/lines/{lineId},11.2 Periode dan payroll run,planned
-DELETE,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
-DELETE,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
+DELETE,/api/v1/admin/positions/{id},6.1 Master organisasi,active
+DELETE,/api/v1/admin/regions/{id},6.1 Master organisasi,active
 DELETE,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,active
 DELETE,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
 DELETE,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
@@ -82,12 +82,12 @@ GET,/api/v1/admin/dashboard/expiring,14.1 Dashboard,planned
 GET,/api/v1/admin/dashboard/headcount,14.1 Dashboard,planned
 GET,/api/v1/admin/dashboard/payroll-cost,14.1 Dashboard,planned
 GET,/api/v1/admin/dashboard/summary,14.1 Dashboard,planned
-GET,/api/v1/admin/departments,6.1 Master organisasi,planned
-GET,/api/v1/admin/departments/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/departments,6.1 Master organisasi,active
+GET,/api/v1/admin/departments/{id},6.1 Master organisasi,active
 GET,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,planned
 GET,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
-GET,/api/v1/admin/divisions,6.1 Master organisasi,planned
-GET,/api/v1/admin/divisions/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/divisions,6.1 Master organisasi,active
+GET,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 GET,/api/v1/admin/document-templates,12.2 Dokumen,planned
 GET,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 GET,/api/v1/admin/document-types,12.2 Dokumen,planned
@@ -135,8 +135,8 @@ GET,/api/v1/admin/notification-rules,"13.2 Admin: aturan, template, dan log",pla
 GET,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
 GET,/api/v1/admin/notification-stats,"13.2 Admin: aturan, template, dan log",planned
 GET,/api/v1/admin/notification-templates,"13.2 Admin: aturan, template, dan log",planned
-GET,/api/v1/admin/offices,6.1 Master organisasi,planned
-GET,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/offices,6.1 Master organisasi,active
+GET,/api/v1/admin/offices/{id},6.1 Master organisasi,active
 GET,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
 GET,/api/v1/admin/organization/tree,6.1 Master organisasi,active
 GET,/api/v1/admin/overtime-requests,9.3 Lembur,active
@@ -162,10 +162,10 @@ GET,/api/v1/admin/payslips/{id},11.3 Slip gaji,planned
 GET,/api/v1/admin/payslips/{id}/download,11.3 Slip gaji,planned
 GET,/api/v1/admin/permissions,5.2 Role dan registry permission,active
 GET,/api/v1/admin/position-role-suggestions,5.3 Hak akses per pengguna,planned
-GET,/api/v1/admin/positions,6.1 Master organisasi,planned
-GET,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
-GET,/api/v1/admin/regions,6.1 Master organisasi,planned
-GET,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
+GET,/api/v1/admin/positions,6.1 Master organisasi,active
+GET,/api/v1/admin/positions/{id},6.1 Master organisasi,active
+GET,/api/v1/admin/regions,6.1 Master organisasi,active
+GET,/api/v1/admin/regions/{id},6.1 Master organisasi,active
 GET,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,active
 GET,/api/v1/admin/reimbursements,9.5 Reimbursement,active
 GET,/api/v1/admin/reimbursements/{id},9.5 Reimbursement,active
@@ -292,9 +292,9 @@ PATCH,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
 PATCH,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/company-profile,14.5 Pengaturan tenant dan langganan,planned
 PATCH,/api/v1/admin/contracts/{id},7.3 Kontrak,active
-PATCH,/api/v1/admin/departments/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/departments/{id},6.1 Master organisasi,active
 PATCH,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
-PATCH,/api/v1/admin/divisions/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 PATCH,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
@@ -308,11 +308,11 @@ PATCH,/api/v1/admin/holidays/{id},"8.3 Admin: master shift, roster, dan libur",a
 PATCH,/api/v1/admin/leave-policies/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/leave-types/{id},9.2 Admin: cuti dan izin,active
-PATCH,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/offices/{id},6.1 Master organisasi,active
 PATCH,/api/v1/admin/overtime-requests/{id},9.3 Lembur,active
 PATCH,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,active
-PATCH,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
-PATCH,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
+PATCH,/api/v1/admin/positions/{id},6.1 Master organisasi,active
+PATCH,/api/v1/admin/regions/{id},6.1 Master organisasi,active
 PATCH,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,active
 PATCH,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
 PATCH,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
@@ -353,9 +353,9 @@ POST,/api/v1/admin/company-documents/{id}/publish,12.2 Dokumen,planned
 POST,/api/v1/admin/company-profile/logo,14.5 Pengaturan tenant dan langganan,planned
 POST,/api/v1/admin/contracts,7.3 Kontrak,active
 POST,/api/v1/admin/contracts/{id}/renew,7.3 Kontrak,active
-POST,/api/v1/admin/departments,6.1 Master organisasi,planned
+POST,/api/v1/admin/departments,6.1 Master organisasi,active
 POST,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,planned
-POST,/api/v1/admin/divisions,6.1 Master organisasi,planned
+POST,/api/v1/admin/divisions,6.1 Master organisasi,active
 POST,/api/v1/admin/document-templates,12.2 Dokumen,planned
 POST,/api/v1/admin/document-templates/{id}/render,12.2 Dokumen,planned
 POST,/api/v1/admin/document-types,12.2 Dokumen,planned
@@ -391,7 +391,7 @@ POST,/api/v1/admin/loans/{id}/installments/{seq}/waive,9.4 Kasbon,active
 POST,/api/v1/admin/loans/{id}/settle,9.4 Kasbon,active
 POST,/api/v1/admin/notification-deliveries/{id}/retry,"13.2 Admin: aturan, template, dan log",planned
 POST,/api/v1/admin/notification-templates/{id}/preview,"13.2 Admin: aturan, template, dan log",planned
-POST,/api/v1/admin/offices,6.1 Master organisasi,planned
+POST,/api/v1/admin/offices,6.1 Master organisasi,active
 POST,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
 POST,/api/v1/admin/overtime-requests,9.3 Lembur,active
 POST,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,active
@@ -405,8 +405,8 @@ POST,/api/v1/admin/payroll/runs/{id}/items/{itemId}/lines,11.2 Periode dan payro
 POST,/api/v1/admin/payroll/runs/{id}/payslips/publish,11.3 Slip gaji,planned
 POST,/api/v1/admin/payroll/runs/{id}/recalculate,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/payroll/runs/{id}/submit,11.2 Periode dan payroll run,planned
-POST,/api/v1/admin/positions,6.1 Master organisasi,planned
-POST,/api/v1/admin/regions,6.1 Master organisasi,planned
+POST,/api/v1/admin/positions,6.1 Master organisasi,active
+POST,/api/v1/admin/regions,6.1 Master organisasi,active
 POST,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,active
 POST,/api/v1/admin/reimbursements/{id}/pay,9.5 Reimbursement,active
 POST,/api/v1/admin/reports/{key}/export,14.2 Laporan,planned
