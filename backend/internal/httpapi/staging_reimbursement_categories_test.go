@@ -103,6 +103,10 @@ func TestStagingReimbursementCategories(t *testing.T) {
 	var essState auth.State
 	doJSON(t, ess, "POST", server.URL+"/api/v1/auth/demo-login", map[string]string{"account": "ess"}, 200, &essState)
 	doJSON(t, ess, "GET", server.URL+"/api/v1/admin/reimbursement-categories", nil, 403, nil)
+	doJSON(t, ess, "GET", server.URL+"/api/v1/lookups/reimbursement-categories?q="+code, nil, 200, &lookup)
+	if len(lookup.Data) != 0 {
+		t.Fatalf("inactive category visible to ESS: %#v", lookup.Data)
+	}
 	var ownEmployee string
 	if err := db.QueryRow(`SELECT id FROM employees WHERE tenant_id=? AND user_id=?`, state.SelectedTenantID, essState.User.ID).Scan(&ownEmployee); err != nil {
 		t.Fatal(err)

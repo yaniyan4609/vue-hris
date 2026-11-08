@@ -57,7 +57,7 @@ func (a adminAPI) lookupCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var tenantID string
-	if kind == "leave-types" {
+	if kind == "leave-types" || kind == "reimbursement-categories" {
 		state, err := a.auth.Current(r.Context(), cookieToken(r))
 		if err != nil {
 			writeAuthError(w, err)
@@ -65,7 +65,11 @@ func (a adminAPI) lookupCatalog(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, tenant := range state.Tenants {
 			if tenant.ID == state.SelectedTenantID && tenant.ESS {
-				_, decision, err := a.access.Decide(r.Context(), tenant.ID, state.User.ID, tenant.Timezone, "cuti.buat")
+				permission := "cuti.buat"
+				if kind == "reimbursement-categories" {
+					permission = "reimbursement.buat"
+				}
+				_, decision, err := a.access.Decide(r.Context(), tenant.ID, state.User.ID, tenant.Timezone, permission)
 				if err != nil {
 					writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa akses.")
 					return

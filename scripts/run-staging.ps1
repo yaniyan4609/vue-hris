@@ -118,6 +118,8 @@ try {
         $env:PLATFORM_MFA_KEY = ([System.Net.NetworkCredential]::new('', $secureMfaKey)).Password
     }
     $env:APP_ENV = 'staging'
+    $env:FILE_STORAGE_DIR = Join-Path $repoRoot 'work/files'
+    New-Item -ItemType Directory -Force -Path $env:FILE_STORAGE_DIR | Out-Null
     $env:ENABLE_DEMO_LOGIN = 'true'
     $env:COOKIE_SECURE = 'false'
     $env:APP_ORIGIN = "http://${lanIP}:${frontendPort}"

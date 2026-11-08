@@ -39,7 +39,7 @@ DELETE,/api/v1/admin/webhooks/{id},14.5 Pengaturan tenant dan langganan,planned
 DELETE,/api/v1/admin/work-schedules/{id},"8.3 Admin: master shift, roster, dan libur",active
 DELETE,/api/v1/ess/profile/change-requests/{id},7.8 ESS: profil sendiri,planned
 DELETE,/api/v1/ess/profile/emergency-contacts/{id},7.8 ESS: profil sendiri,planned
-DELETE,/api/v1/files/{id},12.1 Berkas,planned
+DELETE,/api/v1/files/{id},12.1 Berkas,active
 DELETE,/api/v1/jobs/{id},14.3 Ekspor dan impor (job generik),planned
 DELETE,/api/v1/me/sessions/{id},"4. Autentikasi, akun, dan sesi",active
 DELETE,/api/v1/platform/plans/{id},"15.2 Paket, langganan, dan billing",planned
@@ -241,8 +241,8 @@ GET,/api/v1/ess/requests/{requestId},10.2 ESS: pengajuan saya,active
 GET,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
 GET,/api/v1/ess/schedule,8.1 ESS: absensi dan jadwal pribadi,active
 GET,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
-GET,/api/v1/files/{id},12.1 Berkas,planned
-GET,/api/v1/files/{id}/download,12.1 Berkas,planned
+GET,/api/v1/files/{id},12.1 Berkas,active
+GET,/api/v1/files/{id}/download,12.1 Berkas,active
 GET,/api/v1/holidays,"8.3 Admin: master shift, roster, dan libur",active
 GET,/api/v1/jobs,14.3 Ekspor dan impor (job generik),planned
 GET,/api/v1/jobs/{id},14.3 Ekspor dan impor (job generik),planned
@@ -408,7 +408,7 @@ POST,/api/v1/admin/payroll/runs/{id}/submit,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/positions,6.1 Master organisasi,planned
 POST,/api/v1/admin/regions,6.1 Master organisasi,planned
 POST,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,active
-POST,/api/v1/admin/reimbursements/{id}/pay,9.5 Reimbursement,planned
+POST,/api/v1/admin/reimbursements/{id}/pay,9.5 Reimbursement,active
 POST,/api/v1/admin/reports/{key}/export,14.2 Laporan,planned
 POST,/api/v1/admin/roles,5.2 Role dan registry permission,active
 POST,/api/v1/admin/shift-instances/generate,"8.3 Admin: master shift, roster, dan libur",planned
@@ -451,15 +451,15 @@ POST,/api/v1/ess/overtime-requests,9.3 Lembur,active
 POST,/api/v1/ess/profile/change-requests,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/profile/emergency-contacts,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/profile/photo,7.8 ESS: profil sendiri,planned
-POST,/api/v1/ess/reimbursements,9.5 Reimbursement,planned
-POST,/api/v1/ess/reimbursements/{id}/receipts,9.5 Reimbursement,planned
+POST,/api/v1/ess/reimbursements,9.5 Reimbursement,active
+POST,/api/v1/ess/reimbursements/{id}/receipts,9.5 Reimbursement,active
 POST,/api/v1/ess/requests/{requestId}/cancel,10.2 ESS: pengajuan saya,active
 POST,/api/v1/ess/requests/{requestId}/resubmit,10.2 ESS: pengajuan saya,active
 POST,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
 POST,/api/v1/ess/shift-swaps/{id}/respond,8.1 ESS: absensi dan jadwal pribadi,planned
-POST,/api/v1/files/uploads,12.1 Berkas,planned
-POST,/api/v1/files/{id}/complete,12.1 Berkas,planned
+POST,/api/v1/files/uploads,12.1 Berkas,active
+POST,/api/v1/files/{id}/complete,12.1 Berkas,active
 POST,/api/v1/notifications/read-all,13.1 Inbox dan preferensi (semua pengguna),active
 POST,/api/v1/notifications/{id}/archive,13.1 Inbox dan preferensi (semua pengguna),active
 POST,/api/v1/notifications/{id}/read,13.1 Inbox dan preferensi (semua pengguna),active

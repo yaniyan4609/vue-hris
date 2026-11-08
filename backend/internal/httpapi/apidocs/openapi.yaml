@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.18.0
+  version: 0.19.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -30,6 +30,8 @@ tags:
     description: Pembacaan pengajuan dan tugas approval
   - name: Reimbursements
     description: Kategori dan klaim biaya karyawan
+  - name: Files
+    description: Unggah kuitansi lokal khusus staging
   - name: Employees
     description: Data karyawan dan profil ESS
   - name: Platform
@@ -2836,6 +2838,22 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200': { description: Daftar klaim sendiri, termasuk kategori yang kemudian dinonaktifkan }
+    post:
+      tags: [Reimbursements]
+      operationId: submitEssReimbursement
+      x-permission: reimbursement.buat
+      summary: Ajukan klaim dengan kuitansi terverifikasi dan approval default
+      description: Batas bulanan dihitung per karyawan, kategori, dan bulan transaksi. Klaim serupa berdasarkan karyawan, tanggal, nominal, dan hash isi kuitansi perlu confirm_duplicate true.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReimbursementInput' }
+      responses:
+        '201': { description: Klaim dan tugas approver dibuat dalam satu transaksi }
+        '409': { description: DUPLICATE_SUSPECTED, batas bulanan, kuitansi terpakai, atau alur approval belum tersedia }
   /api/v1/ess/reimbursements/{id}:
     parameters:
       - $ref: '#/components/parameters/ResourceID'
@@ -2846,6 +2864,27 @@ paths:
       responses:
         '200': { description: Klaim dan kuitansi tanpa storage key atau URL file }
         '404': { description: Klaim tidak ada atau bukan milik karyawan }
+  /api/v1/ess/reimbursements/{id}/receipts:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Reimbursements]
+      operationId: addEssReimbursementReceipts
+      summary: Tambah kuitansi pada klaim returned
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file_ids]
+              properties:
+                file_ids: { type: array, minItems: 1, maxItems: 5, items: { type: string, minLength: 26, maxLength: 26 } }
+      responses:
+        '200': { description: 'Kuitansi ditambahkan; kirim ulang melalui /ess/requests/{requestId}/resubmit' }
+        '409': { description: Klaim bukan returned atau kuitansi telah dipakai }
   /api/v1/admin/reimbursements:
     get:
       tags: [Reimbursements]
@@ -2871,6 +2910,119 @@ paths:
       responses:
         '200': { description: Klaim dan metadata kuitansi dalam scope }
         '404': { description: Klaim tidak ditemukan dalam scope }
+  /api/v1/admin/reimbursements/{id}/pay:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Reimbursements]
+      operationId: payAdminReimbursement
+      x-permission: reimbursement.bayar
+      summary: Tandai klaim approved dibayar satu kali
+      description: Memerlukan reauth. Pengulangan dengan payment_ref yang sama mengembalikan hasil idempotent tanpa audit pembayaran baru.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_ref]
+              properties:
+                payment_ref: { type: string, minLength: 1, maxLength: 160 }
+      responses:
+        '200': { description: Klaim dibayar atau retry identik }
+        '403': { description: Verifikasi ulang dibutuhkan }
+        '409': { description: Klaim belum approved atau sudah dibayar dengan referensi lain }
+  /api/v1/files/uploads:
+    post:
+      tags: [Files]
+      operationId: createReceiptUpload
+      x-permission: reimbursement.buat
+      summary: Minta unggah kuitansi di staging
+      description: Hanya purpose receipt, PNG/JPEG/PDF hingga 10 MiB. Penyimpanan lokal staging dibatasi 100 MiB per tenant. Endpoint tidak tersedia di luar staging.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceiptUploadInput' }
+      responses:
+        '201': { description: file_id, upload_url relatif, method PUT, headers, expires_at }
+        '422': { description: Kuota staging terlampaui }
+        '503': { description: Penyimpanan lokal tidak tersedia }
+  /api/v1/files/{id}/content:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Files]
+      operationId: getReceiptContent
+      summary: Unduh kuitansi melalui tautan sementara
+      description: Dipakai oleh redirect download. Signature terikat sesi dan berlaku paling lama lima menit; hak file diperiksa ulang dan unduhan diaudit.
+      parameters:
+        - { in: query, name: expires, required: true, schema: { type: integer } }
+        - { in: query, name: signature, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Byte kuitansi }
+        '403': { description: Tautan tidak sah atau kedaluwarsa }
+    put:
+      tags: [Files]
+      operationId: putReceiptContent
+      summary: Kirim byte kuitansi milik pengunggah
+      description: Rute tambahan untuk adapter lokal staging; kirim Content-Type sesuai permintaan unggah dan X-CSRF-Token.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/pdf: { schema: { type: string, format: binary } }
+          image/jpeg: { schema: { type: string, format: binary } }
+          image/png: { schema: { type: string, format: binary } }
+      responses:
+        '204': { description: Byte disimpan; panggil complete untuk verifikasi }
+  /api/v1/files/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Files]
+      operationId: completeReceiptUpload
+      summary: Verifikasi ukuran, SHA-256, dan struktur isi kuitansi
+      description: Validasi staging belum menggantikan pemindaian malware produksi. Berkas baru dapat dipakai klaim setelah complete berhasil.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '200': { description: Kuitansi siap dipakai pada klaim }
+        '422': { description: Isi tidak sesuai metadata yang dinyatakan }
+  /api/v1/files/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Files]
+      operationId: getReceiptFile
+      summary: Metadata kuitansi untuk pengunggah atau Admin dalam scope klaim
+      responses:
+        '200': { description: Metadata tanpa storage key }
+        '404': { description: Berkas tidak ada atau di luar scope }
+    delete:
+      tags: [Files]
+      operationId: deleteReceiptFile
+      summary: Hapus kuitansi milik pengunggah yang belum terikat ke klaim
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Kuitansi bebas dihapus }
+        '409': { description: Kuitansi sudah terikat ke klaim }
+  /api/v1/files/{id}/download:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Files]
+      operationId: redirectReceiptDownload
+      summary: Minta URL unduh sementara setelah cek akses
+      responses:
+        '302': { description: Redirect ke URL sesi sementara, berlaku lima menit }
+        '404': { description: Kuitansi tidak ada atau di luar scope }
   /api/v1/admin/reimbursement-categories:
     get:
       tags: [Reimbursements]
@@ -3186,6 +3338,25 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    ReceiptUploadInput:
+      type: object
+      required: [purpose, original_name, mime_type, size_bytes, sha256]
+      properties:
+        purpose: { type: string, enum: [receipt] }
+        original_name: { type: string, minLength: 1, maxLength: 255 }
+        mime_type: { type: string, enum: [application/pdf, image/jpeg, image/png] }
+        size_bytes: { type: integer, minimum: 1, maximum: 10485760 }
+        sha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+    ReimbursementInput:
+      type: object
+      required: [category_id, trx_date, amount, file_ids]
+      properties:
+        category_id: { type: string, minLength: 26, maxLength: 26 }
+        trx_date: { type: string, format: date }
+        amount: { type: number, multipleOf: 0.01, exclusiveMinimum: 0 }
+        description: { type: string, maxLength: 2000 }
+        file_ids: { type: array, minItems: 1, maxItems: 5, items: { type: string, minLength: 26, maxLength: 26 } }
+        confirm_duplicate: { type: boolean, default: false }
     ReimbursementCategoryInput:
       type: object
       required: [code, name]

@@ -37,6 +37,11 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data cuti tidak sesuai pengajuan.")
 			return
 		}
+	} else if d.Kind == "reimbursement" {
+		if err := tx.QueryRowContext(r.Context(), `SELECT status FROM reimbursements WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&domainStatus); err != nil || domainStatus != "in_review" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status klaim tidak sesuai pengajuan.")
+			return
+		}
 	} else {
 		if err := tx.QueryRowContext(r.Context(), `SELECT proposed_minutes,status FROM overtime_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&proposed, &domainStatus); err != nil || domainStatus != "in_review" {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
@@ -168,6 +173,17 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 	} else if d.Kind == "overtime" && resultStatus == "rejected" {
 		if _, err := tx.ExecContext(r.Context(), `UPDATE overtime_requests SET status='rejected' WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, c.tenant.ID, d.RefID, d.RequestID); err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menolak lembur.")
+			return
+		}
+	} else if d.Kind == "reimbursement" && (resultStatus == "approved" || resultStatus == "rejected") {
+		result, err := tx.ExecContext(r.Context(), `UPDATE reimbursements SET status=? WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, resultStatus, c.tenant.ID, d.RefID, d.RequestID)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memperbarui keputusan klaim.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status klaim telah berubah.")
 			return
 		}
 	}

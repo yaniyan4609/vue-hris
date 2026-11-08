@@ -73,6 +73,7 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 		r.Get("/reimbursement-categories", a.listReimbursementCategories)
 		r.Get("/reimbursements", a.listAdminReimbursements)
 		r.Get("/reimbursements/{id}", a.getAdminReimbursement)
+		r.With(checkOrigin(config)).Post("/reimbursements/{id}/pay", a.payAdminReimbursement)
 		r.With(checkOrigin(config)).Post("/reimbursement-categories", a.createReimbursementCategory)
 		r.With(checkOrigin(config)).Patch("/reimbursement-categories/{id}", a.updateReimbursementCategory)
 		r.With(checkOrigin(config)).Delete("/reimbursement-categories/{id}", a.deactivateReimbursementCategory)
@@ -117,6 +118,8 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 	r.Get("/api/v1/ess/overtime-requests", a.listEssOvertime)
 	r.Get("/api/v1/ess/overtime-requests/{id}", a.getEssOvertime)
 	r.Get("/api/v1/ess/reimbursements", a.listEssReimbursements)
+	r.With(checkOrigin(config)).Post("/api/v1/ess/reimbursements", a.submitEssReimbursement)
+	r.With(checkOrigin(config)).Post("/api/v1/ess/reimbursements/{id}/receipts", a.addEssReimbursementReceipts)
 	r.Get("/api/v1/ess/reimbursements/{id}", a.getEssReimbursement)
 	r.Get("/api/v1/ess/leave/types", a.listEssLeaveTypes)
 	r.Get("/api/v1/ess/leave/balances", a.listEssLeaveBalances)
@@ -127,6 +130,13 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 	r.Get("/api/v1/ess/leave-requests/{id}", a.getEssLeave)
 	a.mountEssAttendance(r)
 	r.With(checkOrigin(config)).Post("/api/v1/ess/attendance/location-check", a.essLocationCheck)
+	r.With(checkOrigin(config)).Post("/api/v1/files/uploads", a.createReceiptUpload)
+	r.Get("/api/v1/files/{id}", a.getReceiptFile)
+	r.Get("/api/v1/files/{id}/download", a.redirectReceiptDownload)
+	r.Get("/api/v1/files/{id}/content", a.getReceiptContent)
+	r.With(checkOrigin(config)).Put("/api/v1/files/{id}/content", a.putReceiptContent)
+	r.With(checkOrigin(config)).Post("/api/v1/files/{id}/complete", a.completeReceiptUpload)
+	r.With(checkOrigin(config)).Delete("/api/v1/files/{id}", a.deleteReceiptFile)
 }
 
 func (a adminAPI) authorize(w http.ResponseWriter, r *http.Request, code string) (adminContext, bool) {

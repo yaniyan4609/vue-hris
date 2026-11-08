@@ -128,7 +128,7 @@ func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, r, 404, "NOT_FOUND", "Pengajuan tidak ditemukan dalam scope.")
 		return
 	}
-	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests"))
+	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements"))
 	if body.Action == "return" && refTable.Valid && !domainReady {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Pengembalian jenis pengajuan ini menunggu handler domain.")
 		return
@@ -168,6 +168,18 @@ func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		rows, _ := result.RowsAffected()
 		if rows != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data cuti tidak sesuai pengajuan.")
+			return
+		}
+	}
+	if kind == "reimbursement" && domainReady {
+		result, err := tx.ExecContext(r.Context(), `UPDATE reimbursements SET status='returned' WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='in_review'`, c.tenant.ID, refID.String, requestID, subjectID.String)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengembalikan klaim.")
+			return
+		}
+		rows, _ := result.RowsAffected()
+		if rows != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status klaim tidak sesuai pengajuan.")
 			return
 		}
 	}

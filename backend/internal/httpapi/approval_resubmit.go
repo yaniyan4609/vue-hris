@@ -110,7 +110,7 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perbaikan field domain belum tersedia untuk jenis pengajuan ini.")
 		return
 	}
-	if kind != "overtime" && kind != "leave" && refTable.Valid {
+	if kind != "overtime" && kind != "leave" && kind != "reimbursement" && refTable.Valid {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Kirim ulang jenis pengajuan ini menunggu handler domain.")
 		return
 	}
@@ -120,6 +120,10 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if kind == "leave" && (!refTable.Valid || refTable.String != "leave_requests" || !refID.Valid) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi data cuti tidak valid.")
+		return
+	}
+	if kind == "reimbursement" && (!refTable.Valid || refTable.String != "reimbursements" || !refID.Valid) {
+		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi klaim tidak valid.")
 		return
 	}
 	if kind == "overtime" {
@@ -299,6 +303,28 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		affected, _ := result.RowsAffected()
 		if affected != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data cuti tidak sesuai pengajuan.")
+			return
+		}
+	}
+	if kind == "reimbursement" {
+		var status string
+		if err := tx.QueryRowContext(r.Context(), `SELECT status FROM reimbursements WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.state.SelectedTenantID, refID.String, requestID, subjectID.String).Scan(&status); err != nil || status != "returned" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status klaim tidak sesuai pengajuan.")
+			return
+		}
+		var receipts int
+		if err := tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM reimbursement_receipts rr JOIN files f ON f.tenant_id=rr.tenant_id AND f.id=rr.file_id WHERE rr.tenant_id=? AND rr.reimbursement_id=? AND f.scan_status='clean' AND f.deleted_at IS NULL`, c.state.SelectedTenantID, refID.String).Scan(&receipts); err != nil || receipts == 0 {
+			writeAPIError(w, r, 409, "RECEIPT_REQUIRED", "Kuitansi terverifikasi wajib tersedia sebelum kirim ulang.")
+			return
+		}
+		result, err := tx.ExecContext(r.Context(), `UPDATE reimbursements SET status='in_review' WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='returned'`, c.state.SelectedTenantID, refID.String, requestID, subjectID.String)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membuka ulang klaim.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status klaim telah berubah.")
 			return
 		}
 	}
