@@ -147,8 +147,8 @@ GET,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,active
 GET,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,active
 GET,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,active
 GET,/api/v1/admin/payroll/periods/{id},11.2 Periode dan payroll run,active
-GET,/api/v1/admin/payroll/rules/bpjs,11.1 Komponen dan aturan,planned
-GET,/api/v1/admin/payroll/rules/tax,11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/payroll/rules/bpjs,11.1 Komponen dan aturan,active
+GET,/api/v1/admin/payroll/rules/tax,11.1 Komponen dan aturan,active
 GET,/api/v1/admin/payroll/runs,11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/runs/{id},11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/runs/{id}/adjustments,11.2 Periode dan payroll run,planned

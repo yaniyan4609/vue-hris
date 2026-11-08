@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.24.0
+  version: 0.25.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2828,6 +2828,61 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200': { description: Mutasi ledger dalam scope karyawan }
+  /api/v1/admin/payroll/rules/tax:
+    get:
+      tags: [Payroll]
+      operationId: getPayrollTaxRules
+      x-permission: penggajian.lihat
+      summary: Baca aturan PPh 21 tenant yang berlaku pada tanggal
+      parameters:
+        - { in: query, name: date, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Aturan terstruktur atau configured false }
+    post:
+      tags: [Payroll]
+      operationId: publishPayrollTaxRule
+      x-permission: penggajian.kelola
+      summary: Terbitkan versi aturan PPh 21 tenant
+      description: Perlu reauth. Editor terstruktur memerlukan TER bulanan lengkap untuk kategori A, B, dan C, PTKP, serta rentang tarif tahunan dengan batas atas eksklusif. Sumber aturan wajib dicatat. Versi sebelumnya ditutup atomik; tanggal yang menyentuh payroll final ditolak. Ini penyimpanan aturan, belum mengaktifkan kalkulasi pajak.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayrollTaxRuleInput' }
+      responses:
+        '201': { description: Aturan diterbitkan, audit berisi hash data }
+        '403': { description: Reauth diperlukan }
+        '409': { description: Versi/tanggal konflik atau payroll sudah final }
+  /api/v1/admin/payroll/rules/bpjs:
+    get:
+      tags: [Payroll]
+      operationId: getPayrollBPJSRules
+      x-permission: penggajian.lihat
+      summary: Baca aturan BPJS tenant yang berlaku pada tanggal
+      parameters:
+        - { in: query, name: date, schema: { type: string, format: date } }
+        - { in: query, name: program, schema: { type: string } }
+      responses:
+        '200': { description: Daftar aturan aktif per program }
+    post:
+      tags: [Payroll]
+      operationId: publishPayrollBPJSRule
+      x-permission: penggajian.kelola
+      summary: Terbitkan versi tarif dan plafon BPJS tenant
+      description: Perlu reauth. Tarif disimpan sebagai pecahan desimal 0 sampai 1; plafon upah boleh null. Versi sebelumnya ditutup atomik. Tidak ada tarif yang diisi otomatis oleh platform.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayrollBPJSRuleInput' }
+      responses:
+        '201': { description: Versi aturan BPJS diterbitkan dan diaudit }
+        '403': { description: Reauth diperlukan }
+        '409': { description: Versi/tanggal konflik atau payroll sudah final }
   /api/v1/admin/payroll/components:
     get:
       tags: [Payroll]
@@ -3748,6 +3803,45 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    PayrollTaxBracket:
+      type: object
+      required: [lower_bound, rate]
+      properties:
+        category: { type: string, enum: [A, B, C], description: Hanya untuk TER bulanan }
+        lower_bound: { type: number, minimum: 0, multipleOf: 0.01 }
+        upper_bound_exclusive: { type: number, nullable: true, multipleOf: 0.01, description: Null hanya untuk rentang terakhir }
+        rate: { type: number, minimum: 0, maximum: 1, multipleOf: 0.000001 }
+    PayrollTaxRuleInput:
+      type: object
+      required: [effective_from, source_reference, ptkp, ter_brackets, annual_brackets]
+      properties:
+        effective_from: { type: string, format: date }
+        effective_to: { type: string, format: date, nullable: true }
+        source_reference: { type: string, minLength: 1, maxLength: 500 }
+        ptkp:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items:
+            type: object
+            required: [status, ter_category, annual_amount]
+            properties:
+              status: { type: string, minLength: 1, maxLength: 16 }
+              ter_category: { type: string, enum: [A, B, C] }
+              annual_amount: { type: number, minimum: 0, multipleOf: 0.01 }
+        ter_brackets: { type: array, minItems: 1, maxItems: 400, items: { $ref: '#/components/schemas/PayrollTaxBracket' } }
+        annual_brackets: { type: array, minItems: 1, maxItems: 400, items: { $ref: '#/components/schemas/PayrollTaxBracket' } }
+    PayrollBPJSRuleInput:
+      type: object
+      required: [program, effective_from, rate_employee, rate_employer, source_reference]
+      properties:
+        program: { type: string, pattern: '^[A-Z][A-Z0-9_]{0,47}$' }
+        effective_from: { type: string, format: date }
+        effective_to: { type: string, format: date, nullable: true }
+        rate_employee: { type: number, minimum: 0, maximum: 1, multipleOf: 0.000001 }
+        rate_employer: { type: number, minimum: 0, maximum: 1, multipleOf: 0.000001 }
+        wage_cap: { type: number, nullable: true, exclusiveMinimum: 0, multipleOf: 0.01 }
+        source_reference: { type: string, minLength: 1, maxLength: 500 }
     PayrollComponentInput:
       type: object
       required: [code, name, component_type, taxable, calc_type]

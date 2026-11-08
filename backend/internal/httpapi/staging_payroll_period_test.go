@@ -43,8 +43,26 @@ func TestStagingPayrollPeriodFinanceAccess(t *testing.T) {
 	if _, err = db.Exec(`INSERT INTO users (id,email,email_normalized,display_name,password_hash) VALUES (?,?,?,'QA Payroll',?)`, userID, email, email, hash); err != nil {
 		t.Fatal(err)
 	}
-	periodID, loanID, componentID, payEmployeeID, payOrgAssignmentID := "", "", "", "", ""
+	periodID, loanID, componentID, payEmployeeID, payOrgAssignmentID, taxID, bpjsID, bpjsSecondID := "", "", "", "", "", "", "", ""
 	t.Cleanup(func() {
+		if bpjsSecondID != "" {
+			_, _ = db.Exec(`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='bpjs_rules' AND entity_id=?`, tenantID, bpjsSecondID)
+			if _, e := db.Exec(`DELETE FROM bpjs_rules WHERE tenant_id=? AND id=?`, tenantID, bpjsSecondID); e != nil {
+				t.Errorf("cleanup second BPJS rule: %v", e)
+			}
+		}
+		if taxID != "" {
+			_, _ = db.Exec(`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='tax_rules' AND entity_id=?`, tenantID, taxID)
+			if _, e := db.Exec(`DELETE FROM tax_rules WHERE tenant_id=? AND id=?`, tenantID, taxID); e != nil {
+				t.Errorf("cleanup tax rule: %v", e)
+			}
+		}
+		if bpjsID != "" {
+			_, _ = db.Exec(`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='bpjs_rules' AND entity_id=?`, tenantID, bpjsID)
+			if _, e := db.Exec(`DELETE FROM bpjs_rules WHERE tenant_id=? AND id=?`, tenantID, bpjsID); e != nil {
+				t.Errorf("cleanup BPJS rule: %v", e)
+			}
+		}
 		if payEmployeeID != "" {
 			for _, query := range []string{
 				`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='employee_pay_components' AND entity_id=?`,
@@ -261,5 +279,68 @@ func TestStagingPayrollPeriodFinanceAccess(t *testing.T) {
 	doJSON(t, client, "GET", componentURL+"/"+componentID, nil, 200, &component)
 	if component.Data.IsActive {
 		t.Fatalf("component still active: %#v", component.Data)
+	}
+	bpjsProgram := "QA_" + userID
+	var publishedBPJS struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	bpjsURL := server.URL + "/api/v1/admin/payroll/rules/bpjs"
+	doJSON(t, client, "POST", bpjsURL, map[string]any{"program": bpjsProgram, "effective_from": "2099-01-01", "rate_employee": 0.01, "rate_employer": 0.04, "wage_cap": 12000000, "source_reference": "QA synthetic rule"}, 201, &publishedBPJS)
+	bpjsID = publishedBPJS.Data.ID
+	var bpjsRules struct {
+		Data struct {
+			Rules []payrollBPJSRuleView `json:"rules"`
+		} `json:"data"`
+	}
+	doJSON(t, client, "GET", bpjsURL+"?date=2099-01-02&program="+bpjsProgram, nil, 200, &bpjsRules)
+	if len(bpjsRules.Data.Rules) != 1 || bpjsRules.Data.Rules[0].WageCap == nil || *bpjsRules.Data.Rules[0].WageCap != "12000000.00" {
+		t.Fatalf("BPJS rules: %#v", bpjsRules.Data)
+	}
+	doJSON(t, client, "POST", bpjsURL, map[string]any{"program": bpjsProgram, "effective_from": "2099-02-01", "rate_employee": 0.02, "rate_employer": 0.04, "source_reference": "QA revised rule"}, 201, &publishedBPJS)
+	bpjsSecondID = publishedBPJS.Data.ID
+	doJSON(t, client, "GET", bpjsURL+"?date=2099-02-02&program="+bpjsProgram, nil, 200, &bpjsRules)
+	if len(bpjsRules.Data.Rules) != 1 || bpjsRules.Data.Rules[0].ID != bpjsSecondID {
+		t.Fatalf("BPJS effective version: %#v", bpjsRules.Data)
+	}
+	var priorUntil string
+	if err = db.QueryRow(`SELECT DATE_FORMAT(effective_to,'%Y-%m-%d') FROM bpjs_rules WHERE tenant_id=? AND id=?`, tenantID, bpjsID).Scan(&priorUntil); err != nil || priorUntil != "2099-01-31" {
+		t.Fatalf("prior BPJS rule not closed: date=%s err=%v", priorUntil, err)
+	}
+	doJSON(t, client, "POST", bpjsURL, map[string]any{"program": bpjsProgram, "effective_from": "2099-01-15", "rate_employee": 0.02, "rate_employer": 0.04, "source_reference": "QA stale rule"}, 409, nil)
+	var existingTax int
+	if err = db.QueryRow(`SELECT COUNT(*) FROM tax_rules WHERE tenant_id=? AND rule_set=?`, tenantID, pph21RuleSet).Scan(&existingTax); err != nil {
+		t.Fatal(err)
+	}
+	if existingTax == 0 {
+		var publishedTax struct {
+			Data struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		taxURL := server.URL + "/api/v1/admin/payroll/rules/tax"
+		taxInput := map[string]any{
+			"effective_from": "2099-01-01", "source_reference": "QA synthetic rule",
+			"ptkp": []map[string]any{{"status": "TK/0", "ter_category": "A", "annual_amount": 54000000}},
+			"ter_brackets": []map[string]any{
+				{"category": "A", "lower_bound": 0, "rate": 0.05},
+				{"category": "B", "lower_bound": 0, "rate": 0.05},
+				{"category": "C", "lower_bound": 0, "rate": 0.05},
+			},
+			"annual_brackets": []map[string]any{{"lower_bound": 0, "rate": 0.05}},
+		}
+		doJSON(t, client, "POST", taxURL, taxInput, 201, &publishedTax)
+		taxID = publishedTax.Data.ID
+		var taxRule struct {
+			Data struct {
+				Configured bool   `json:"configured"`
+				ID         string `json:"id"`
+			} `json:"data"`
+		}
+		doJSON(t, client, "GET", taxURL+"?date=2099-01-02", nil, 200, &taxRule)
+		if !taxRule.Data.Configured || taxRule.Data.ID != taxID {
+			t.Fatalf("tax rule: %#v", taxRule.Data)
+		}
 	}
 }
