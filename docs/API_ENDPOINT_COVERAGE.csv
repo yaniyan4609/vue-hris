@@ -453,7 +453,7 @@ POST,/api/v1/ess/profile/emergency-contacts,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/profile/photo,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/reimbursements,9.5 Reimbursement,planned
 POST,/api/v1/ess/reimbursements/{id}/receipts,9.5 Reimbursement,planned
-POST,/api/v1/ess/requests/{requestId}/cancel,10.2 ESS: pengajuan saya,planned
+POST,/api/v1/ess/requests/{requestId}/cancel,10.2 ESS: pengajuan saya,active
 POST,/api/v1/ess/requests/{requestId}/resubmit,10.2 ESS: pengajuan saya,active
 POST,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned

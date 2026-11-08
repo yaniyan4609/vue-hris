@@ -86,6 +86,7 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 	r.Get("/api/v1/ess/requests", a.listEssRequests)
 	r.Get("/api/v1/ess/requests/{requestId}", a.getEssRequest)
 	r.With(checkOrigin(config)).Post("/api/v1/ess/requests/{requestId}/resubmit", a.resubmitEssRequest)
+	r.With(checkOrigin(config)).Post("/api/v1/ess/requests/{requestId}/cancel", a.cancelEssRequest)
 	r.With(checkOrigin(config)).Post("/api/v1/ess/overtime-requests", a.submitEssOvertime)
 	r.Get("/api/v1/ess/overtime-requests", a.listEssOvertime)
 	r.Get("/api/v1/ess/overtime-requests/{id}", a.getEssOvertime)

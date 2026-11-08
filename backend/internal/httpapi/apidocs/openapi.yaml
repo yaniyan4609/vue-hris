@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.12.0
+  version: 0.13.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2502,6 +2502,20 @@ paths:
         '200': { description: Percobaan dan versi baru pada request yang sama }
         '404': { description: Pengajuan bukan milik karyawan }
         '409': { description: Pengajuan belum returned atau tidak ada approver yang berhak }
+  /api/v1/ess/requests/{requestId}/cancel:
+    parameters:
+      - { in: path, name: requestId, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
+    post:
+      tags: [Approvals]
+      operationId: cancelEssRequest
+      summary: Batalkan pengajuan sendiri yang masih ditinjau atau dikembalikan
+      description: Pembatalan domain saat ini tersedia untuk lembur; pengajuan tanpa referensi domain juga dapat dibatalkan. Tugas pending, request, instance, data lembur, audit, dan outbox diperbarui atomik.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '200': { description: Pengajuan berstatus cancelled }
+        '404': { description: Pengajuan bukan milik karyawan saat ini }
+        '409': { description: Status tidak dapat dibatalkan atau handler domain belum tersedia }
   /api/v1/ess/overtime-requests:
     get:
       tags: [Approvals]

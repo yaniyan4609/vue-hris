@@ -168,6 +168,26 @@ func TestStagingOvertimeApprovalDecision(t *testing.T) {
 	if decision.Data.Status != "approved" {
 		t.Fatalf("revised overtime approval: %#v", decision.Data)
 	}
+	cancelID, cancelOvertimeID, _ := makeRequest()
+	var cancelled struct {
+		Data struct {
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+cancelID+"/cancel", nil, 200, &cancelled)
+	if cancelled.Data.Status != "cancelled" {
+		t.Fatalf("cancelled request: %#v", cancelled.Data)
+	}
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+cancelID+"/cancel", nil, 409, nil)
+	if err := db.QueryRow(`SELECT status FROM overtime_requests WHERE tenant_id=? AND id=?`, tenantID, cancelOvertimeID).Scan(&status); err != nil || status != "cancelled" {
+		t.Fatalf("cancelled overtime: status=%s err=%v", status, err)
+	}
+	returnedCancelID, returnedCancelOvertimeID, _ := makeRequest()
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+returnedCancelID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki", "level_no": 1, "version": 1}, 200, &decision)
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+returnedCancelID+"/cancel", nil, 200, &cancelled)
+	if err := db.QueryRow(`SELECT status FROM overtime_requests WHERE tenant_id=? AND id=?`, tenantID, returnedCancelOvertimeID).Scan(&status); err != nil || status != "cancelled" {
+		t.Fatalf("cancelled returned overtime: status=%s err=%v", status, err)
+	}
 	var existingDefault int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM approval_flows WHERE tenant_id=? AND request_type='overtime' AND is_default=TRUE`, tenantID).Scan(&existingDefault); err != nil {
 		t.Fatal(err)
