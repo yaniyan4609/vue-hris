@@ -30,7 +30,7 @@ var lookupSources = map[string]lookupSource{
 	"shift-templates":          {"shift_templates", "jadwal.lihat", "is_active=TRUE"},
 	"document-types":           {"document_types", "dokumen.lihat", ""},
 	"reimbursement-categories": {"reimbursement_categories", "reimbursement.lihat", "is_active=TRUE"},
-	"pay-components":           {"pay_components", "penggajian.lihat", ""},
+	"pay-components":           {"pay_components", "penggajian.lihat", "is_active=TRUE"},
 }
 
 func canonicalLookupPage(w http.ResponseWriter, r *http.Request) (pageOptions, bool) {

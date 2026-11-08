@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.21.0
+  version: 0.23.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2828,6 +2828,120 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200': { description: Mutasi ledger dalam scope karyawan }
+  /api/v1/admin/payroll/components:
+    get:
+      tags: [Payroll]
+      operationId: listPayrollComponents
+      x-permission: penggajian.lihat
+      parameters:
+        - { in: query, name: q, schema: { type: string, maxLength: 100 } }
+        - { in: query, name: is_active, schema: { type: boolean } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Daftar komponen tenant, termasuk status dan versi }
+    post:
+      tags: [Payroll]
+      operationId: createPayrollComponent
+      x-permission: penggajian.kelola
+      summary: Buat komponen gaji fixed
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayrollComponentInput' }
+      responses:
+        '201': { description: Komponen dibuat dan diaudit }
+        '409': { description: Kode komponen sudah digunakan }
+  /api/v1/admin/payroll/components/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Payroll]
+      operationId: getPayrollComponent
+      x-permission: penggajian.lihat
+      responses:
+        '200': { description: Detail komponen }
+        '404': { description: Komponen tidak ada dalam tenant }
+    patch:
+      tags: [Payroll]
+      operationId: updatePayrollComponent
+      x-permission: penggajian.kelola
+      summary: Ubah nama, status pajak, atau status aktif
+      description: Kode, jenis, dan calc_type tetap. Komponen sistem terkunci. Versi harus cocok; komponen dengan penetapan aktif tidak dapat dinonaktifkan.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: integer, minimum: 1 }
+                name: { type: string, minLength: 1, maxLength: 160 }
+                taxable: { type: boolean }
+                is_active: { type: boolean }
+      responses:
+        '200': { description: Komponen dan versi baru }
+        '409': { description: Versi berubah, komponen sistem, atau masih ditetapkan }
+    delete:
+      tags: [Payroll]
+      operationId: deactivatePayrollComponent
+      x-permission: penggajian.kelola
+      summary: Nonaktifkan komponen tanpa menghapus riwayat
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Komponen nonaktif, termasuk pengulangan }
+        '409': { description: Komponen sistem atau masih ditetapkan }
+  /api/v1/admin/employees/{id}/pay-components:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Payroll]
+      operationId: getEmployeePayComponents
+      x-permission: penggajian.lihat
+      summary: Riwayat komponen gaji karyawan
+      description: Nominal menjadi null bila penggajian.lihat_sensitif tidak tersedia untuk karyawan dalam scope.
+      responses:
+        '200': { description: Riwayat, versi set, dan tanda amounts_masked }
+        '404': { description: Karyawan tidak dalam scope payroll }
+    put:
+      tags: [Payroll]
+      operationId: putEmployeePayComponents
+      x-permission: penggajian.kelola
+      summary: Ganti seluruh set komponen mulai tanggal berlaku
+      description: Memerlukan penggajian.lihat_sensitif dalam scope yang sama dan reauth. Set sebelumnya ditutup sehari sebelum valid_from. Tanggal yang menyentuh payroll final dan tanggal yang sudah punya penetapan baru ditolak. Hanya komponen aktif fixed dapat ditetapkan.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [valid_from, version, components]
+              properties:
+                valid_from: { type: string, format: date }
+                version: { type: integer, minimum: 0 }
+                components:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [component_id, amount]
+                    properties:
+                      component_id: { type: string, minLength: 26, maxLength: 26 }
+                      amount: { type: number, multipleOf: 0.01, exclusiveMinimum: 0 }
+      responses:
+        '200': { description: Set baru dan versi meningkat, nominal tidak masuk audit }
+        '403': { description: Permission sensitif atau reauth tidak ada }
+        '404': { description: Karyawan tidak dalam scope }
+        '409': { description: Versi konflik, periode final, atau penetapan di masa depan sudah ada }
   /api/v1/admin/payroll/periods:
     get:
       tags: [Payroll]
@@ -2884,6 +2998,32 @@ paths:
       responses:
         '200': { description: Daftar cicilan, total nominal, dan preview_only true }
         '404': { description: Periode tidak ditemukan }
+  /api/v1/admin/payroll/periods/{id}/loan-deductions/simulate:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Payroll]
+      operationId: simulatePayrollLoanDeductions
+      x-permission: penggajian.lihat_sensitif
+      summary: Simulasikan potongan kasbon tanpa memotong sebagian cicilan
+      description: Memerlukan juga penggajian.lihat dan irisan kedua scope karyawan. available_net diberikan pemanggil sebagai sisa gaji setelah potongan wajib; nilainya belum dihitung server. Hasil tidak mengubah payroll atau kasbon. Jika nominal cicilan tidak cukup, seluruh cicilan ditunda; cicilan berikutnya pada pinjaman yang sama ikut ditunda.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id, available_net]
+              properties:
+                employee_id: { type: string, minLength: 26, maxLength: 26 }
+                available_net: { type: number, minimum: 0, multipleOf: 0.01 }
+      responses:
+        '200': { description: Planned/deferred per cicilan, alasan, sisa net, dan preview_only true }
+        '403': { description: Hak melihat payroll sensitif tidak ada }
+        '404': { description: Periode atau karyawan tidak ada dalam scope }
+        '409': { description: Lebih dari 1000 cicilan perlu ditinjau manual }
   /api/v1/ess/loans/simulate:
     post:
       tags: [Loans]
@@ -3594,6 +3734,15 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    PayrollComponentInput:
+      type: object
+      required: [code, name, component_type, taxable, calc_type]
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,47}$' }
+        name: { type: string, minLength: 1, maxLength: 160 }
+        component_type: { type: string, enum: [earning, deduction, employer] }
+        taxable: { type: boolean }
+        calc_type: { type: string, enum: [fixed] }
     LoanInput:
       type: object
       required: [amount, tenor_months]

@@ -24,7 +24,7 @@ DELETE,/api/v1/admin/holidays/{id},"8.3 Admin: master shift, roster, dan libur",
 DELETE,/api/v1/admin/leave-policies/{id},9.2 Admin: cuti dan izin,active
 DELETE,/api/v1/admin/leave-types/{id},9.2 Admin: cuti dan izin,active
 DELETE,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
-DELETE,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
+DELETE,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,active
 DELETE,/api/v1/admin/payroll/runs/{id}/items/{itemId}/lines/{lineId},11.2 Periode dan payroll run,planned
 DELETE,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
 DELETE,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
@@ -107,7 +107,7 @@ GET,/api/v1/admin/employees/{id}/documents,12.2 Dokumen,planned
 GET,/api/v1/admin/employees/{id}/emergency-contacts,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/families,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/leave-balances,9.2 Admin: cuti dan izin,active
-GET,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,active
 GET,/api/v1/admin/employees/{id}/summary,7.1 Karyawan,planned
 GET,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
 GET,/api/v1/admin/employees/{id}/timeline,7.1 Karyawan,planned
@@ -143,8 +143,8 @@ GET,/api/v1/admin/overtime-requests,9.3 Lembur,active
 GET,/api/v1/admin/overtime-requests/{id},9.3 Lembur,active
 GET,/api/v1/admin/overtime-summary,9.3 Lembur,active
 GET,/api/v1/admin/payroll/bank-formats,11.2 Periode dan payroll run,planned
-GET,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
-GET,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,active
+GET,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,active
 GET,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,active
 GET,/api/v1/admin/payroll/periods/{id},11.2 Periode dan payroll run,active
 GET,/api/v1/admin/payroll/rules/bpjs,11.1 Komponen dan aturan,planned
@@ -310,7 +310,7 @@ PATCH,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/leave-types/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
 PATCH,/api/v1/admin/overtime-requests/{id},9.3 Lembur,active
-PATCH,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
+PATCH,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,active
 PATCH,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
 PATCH,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
 PATCH,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,active
@@ -394,7 +394,7 @@ POST,/api/v1/admin/notification-templates/{id}/preview,"13.2 Admin: aturan, temp
 POST,/api/v1/admin/offices,6.1 Master organisasi,planned
 POST,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
 POST,/api/v1/admin/overtime-requests,9.3 Lembur,active
-POST,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
+POST,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,active
 POST,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,active
 POST,/api/v1/admin/payroll/periods/{id}/close,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/payroll/periods/{id}/runs,11.2 Periode dan payroll run,planned
@@ -488,7 +488,7 @@ POST,/api/v1/push/subscriptions,13.1 Inbox dan preferensi (semua pengguna),plann
 POST,/api/v1/push/test,13.1 Inbox dan preferensi (semua pengguna),planned
 POST,/api/v1/webhooks/payments/{gateway},16. Webhook dan kesehatan layanan,planned
 PUT,/api/v1/admin/approval-flows/{id}/steps,10.3 Pengaturan alur approval,active
-PUT,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,planned
+PUT,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,active
 PUT,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
 PUT,/api/v1/admin/loan-policies,9.4 Kasbon,active
 PUT,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
