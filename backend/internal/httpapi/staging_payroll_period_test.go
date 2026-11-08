@@ -211,6 +211,16 @@ func TestStagingPayrollPeriodFinanceAccess(t *testing.T) {
 	if _, err = db.Exec(`INSERT INTO employee_assignments (tenant_id,id,employee_id,region_id,office_id,division_id,department_id,position_id,valid_from,current_flag) SELECT ?,?,?,region_id,office_id,division_id,department_id,position_id,UTC_TIMESTAMP(6),1 FROM employee_assignments WHERE tenant_id=? AND employee_id=? AND current_flag=TRUE`, tenantID, payOrgAssignmentID, payEmployeeID, tenantID, employeeID); err != nil {
 		t.Fatal(err)
 	}
+	var proration struct {
+		Data struct {
+			Ready             bool `json:"ready"`
+			MissingRosterDays int  `json:"missing_roster_days"`
+		} `json:"data"`
+	}
+	doJSON(t, client, "GET", server.URL+"/api/v1/admin/payroll/periods/"+periodID+"/proration?employee_id="+payEmployeeID, nil, 200, &proration)
+	if proration.Data.Ready || proration.Data.MissingRosterDays < 28 {
+		t.Fatalf("incomplete roster marked ready: %#v", proration.Data)
+	}
 	payURL := server.URL + "/api/v1/admin/employees/" + payEmployeeID + "/pay-components"
 	assignmentInput := map[string]any{"valid_from": "2100-01-01", "version": 0, "components": []map[string]any{{"component_id": componentID, "amount": 100}}}
 	doJSON(t, client, "PUT", payURL, assignmentInput, 403, nil)

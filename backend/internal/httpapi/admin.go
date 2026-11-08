@@ -85,6 +85,7 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 		r.Get("/payroll/periods/{id}", a.getPayrollPeriod)
 		r.Get("/payroll/periods/{id}/loan-deductions", a.previewPayrollLoanDeductions)
 		r.With(checkOrigin(config)).Post("/payroll/periods/{id}/loan-deductions/simulate", a.simulatePayrollLoanDeductions)
+		r.Get("/payroll/periods/{id}/proration", a.previewPayrollProration)
 		r.Get("/payroll/components", a.listPayrollComponents)
 		r.With(checkOrigin(config)).Post("/payroll/components", a.createPayrollComponent)
 		r.Get("/payroll/components/{id}", a.getPayrollComponent)

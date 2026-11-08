@@ -16,6 +16,8 @@ Status: roadmap aktif, 6 November 2026. Acuan utama: `full-docs/Spesifikasi API 
 
 **Komponen payroll:** migrasi `00042`–`00043` menambah status/versi komponen dan versi set komponen per karyawan. CRUD master serta GET/PUT penetapan karyawan sudah aktif. Jenis komponen dapat `earning`, `deduction`, atau `employer`; hanya `calc_type=fixed` yang dapat dibuat dan ditetapkan sampai kontrak persen/formula diputuskan. PUT mengganti seluruh set mulai `valid_from`, menutup set terdahulu sehari sebelumnya, menolak tanggal yang menyentuh payroll final atau bertabrakan dengan set masa depan, serta memakai reauth dan scope izin sensitif. Audit menyimpan versi/tanggal/jumlah komponen tanpa nominal. API ini belum menghitung gaji atau memposting cicilan.
 
+**Keputusan prorata:** pembagi gaji tengah bulan adalah jumlah hari `day_type='shift'` pada roster **published** sepanjang periode; pembilang hanya hari shift di antara tanggal masuk dan tanggal akhir kerja, inklusif. `GET /admin/payroll/periods/{id}/proration?employee_id=...` memeriksa pembilang, pembagi, dan kelengkapan roster. Setiap tanggal periode harus memiliki roster terbit (termasuk tanggal sebelum mulai kerja) dan `join_date` karyawan harus terisi agar pratinjau menyatakan `ready=true`; tanpa itu kalkulasi draft harus menolak prorata. Helper nominal fixed membulatkan ke sen terdekat, setengah ke atas. Aturan komponen persen/formula masih belum aktif sesuai keputusan Product Owner.
+
 ## 1. Hasil pencocokan spesifikasi dengan kode
 
 | Area | Kondisi sekarang | Target dan cara transisi |
