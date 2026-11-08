@@ -8,6 +8,7 @@ $workDir = Join-Path $repoRoot 'work/launcher'
 $stateFile = Join-Path $workDir 'current.json'
 $credentialFile = Join-Path $workDir 'db-credential.xml'
 $mfaKeyFile = Join-Path $workDir 'platform-mfa-key.xml'
+$tenantMasterKeyFile = Join-Path $workDir 'tenant-master-key.xml'
 $smtpCredentialFile = Join-Path $workDir 'smtp-credential.xml'
 $backendProcess = $null
 $frontendProcess = $null
@@ -117,6 +118,21 @@ try {
         }
         $env:PLATFORM_MFA_KEY = ([System.Net.NetworkCredential]::new('', $secureMfaKey)).Password
     }
+    if (-not $env:TENANT_MASTER_KEY) {
+        if (Test-Path -LiteralPath $tenantMasterKeyFile) {
+            $secureTenantKey = Import-Clixml -LiteralPath $tenantMasterKeyFile
+        } else {
+            $tenantKeyBytes = New-Object byte[] 32
+            [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($tenantKeyBytes)
+            $secureTenantKey = [System.Security.SecureString]::new()
+            foreach ($character in [Convert]::ToBase64String($tenantKeyBytes).ToCharArray()) { $secureTenantKey.AppendChar($character) }
+            $secureTenantKey.MakeReadOnly()
+            $secureTenantKey | Export-Clixml -LiteralPath $tenantMasterKeyFile
+            [Array]::Clear($tenantKeyBytes, 0, $tenantKeyBytes.Length)
+        }
+        $env:TENANT_MASTER_KEY = ([System.Net.NetworkCredential]::new('', $secureTenantKey)).Password
+    }
+    if (-not $env:TENANT_MASTER_KEY_ID) { $env:TENANT_MASTER_KEY_ID = 'local-v1' }
     $env:APP_ENV = 'staging'
     $env:FILE_STORAGE_DIR = Join-Path $repoRoot 'work/files'
     New-Item -ItemType Directory -Force -Path $env:FILE_STORAGE_DIR | Out-Null
@@ -145,6 +161,7 @@ try {
     $backendProcess = Start-Process -FilePath $backendExe -WorkingDirectory $backendDir -WindowStyle Hidden -RedirectStandardOutput (Join-Path $instanceDir 'backend.out.log') -RedirectStandardError (Join-Path $instanceDir 'backend.err.log') -PassThru
     Remove-Item Env:DB_PASSWORD -ErrorAction SilentlyContinue
     Remove-Item Env:PLATFORM_MFA_KEY -ErrorAction SilentlyContinue
+    Remove-Item Env:TENANT_MASTER_KEY -ErrorAction SilentlyContinue
     Remove-Item Env:SMTP_PASSWORD -ErrorAction SilentlyContinue
     if (-not (Wait-HrisURL -Url "http://127.0.0.1:${backendPort}/readyz" -Seconds 30 -Process $backendProcess)) {
         throw "Backend gagal siap. Periksa $(Join-Path $instanceDir 'backend.err.log')"
@@ -190,6 +207,7 @@ try {
 } finally {
     Remove-Item Env:DB_PASSWORD -ErrorAction SilentlyContinue
     Remove-Item Env:PLATFORM_MFA_KEY -ErrorAction SilentlyContinue
+    Remove-Item Env:TENANT_MASTER_KEY -ErrorAction SilentlyContinue
     Remove-Item Env:SMTP_PASSWORD -ErrorAction SilentlyContinue
     if ($ready -and $state) {
         Stop-HrisOwnedProcess -ProcessId $state.frontendPid -StartedUtcTicks $state.frontendStartedUtcTicks

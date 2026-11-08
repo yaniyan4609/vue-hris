@@ -109,7 +109,7 @@ GET,/api/v1/admin/employees/{id}/families,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/leave-balances,9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,active
 GET,/api/v1/admin/employees/{id}/summary,7.1 Karyawan,planned
-GET,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/timeline,7.1 Karyawan,planned
 GET,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
 GET,/api/v1/admin/holidays,"8.3 Admin: master shift, roster, dan libur",active
@@ -489,7 +489,7 @@ POST,/api/v1/push/test,13.1 Inbox dan preferensi (semua pengguna),planned
 POST,/api/v1/webhooks/payments/{gateway},16. Webhook dan kesehatan layanan,planned
 PUT,/api/v1/admin/approval-flows/{id}/steps,10.3 Pengaturan alur approval,active
 PUT,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,active
-PUT,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
+PUT,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,active
 PUT,/api/v1/admin/loan-policies,9.4 Kasbon,active
 PUT,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
 PUT,/api/v1/admin/notification-templates/{id},"13.2 Admin: aturan, template, dan log",planned
