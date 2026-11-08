@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func (a adminAPI) adminLeaveEmployee(w http.ResponseWriter, r *http.Request, c adminContext, id string) (employee, bool) {
+func (a adminAPI) adminScopedEmployee(w http.ResponseWriter, r *http.Request, c adminContext, id string) (employee, bool) {
 	if len(id) != 26 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "ID karyawan tidak valid.")
 		return employee{}, false
@@ -63,7 +63,7 @@ func (a adminAPI) createAdminLeave(w http.ResponseWriter, r *http.Request) {
 		writeLeaveIssue(w, r, err)
 		return
 	}
-	if _, ok = a.adminLeaveEmployee(w, r, c, body.EmployeeID); !ok {
+	if _, ok = a.adminScopedEmployee(w, r, c, body.EmployeeID); !ok {
 		return
 	}
 	a.createLeaveSubmission(w, r, c.tenant.ID, body.EmployeeID, c.state.User.ID, c.tenant.Timezone, in)
@@ -107,7 +107,7 @@ func (a adminAPI) updateAdminLeave(w http.ResponseWriter, r *http.Request) {
 		writeLeaveIssue(w, r, err)
 		return
 	}
-	if _, ok = a.adminLeaveEmployee(w, r, c, employeeID); !ok {
+	if _, ok = a.adminScopedEmployee(w, r, c, employeeID); !ok {
 		return
 	}
 	if requestStatus != "draft" && requestStatus != "returned" {

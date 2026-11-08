@@ -192,10 +192,25 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if kind == "overtime" {
 		var proposed int
+		var workDate time.Time
 		var overtimeReason sql.NullString
 		var overtimeStatus string
-		if err := tx.QueryRowContext(r.Context(), `SELECT proposed_minutes,reason,status FROM overtime_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.state.SelectedTenantID, refID.String, requestID, subjectID.String).Scan(&proposed, &overtimeReason, &overtimeStatus); err != nil || overtimeStatus != "returned" {
+		if err := tx.QueryRowContext(r.Context(), `SELECT work_date,proposed_minutes,reason,status FROM overtime_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.state.SelectedTenantID, refID.String, requestID, subjectID.String).Scan(&workDate, &proposed, &overtimeReason, &overtimeStatus); err != nil || overtimeStatus != "returned" {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
+			return
+		}
+		var locked string
+		if err := tx.QueryRowContext(r.Context(), `SELECT id FROM employees WHERE tenant_id=? AND id=? FOR UPDATE`, c.state.SelectedTenantID, subjectID.String).Scan(&locked); err != nil {
+			writeAPIError(w, r, 409, "EMPLOYEE_INVALID", "Karyawan tidak tersedia.")
+			return
+		}
+		var duplicate int
+		if err := tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM overtime_requests WHERE tenant_id=? AND employee_id=? AND work_date=? AND id<>? AND status IN ('submitted','in_review','approved')`, c.state.SelectedTenantID, subjectID.String, workDate.Format("2006-01-02"), refID.String).Scan(&duplicate); err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa bentrok lembur.")
+			return
+		}
+		if duplicate > 0 {
+			writeAPIError(w, r, 409, "OVERTIME_EXISTS", "Sudah ada pengajuan lembur aktif pada tanggal itu.")
 			return
 		}
 		if value, ok := normalized["proposed_minutes"]; ok {

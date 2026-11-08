@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.16.0
+  version: 0.17.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2672,6 +2672,30 @@ paths:
         - { in: query, name: to, schema: { type: string, format: date } }
       responses:
         '200': { description: Lembur dalam scope pengguna Admin }
+    post:
+      tags: [Approvals]
+      operationId: createAdminOvertimeRequest
+      x-permission: lembur.buat
+      summary: Ajukan lembur atas nama karyawan dalam scope
+      description: Request, tugas approval, audit, dan outbox dibuat atomik. Pembuat pengajuan tidak dapat menjadi approver.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id, work_date, proposed_minutes, reason]
+              properties:
+                employee_id: { type: string, minLength: 26, maxLength: 26 }
+                work_date: { type: string, format: date }
+                proposed_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+                shift_instance_id: { type: string, nullable: true }
+      responses:
+        '201': { description: Pengajuan lembur in_review }
+        '409': { description: Tanggal berbenturan atau tidak ada approver selain pembuat }
   /api/v1/admin/leave-requests:
     get:
       tags: [Approvals]
@@ -2949,6 +2973,44 @@ paths:
       responses:
         '200': { description: Detail lembur dalam scope }
         '404': { description: Di luar tenant atau scope }
+    patch:
+      tags: [Approvals]
+      operationId: updateAdminOvertimeRequest
+      x-permission: lembur.ubah
+      summary: Revisi draft atau lembur returned dalam scope
+      description: Returned memerlukan version dan note. Revisi membuka ulang tugas tahap pertama pada request yang sama; bentrok tanggal dan shift diperiksa ulang.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: integer, minimum: 1 }
+                note: { type: string, maxLength: 2000 }
+                work_date: { type: string, format: date }
+                proposed_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+                shift_instance_id: { type: string, nullable: true }
+      responses:
+        '200': { description: Draft diperbarui atau returned dikirim ulang }
+        '409': { description: Status, versi, bentrok tanggal, atau approver tidak sesuai }
+  /api/v1/admin/overtime-summary:
+    get:
+      tags: [Approvals]
+      operationId: getAdminOvertimeSummary
+      x-permission: lembur.lihat
+      summary: Rekap usulan, persetujuan, dan menit dibayar per periode
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Total dan rincian karyawan dalam scope }
   /api/v1/realtime/ws:
     get:
       tags: [Realtime]

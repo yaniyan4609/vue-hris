@@ -141,7 +141,7 @@ GET,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
 GET,/api/v1/admin/organization/tree,6.1 Master organisasi,active
 GET,/api/v1/admin/overtime-requests,9.3 Lembur,active
 GET,/api/v1/admin/overtime-requests/{id},9.3 Lembur,active
-GET,/api/v1/admin/overtime-summary,9.3 Lembur,planned
+GET,/api/v1/admin/overtime-summary,9.3 Lembur,active
 GET,/api/v1/admin/payroll/bank-formats,11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
 GET,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
@@ -309,7 +309,7 @@ PATCH,/api/v1/admin/leave-policies/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/leave-types/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
-PATCH,/api/v1/admin/overtime-requests/{id},9.3 Lembur,planned
+PATCH,/api/v1/admin/overtime-requests/{id},9.3 Lembur,active
 PATCH,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
 PATCH,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
 PATCH,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
@@ -393,7 +393,7 @@ POST,/api/v1/admin/notification-deliveries/{id}/retry,"13.2 Admin: aturan, templ
 POST,/api/v1/admin/notification-templates/{id}/preview,"13.2 Admin: aturan, template, dan log",planned
 POST,/api/v1/admin/offices,6.1 Master organisasi,planned
 POST,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
-POST,/api/v1/admin/overtime-requests,9.3 Lembur,planned
+POST,/api/v1/admin/overtime-requests,9.3 Lembur,active
 POST,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
 POST,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/payroll/periods/{id}/close,11.2 Periode dan payroll run,planned

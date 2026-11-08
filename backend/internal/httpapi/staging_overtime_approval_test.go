@@ -151,6 +151,9 @@ func TestStagingOvertimeApprovalDecision(t *testing.T) {
 		t.Fatalf("rejected domain: status=%s err=%v", status, err)
 	}
 	returnedID, returnedOvertimeID, _ := makeRequest()
+	if _, err := db.Exec(`UPDATE overtime_requests SET work_date=? WHERE tenant_id=? AND id=?`, time.Now().AddDate(0, 0, 18).Format("2006-01-02"), tenantID, returnedOvertimeID); err != nil {
+		t.Fatal(err)
+	}
 	returnedActionURL := server.URL + "/api/v1/admin/approvals/" + returnedID + "/actions"
 	doJSON(t, admin, "POST", returnedActionURL, map[string]any{"action": "return", "reason": "Durasi perlu diperbaiki", "level_no": 1, "version": 1}, 200, &decision)
 	var returnedStatus string
@@ -184,10 +187,25 @@ func TestStagingOvertimeApprovalDecision(t *testing.T) {
 	}
 	returnedCancelID, returnedCancelOvertimeID, _ := makeRequest()
 	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+returnedCancelID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki", "level_no": 1, "version": 1}, 200, &decision)
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+returnedCancelID+"/resubmit", map[string]any{"version": 2, "correction": map[string]any{"note": "Tanggal berbenturan"}}, 409, nil)
 	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+returnedCancelID+"/cancel", nil, 200, &cancelled)
 	if err := db.QueryRow(`SELECT status FROM overtime_requests WHERE tenant_id=? AND id=?`, tenantID, returnedCancelOvertimeID).Scan(&status); err != nil || status != "cancelled" {
 		t.Fatalf("cancelled returned overtime: status=%s err=%v", status, err)
 	}
+	adminRevisionID, adminRevisionOvertimeID, _ := makeRequest()
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+adminRevisionID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki durasi", "level_no": 1, "version": 1}, 200, nil)
+	t.Cleanup(func() {
+		if _, e := db.Exec(`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='overtime_requests' AND entity_id=?`, tenantID, adminRevisionOvertimeID); e != nil {
+			t.Errorf("cleanup overtime revision audit: %v", e)
+		}
+	})
+	doJSON(t, admin, "PATCH", server.URL+"/api/v1/admin/overtime-requests/"+adminRevisionOvertimeID, map[string]any{"version": 1, "note": "Versi lama", "proposed_minutes": 75}, 409, nil)
+	revisionDate := time.Now().AddDate(0, 0, 22).Format("2006-01-02")
+	doJSON(t, admin, "PATCH", server.URL+"/api/v1/admin/overtime-requests/"+adminRevisionOvertimeID, map[string]any{"version": 2, "note": "Durasi sudah dikoreksi", "work_date": revisionDate, "proposed_minutes": 75, "reason": "Koreksi durasi oleh Admin"}, 200, nil)
+	if err := db.QueryRow(`SELECT proposed_minutes,status FROM overtime_requests WHERE tenant_id=? AND id=?`, tenantID, adminRevisionOvertimeID).Scan(&revisedMinutes, &status); err != nil || revisedMinutes != 75 || status != "in_review" {
+		t.Fatalf("admin overtime revision: minutes=%d status=%s err=%v", revisedMinutes, status, err)
+	}
+	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/overtime-summary?from="+time.Now().Format("2006-01-02")+"&to="+time.Now().Format("2006-01-02")+"&employee_id="+employeeID, nil, 200, nil)
 	var existingDefault int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM approval_flows WHERE tenant_id=? AND request_type='overtime' AND is_default=TRUE`, tenantID).Scan(&existingDefault); err != nil {
 		t.Fatal(err)
@@ -253,6 +271,69 @@ func TestStagingOvertimeApprovalDecision(t *testing.T) {
 		doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+submitted.Data.RequestID+"/actions", map[string]any{"action": "approve", "level_no": 2, "version": 2, "data": map[string]any{"approved_minutes": 90}}, 200, &decision)
 		if decision.Data.Status != "approved" {
 			t.Fatalf("submitted overtime approval: %#v", decision.Data)
+		}
+		adminDate := time.Now().AddDate(0, 0, 21).Format("2006-01-02")
+		adminInput := map[string]any{"employee_id": employeeID, "work_date": adminDate, "proposed_minutes": 120, "reason": "Persiapan operasi"}
+		doJSON(t, admin, "POST", server.URL+"/api/v1/admin/overtime-requests", adminInput, 409, nil)
+		var adminRoleID string
+		if err := db.QueryRow(`SELECT id FROM roles WHERE tenant_id=? AND code='ADMIN_TENANT'`, tenantID).Scan(&adminRoleID); err != nil {
+			t.Fatal(err)
+		}
+		otherUserID, _ := ids.New()
+		otherRoleID, _ := ids.New()
+		t.Cleanup(func() {
+			if _, e := db.Exec(`UPDATE approval_flow_steps SET approver_ref_id=? WHERE tenant_id=? AND flow_id=? AND level_no=1`, adminState.User.ID, tenantID, flowID); e != nil {
+				t.Errorf("restore overtime flow: %v", e)
+			}
+			if _, e := db.Exec(`DELETE FROM user_roles WHERE tenant_id=? AND id=?`, tenantID, otherRoleID); e != nil {
+				t.Errorf("cleanup overtime approver role: %v", e)
+			}
+			if _, e := db.Exec(`DELETE FROM tenant_memberships WHERE tenant_id=? AND user_id=?`, tenantID, otherUserID); e != nil {
+				t.Errorf("cleanup overtime approver membership: %v", e)
+			}
+			if _, e := db.Exec(`DELETE FROM users WHERE id=?`, otherUserID); e != nil {
+				t.Errorf("cleanup overtime approver: %v", e)
+			}
+		})
+		email := "qa-overtime-approver-" + otherUserID + "@example.invalid"
+		if _, err := db.Exec(`INSERT INTO users (id,email,email_normalized,display_name) VALUES (?,?,?,'QA Overtime Approver')`, otherUserID, email, email); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO tenant_memberships (tenant_id,user_id,status) VALUES (?,?,'active')`, tenantID, otherUserID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO user_roles (tenant_id,id,user_id,role_id,valid_from) VALUES (?,?,?,?,CURRENT_DATE())`, tenantID, otherRoleID, otherUserID, adminRoleID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`UPDATE approval_flow_steps SET approver_ref_id=? WHERE tenant_id=? AND flow_id=? AND level_no=1`, otherUserID, tenantID, flowID); err != nil {
+			t.Fatal(err)
+		}
+		var adminSubmitted struct {
+			Data struct {
+				ID        string `json:"id"`
+				RequestID string `json:"request_id"`
+			} `json:"data"`
+		}
+		doJSON(t, admin, "POST", server.URL+"/api/v1/admin/overtime-requests", adminInput, 201, &adminSubmitted)
+		t.Cleanup(func() {
+			var instanceID string
+			_ = db.QueryRow(`SELECT id FROM approval_instances WHERE tenant_id=? AND request_id=?`, tenantID, adminSubmitted.Data.RequestID).Scan(&instanceID)
+			for _, entry := range []struct{ query, id string }{{`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='requests' AND entity_id=?`, adminSubmitted.Data.RequestID}, {`DELETE FROM notification_outbox WHERE tenant_id=? AND aggregate_type='request' AND aggregate_id=?`, adminSubmitted.Data.RequestID}, {`DELETE FROM approval_tasks WHERE tenant_id=? AND instance_id=?`, instanceID}, {`DELETE FROM approval_instances WHERE tenant_id=? AND id=?`, instanceID}, {`DELETE FROM overtime_requests WHERE tenant_id=? AND id=?`, adminSubmitted.Data.ID}, {`DELETE FROM requests WHERE tenant_id=? AND id=?`, adminSubmitted.Data.RequestID}} {
+				if _, e := db.Exec(entry.query, tenantID, entry.id); e != nil {
+					t.Errorf("cleanup admin overtime: %v", e)
+				}
+			}
+		})
+		var summary struct {
+			Data struct {
+				Requests  int              `json:"requests"`
+				Proposed  int              `json:"proposed_minutes"`
+				Employees []map[string]any `json:"employees"`
+			} `json:"data"`
+		}
+		doJSON(t, admin, "GET", server.URL+"/api/v1/admin/overtime-summary?from="+adminDate+"&to="+adminDate+"&employee_id="+employeeID, nil, 200, &summary)
+		if summary.Data.Requests != 1 || summary.Data.Proposed != 120 || len(summary.Data.Employees) != 1 {
+			t.Fatalf("overtime summary: %#v", summary.Data)
 		}
 	} else {
 		t.Log("ESS submission test omitted because the tenant already has a default overtime flow")
