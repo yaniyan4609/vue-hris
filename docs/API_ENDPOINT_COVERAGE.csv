@@ -28,7 +28,7 @@ DELETE,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
 DELETE,/api/v1/admin/payroll/runs/{id}/items/{itemId}/lines/{lineId},11.2 Periode dan payroll run,planned
 DELETE,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
 DELETE,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
-DELETE,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,planned
+DELETE,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,active
 DELETE,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
 DELETE,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
 DELETE,/api/v1/admin/users/{id}/roles/{userRoleId},5.3 Hak akses per pengguna,planned
@@ -166,9 +166,9 @@ GET,/api/v1/admin/positions,6.1 Master organisasi,planned
 GET,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
 GET,/api/v1/admin/regions,6.1 Master organisasi,planned
 GET,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
-GET,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,planned
-GET,/api/v1/admin/reimbursements,9.5 Reimbursement,planned
-GET,/api/v1/admin/reimbursements/{id},9.5 Reimbursement,planned
+GET,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,active
+GET,/api/v1/admin/reimbursements,9.5 Reimbursement,active
+GET,/api/v1/admin/reimbursements/{id},9.5 Reimbursement,active
 GET,/api/v1/admin/reminders/summary,"13.2 Admin: aturan, template, dan log",planned
 GET,/api/v1/admin/reports,14.2 Laporan,planned
 GET,/api/v1/admin/reports/{key},14.2 Laporan,planned
@@ -234,8 +234,8 @@ GET,/api/v1/ess/payslips/{id}/download,11.3 Slip gaji,planned
 GET,/api/v1/ess/profile,7.8 ESS: profil sendiri,planned
 GET,/api/v1/ess/profile/change-requests,7.8 ESS: profil sendiri,planned
 GET,/api/v1/ess/profile/emergency-contacts,7.8 ESS: profil sendiri,planned
-GET,/api/v1/ess/reimbursements,9.5 Reimbursement,planned
-GET,/api/v1/ess/reimbursements/{id},9.5 Reimbursement,planned
+GET,/api/v1/ess/reimbursements,9.5 Reimbursement,active
+GET,/api/v1/ess/reimbursements/{id},9.5 Reimbursement,active
 GET,/api/v1/ess/requests,10.2 ESS: pengajuan saya,active
 GET,/api/v1/ess/requests/{requestId},10.2 ESS: pengajuan saya,active
 GET,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
@@ -313,7 +313,7 @@ PATCH,/api/v1/admin/overtime-requests/{id},9.3 Lembur,active
 PATCH,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
 PATCH,/api/v1/admin/positions/{id},6.1 Master organisasi,planned
 PATCH,/api/v1/admin/regions/{id},6.1 Master organisasi,planned
-PATCH,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,planned
+PATCH,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,active
 PATCH,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
 PATCH,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
 PATCH,/api/v1/admin/terminations/{id},7.6 Resign dan terminasi,planned
@@ -407,7 +407,7 @@ POST,/api/v1/admin/payroll/runs/{id}/recalculate,11.2 Periode dan payroll run,pl
 POST,/api/v1/admin/payroll/runs/{id}/submit,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/positions,6.1 Master organisasi,planned
 POST,/api/v1/admin/regions,6.1 Master organisasi,planned
-POST,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,planned
+POST,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,active
 POST,/api/v1/admin/reimbursements/{id}/pay,9.5 Reimbursement,planned
 POST,/api/v1/admin/reports/{key}/export,14.2 Laporan,planned
 POST,/api/v1/admin/roles,5.2 Role dan registry permission,active

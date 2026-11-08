@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.17.0
+  version: 0.18.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -28,6 +28,8 @@ tags:
     description: Master shift, pola jadwal, dan hari libur
   - name: Approvals
     description: Pembacaan pengajuan dan tugas approval
+  - name: Reimbursements
+    description: Kategori dan klaim biaya karyawan
   - name: Employees
     description: Data karyawan dan profil ESS
   - name: Platform
@@ -2820,6 +2822,105 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200': { description: Mutasi ledger dalam scope karyawan }
+  /api/v1/ess/reimbursements:
+    get:
+      tags: [Reimbursements]
+      operationId: listEssReimbursements
+      summary: Daftar klaim milik karyawan yang masuk
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: category_id, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Daftar klaim sendiri, termasuk kategori yang kemudian dinonaktifkan }
+  /api/v1/ess/reimbursements/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Reimbursements]
+      operationId: getEssReimbursement
+      summary: Detail klaim sendiri dan metadata kuitansi
+      responses:
+        '200': { description: Klaim dan kuitansi tanpa storage key atau URL file }
+        '404': { description: Klaim tidak ada atau bukan milik karyawan }
+  /api/v1/admin/reimbursements:
+    get:
+      tags: [Reimbursements]
+      operationId: listAdminReimbursements
+      x-permission: reimbursement.lihat
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: category_id, schema: { type: string } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Daftar klaim sesuai scope karyawan }
+  /api/v1/admin/reimbursements/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Reimbursements]
+      operationId: getAdminReimbursement
+      x-permission: reimbursement.lihat
+      responses:
+        '200': { description: Klaim dan metadata kuitansi dalam scope }
+        '404': { description: Klaim tidak ditemukan dalam scope }
+  /api/v1/admin/reimbursement-categories:
+    get:
+      tags: [Reimbursements]
+      operationId: listReimbursementCategories
+      x-permission: pengaturan.kelola
+      parameters:
+        - { in: query, name: q, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Kategori tenant termasuk yang nonaktif }
+    post:
+      tags: [Reimbursements]
+      operationId: createReimbursementCategory
+      x-permission: pengaturan.kelola
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReimbursementCategoryInput' }
+      responses:
+        '201': { description: Kategori dibuat aktif }
+        '409': { description: Kode kategori sudah dipakai }
+  /api/v1/admin/reimbursement-categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    patch:
+      tags: [Reimbursements]
+      operationId: updateReimbursementCategory
+      x-permission: pengaturan.kelola
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReimbursementCategoryPatch' }
+      responses:
+        '200': { description: Kategori diperbarui }
+        '409': { description: Kode kategori sudah dipakai }
+    delete:
+      tags: [Reimbursements]
+      operationId: deactivateReimbursementCategory
+      x-permission: pengaturan.kelola
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Kategori dinonaktifkan tanpa menghapus klaim lama }
   /api/v1/admin/leave-types:
     get:
       tags: [Approvals]
@@ -3085,6 +3186,20 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    ReimbursementCategoryInput:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,47}$' }
+        name: { type: string, minLength: 1, maxLength: 160 }
+        monthly_limit: { type: number, multipleOf: 0.01, exclusiveMinimum: 0, nullable: true, description: Rupiah per karyawan per bulan; null berarti tanpa batas }
+    ReimbursementCategoryPatch:
+      type: object
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,47}$' }
+        name: { type: string, minLength: 1, maxLength: 160 }
+        monthly_limit: { type: number, multipleOf: 0.01, exclusiveMinimum: 0, nullable: true }
+        is_active: { type: boolean }
     LeaveRequestInput:
       type: object
       required: [leave_type_id, start_date, end_date]

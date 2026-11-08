@@ -29,7 +29,7 @@ var lookupSources = map[string]lookupSource{
 	"leave-types":              {"leave_types", "cuti.lihat", "is_active=TRUE"},
 	"shift-templates":          {"shift_templates", "jadwal.lihat", "is_active=TRUE"},
 	"document-types":           {"document_types", "dokumen.lihat", ""},
-	"reimbursement-categories": {"reimbursement_categories", "reimbursement.lihat", ""},
+	"reimbursement-categories": {"reimbursement_categories", "reimbursement.lihat", "is_active=TRUE"},
 	"pay-components":           {"pay_components", "penggajian.lihat", ""},
 }
 
