@@ -73,6 +73,43 @@ func writeLeaveIssue(w http.ResponseWriter, r *http.Request, err error) {
 	writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa pengajuan cuti.")
 }
 
+func removeApprover(candidates []string, userID string) []string {
+	selected := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate != userID {
+			selected = append(selected, candidate)
+		}
+	}
+	return selected
+}
+
+func (a adminAPI) fallbackLeaveApprovers(r *http.Request, tenantID, employeeID, zone string, flow approvalFlow, excluded string) ([]string, error) {
+	if flow.FallbackRoleID == nil {
+		return []string{}, nil
+	}
+	employee, err := scanEmployee(a.db.QueryRowContext(r.Context(), employeeSelect+` WHERE e.tenant_id=? AND e.id=?`, tenantID, employeeID))
+	if err != nil {
+		return nil, err
+	}
+	target, err := a.targetFor(r.Context(), tenantID, employee)
+	if err != nil {
+		return nil, err
+	}
+	location, err := time.LoadLocation(zone)
+	if err != nil {
+		location = time.UTC
+	}
+	candidates, err := a.roleApproverCandidates(r, tenantID, *flow.FallbackRoleID, time.Now().In(location).Format("2006-01-02"))
+	if err != nil {
+		return nil, err
+	}
+	eligible, err := a.eligibleApprovers(r, tenantID, zone, employee, target, "cuti.approve", candidates)
+	if err != nil {
+		return nil, err
+	}
+	return removeApprover(eligible, excluded), nil
+}
+
 func (a adminAPI) prepareLeave(r *http.Request, q leaveQuery, tenantID, employeeID, zone string, in leaveInput) (leavePrepared, error) {
 	var p leavePrepared
 	start, end, err := validateLeaveInput(&in)
@@ -276,7 +313,10 @@ func (a adminAPI) submitEssLeave(w http.ResponseWriter, r *http.Request) {
 		writeLeaveIssue(w, r, err)
 		return
 	}
-	tenantID := c.state.SelectedTenantID
+	a.createLeaveSubmission(w, r, c.state.SelectedTenantID, c.employeeID, c.state.User.ID, c.zone.String(), in)
+}
+
+func (a adminAPI) createLeaveSubmission(w http.ResponseWriter, r *http.Request, tenantID, employeeID, actorID, zone string, in leaveInput) {
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeLeaveIssue(w, r, err)
@@ -284,13 +324,25 @@ func (a adminAPI) submitEssLeave(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var locked string
-	if err = tx.QueryRowContext(r.Context(), `SELECT id FROM employees WHERE tenant_id=? AND id=? FOR UPDATE`, tenantID, c.employeeID).Scan(&locked); err != nil {
+	if err = tx.QueryRowContext(r.Context(), `SELECT id FROM employees WHERE tenant_id=? AND id=? FOR UPDATE`, tenantID, employeeID).Scan(&locked); err != nil {
 		writeAPIError(w, r, 404, "EMPLOYEE_NOT_FOUND", "Karyawan tidak ditemukan.")
 		return
 	}
-	p, err := a.prepareLeave(r, tx, tenantID, c.employeeID, c.zone.String(), in)
+	p, err := a.prepareLeave(r, tx, tenantID, employeeID, zone, in)
 	if err != nil {
 		writeLeaveIssue(w, r, err)
+		return
+	}
+	p.Approvers = removeApprover(p.Approvers, actorID)
+	if len(p.Approvers) == 0 {
+		p.Approvers, err = a.fallbackLeaveApprovers(r, tenantID, employeeID, zone, p.Flow, actorID)
+		if err != nil {
+			writeLeaveIssue(w, r, err)
+			return
+		}
+	}
+	if len(p.Approvers) == 0 {
+		writeAPIError(w, r, 409, "NO_APPROVER", "Pengaju tidak dapat menjadi approver pengajuannya sendiri.")
 		return
 	}
 	requestID, err := ids.New()
@@ -308,11 +360,11 @@ func (a adminAPI) submitEssLeave(w http.ResponseWriter, r *http.Request) {
 		writeLeaveIssue(w, r, err)
 		return
 	}
-	if _, err = tx.ExecContext(r.Context(), `INSERT INTO requests (tenant_id,id,request_type,subject_employee_id,requested_by,ref_table,ref_id,status,submitted_at) VALUES (?,?,'leave',?,?,'leave_requests',?,'in_review',UTC_TIMESTAMP(6))`, tenantID, requestID, c.employeeID, c.state.User.ID, leaveID); err != nil {
+	if _, err = tx.ExecContext(r.Context(), `INSERT INTO requests (tenant_id,id,request_type,subject_employee_id,requested_by,ref_table,ref_id,status,submitted_at) VALUES (?,?,'leave',?,?,'leave_requests',?,'in_review',UTC_TIMESTAMP(6))`, tenantID, requestID, employeeID, actorID, leaveID); err != nil {
 		writeLeaveIssue(w, r, err)
 		return
 	}
-	if _, err = tx.ExecContext(r.Context(), `INSERT INTO leave_requests (tenant_id,id,employee_id,leave_type_id,start_date,end_date,days,reason,attachment_file_id,status,request_id) VALUES (?,?,?,?,?,?,?,?,?,'in_review',?)`, tenantID, leaveID, c.employeeID, in.LeaveTypeID, in.StartDate, in.EndDate, p.Days, in.Reason, in.AttachmentFileID, requestID); err != nil {
+	if _, err = tx.ExecContext(r.Context(), `INSERT INTO leave_requests (tenant_id,id,employee_id,leave_type_id,start_date,end_date,days,reason,attachment_file_id,status,request_id) VALUES (?,?,?,?,?,?,?,?,?,'in_review',?)`, tenantID, leaveID, employeeID, in.LeaveTypeID, in.StartDate, in.EndDate, p.Days, in.Reason, in.AttachmentFileID, requestID); err != nil {
 		writeLeaveIssue(w, r, err)
 		return
 	}
@@ -352,7 +404,7 @@ func (a adminAPI) submitEssLeave(w http.ResponseWriter, r *http.Request) {
 		writeLeaveIssue(w, r, err)
 		return
 	}
-	if err = audit(r.Context(), tx, tenantID, c.state.User.ID, "submit", "requests", requestID, nil, map[string]any{"request_type": "leave", "leave_id": leaveID, "days": p.Days, "allocations": p.Allocations}); err != nil {
+	if err = audit(r.Context(), tx, tenantID, actorID, "submit", "requests", requestID, nil, map[string]any{"request_type": "leave", "leave_id": leaveID, "days": p.Days, "allocations": p.Allocations}); err != nil {
 		writeLeaveIssue(w, r, err)
 		return
 	}

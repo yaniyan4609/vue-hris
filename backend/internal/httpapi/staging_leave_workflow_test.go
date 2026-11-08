@@ -79,6 +79,9 @@ func TestStagingLeaveCrossYearWorkflow(t *testing.T) {
 				}
 			}
 			if leaveID != "" {
+				if _, e := db.Exec(`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='leave_requests' AND entity_id=?`, tenantID, leaveID); e != nil {
+					t.Errorf("cleanup leave audit: %v", e)
+				}
 				for _, query := range []string{`DELETE FROM leave_balance_ledger WHERE tenant_id=? AND ref_type='leave_request_allocation' AND ref_id IN (SELECT id FROM leave_request_allocations WHERE tenant_id=? AND leave_request_id=?)`, `DELETE FROM leave_request_allocations WHERE tenant_id=? AND leave_request_id=?`, `DELETE FROM leave_requests WHERE tenant_id=? AND id=?`} {
 					if query == `DELETE FROM leave_balance_ledger WHERE tenant_id=? AND ref_type='leave_request_allocation' AND ref_id IN (SELECT id FROM leave_request_allocations WHERE tenant_id=? AND leave_request_id=?)` {
 						_, e := db.Exec(query, tenantID, tenantID, leaveID)
@@ -176,15 +179,34 @@ func TestStagingLeaveCrossYearWorkflow(t *testing.T) {
 		t.Fatalf("admin leave page: %#v", adminPage.Data)
 	}
 	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/leave-requests/"+leaveID, nil, 200, nil)
+	var balances struct {
+		Data []map[string]any `json:"data"`
+	}
+	doJSON(t, admin, "GET", fmt.Sprintf("%s/api/v1/admin/leave-balances?employee_id=%s&leave_type_id=%s&year=%d", server.URL, employeeID, typeID, year), nil, 200, &balances)
+	if len(balances.Data) != 1 || balances.Data[0]["balance_days"] != "3.00" || balances.Data[0]["reserved_days"] != "2.00" || balances.Data[0]["available_days"] != "1.00" {
+		t.Fatalf("reserved balance: %#v", balances.Data)
+	}
+	doJSON(t, admin, "GET", fmt.Sprintf("%s/api/v1/admin/employees/%s/leave-balances?year=%d", server.URL, employeeID, year), nil, 200, nil)
 	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/leave-requests", input, 409, nil)
 	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Perjelas alasan", "level_no": 1, "version": 1}, 200, nil)
 	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+requestID+"/resubmit", map[string]any{"version": 2, "correction": map[string]any{"note": "Alasan sudah diperjelas", "reason": "Cuti keluarga lintas tahun", "start_date": start, "end_date": end}}, 200, nil)
-	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "approve", "level_no": 1, "version": 3}, 200, nil)
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Lengkapi catatan", "level_no": 1, "version": 3}, 200, nil)
+	doJSON(t, admin, "PATCH", server.URL+"/api/v1/admin/leave-requests/"+leaveID, map[string]any{"version": 3, "note": "Versi lama", "reason": "Revisi admin"}, 409, nil)
+	doJSON(t, admin, "PATCH", server.URL+"/api/v1/admin/leave-requests/"+leaveID, map[string]any{"version": 4, "note": "Catatan dilengkapi Admin", "reason": "Cuti keluarga lintas tahun, catatan lengkap"}, 200, nil)
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "approve", "level_no": 1, "version": 5}, 200, nil)
 	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "approve", "level_no": 1, "version": 1}, 409, nil)
 	var usage int
 	var total string
 	if err = db.QueryRow(`SELECT COUNT(*),CAST(SUM(days) AS CHAR) FROM leave_balance_ledger WHERE tenant_id=? AND employee_id=? AND leave_type_id=? AND entry_type='usage' AND ref_type='leave_request_allocation'`, tenantID, employeeID, typeID).Scan(&usage, &total); err != nil || usage != 2 || total != "-4.00" {
 		t.Fatalf("usage=%d total=%q err=%v", usage, total, err)
+	}
+	doJSON(t, admin, "GET", fmt.Sprintf("%s/api/v1/admin/leave-balances/ledger?employee_id=%s&leave_type_id=%s&year=%d", server.URL, employeeID, typeID, year), nil, 200, nil)
+	var calendar struct {
+		Data []map[string]any `json:"data"`
+	}
+	doJSON(t, admin, "GET", fmt.Sprintf("%s/api/v1/admin/leave-calendar?month=%d-12&office_id=%s", server.URL, year, officeID), nil, 200, &calendar)
+	if len(calendar.Data) != 1 || calendar.Data[0]["id"] != leaveID {
+		t.Fatalf("leave calendar: %#v", calendar.Data)
 	}
 	var detail struct {
 		Data map[string]any `json:"data"`
@@ -192,5 +214,91 @@ func TestStagingLeaveCrossYearWorkflow(t *testing.T) {
 	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/leave-requests/"+leaveID, nil, 200, &detail)
 	if detail.Data["status"] != "approved" {
 		t.Fatalf("detail=%#v", detail.Data)
+	}
+	var adminDetail struct {
+		Data struct {
+			Actions []map[string]any `json:"actions"`
+			Tasks   []map[string]any `json:"tasks"`
+		} `json:"data"`
+	}
+	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/leave-requests/"+leaveID, nil, 200, &adminDetail)
+	if len(adminDetail.Data.Actions) != 3 || len(adminDetail.Data.Tasks) != 3 {
+		t.Fatalf("approval chain: actions=%d tasks=%d", len(adminDetail.Data.Actions), len(adminDetail.Data.Tasks))
+	}
+	var adminRoleID string
+	if err = db.QueryRow(`SELECT id FROM roles WHERE tenant_id=? AND code='ADMIN_TENANT'`, tenantID).Scan(&adminRoleID); err != nil {
+		t.Fatal(err)
+	}
+	otherUserID, otherRoleID, otherScheduleID := newID(), newID(), newID()
+	otherDate := fmt.Sprintf("%04d-01-03", year+1)
+	var otherLeaveID, otherRequestID string
+	t.Cleanup(func() {
+		if otherRequestID != "" {
+			var instanceID string
+			_ = db.QueryRow(`SELECT id FROM approval_instances WHERE tenant_id=? AND request_id=?`, tenantID, otherRequestID).Scan(&instanceID)
+			if otherLeaveID != "" {
+				for _, entry := range []struct{ query, id string }{{`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='leave_requests' AND entity_id=?`, otherLeaveID}, {`DELETE FROM leave_request_allocations WHERE tenant_id=? AND leave_request_id=?`, otherLeaveID}, {`DELETE FROM leave_requests WHERE tenant_id=? AND id=?`, otherLeaveID}} {
+					if _, e := db.Exec(entry.query, tenantID, entry.id); e != nil {
+						t.Errorf("cleanup admin leave: %v", e)
+					}
+				}
+			}
+			for _, entry := range []struct{ query, id string }{{`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='requests' AND entity_id=?`, otherRequestID}, {`DELETE FROM notification_outbox WHERE tenant_id=? AND aggregate_type='request' AND aggregate_id=?`, otherRequestID}} {
+				if _, e := db.Exec(entry.query, tenantID, entry.id); e != nil {
+					t.Errorf("cleanup admin request: %v", e)
+				}
+			}
+			if instanceID != "" {
+				for _, query := range []string{`DELETE FROM approval_tasks WHERE tenant_id=? AND instance_id=?`, `DELETE FROM approval_instances WHERE tenant_id=? AND id=?`} {
+					if _, e := db.Exec(query, tenantID, instanceID); e != nil {
+						t.Errorf("cleanup admin approval: %v", e)
+					}
+				}
+			}
+			if _, e := db.Exec(`DELETE FROM requests WHERE tenant_id=? AND id=?`, tenantID, otherRequestID); e != nil {
+				t.Errorf("cleanup admin request row: %v", e)
+			}
+		}
+		if _, e := db.Exec(`DELETE FROM work_schedules WHERE tenant_id=? AND id=?`, tenantID, otherScheduleID); e != nil {
+			t.Errorf("cleanup admin roster: %v", e)
+		}
+		if _, e := db.Exec(`DELETE FROM user_roles WHERE tenant_id=? AND id=?`, tenantID, otherRoleID); e != nil {
+			t.Errorf("cleanup approver role: %v", e)
+		}
+		if _, e := db.Exec(`DELETE FROM tenant_memberships WHERE tenant_id=? AND user_id=?`, tenantID, otherUserID); e != nil {
+			t.Errorf("cleanup approver membership: %v", e)
+		}
+		if _, e := db.Exec(`DELETE FROM users WHERE id=?`, otherUserID); e != nil {
+			t.Errorf("cleanup approver user: %v", e)
+		}
+	})
+	email := "qa-leave-approver-" + otherUserID + "@example.invalid"
+	if _, err = db.Exec(`INSERT INTO users (id,email,email_normalized,display_name) VALUES (?,?,?,'QA Leave Approver')`, otherUserID, email, email); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`INSERT INTO tenant_memberships (tenant_id,user_id,status) VALUES (?,?,'active')`, tenantID, otherUserID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`INSERT INTO user_roles (tenant_id,id,user_id,role_id,valid_from) VALUES (?,?,?,?,CURRENT_DATE())`, tenantID, otherRoleID, otherUserID, adminRoleID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`INSERT INTO work_schedules (tenant_id,id,employee_id,work_date,shift_template_id,day_type,office_id,status,published_at) VALUES (?,?,?,?,?,'shift',?,'published',UTC_TIMESTAMP(6))`, tenantID, otherScheduleID, employeeID, otherDate, shiftID, officeID); err != nil {
+		t.Fatal(err)
+	}
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/leave-requests", map[string]any{"employee_id": employeeID, "leave_type_id": typeID, "start_date": otherDate, "end_date": otherDate, "reason": "Tidak boleh approve sendiri"}, 409, nil)
+	if _, err = db.Exec(`UPDATE approval_flow_steps SET approver_ref_id=? WHERE tenant_id=? AND id=?`, otherUserID, tenantID, stepID); err != nil {
+		t.Fatal(err)
+	}
+	var adminCreated struct {
+		Data struct {
+			ID        string `json:"id"`
+			RequestID string `json:"request_id"`
+		} `json:"data"`
+	}
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/leave-requests", map[string]any{"employee_id": employeeID, "leave_type_id": typeID, "start_date": otherDate, "end_date": otherDate, "reason": "Diajukan Admin"}, 201, &adminCreated)
+	otherLeaveID, otherRequestID = adminCreated.Data.ID, adminCreated.Data.RequestID
+	var assignee string
+	if err = db.QueryRow(`SELECT t.assignee_user_id FROM approval_tasks t JOIN approval_instances i ON i.tenant_id=t.tenant_id AND i.id=t.instance_id WHERE i.tenant_id=? AND i.request_id=?`, tenantID, otherRequestID).Scan(&assignee); err != nil || assignee != otherUserID {
+		t.Fatalf("admin approver=%s err=%v", assignee, err)
 	}
 }

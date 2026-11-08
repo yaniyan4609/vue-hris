@@ -369,5 +369,9 @@ func (a adminAPI) getAdminLeave(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca pengajuan cuti.")
 		return
 	}
+	if err := a.attachAdminLeaveApproval(r, c.tenant.ID, item); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca rantai approval cuti.")
+		return
+	}
 	writeAPIData(w, 200, item, nil)
 }

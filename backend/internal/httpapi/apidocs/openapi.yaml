@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.15.0
+  version: 0.16.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2687,6 +2687,28 @@ paths:
         - { in: query, name: to, schema: { type: string, format: date } }
       responses:
         '200': { description: Pengajuan cuti dalam scope pengguna Admin }
+    post:
+      tags: [Approvals]
+      operationId: createAdminLeaveRequest
+      x-permission: cuti.buat
+      summary: Ajukan cuti atas nama karyawan dalam scope
+      description: Menggunakan validasi roster, kebijakan, saldo, dan approval yang sama dengan ESS. Pembuat pengajuan tidak dapat menjadi approver.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/LeaveRequestInput'
+                - type: object
+                  required: [employee_id]
+                  properties:
+                    employee_id: { type: string, minLength: 26, maxLength: 26 }
+      responses:
+        '201': { description: Pengajuan, alokasi, tugas approval, audit, dan outbox dibuat }
+        '409': { description: Roster, saldo, kebijakan, atau approver lain belum tersedia }
   /api/v1/admin/leave-requests/{id}:
     parameters:
       - $ref: '#/components/parameters/ResourceID'
@@ -2695,8 +2717,85 @@ paths:
       operationId: getAdminLeaveRequest
       x-permission: cuti.lihat
       responses:
-        '200': { description: Detail cuti dalam scope }
+        '200': { description: Detail cuti, revisi, tugas, dan keputusan approval dalam scope }
         '404': { description: Di luar tenant atau scope }
+    patch:
+      tags: [Approvals]
+      operationId: updateAdminLeaveRequest
+      x-permission: cuti.ubah
+      summary: Revisi draft atau pengajuan returned dalam scope
+      description: Field cuti dapat dikirim sebagian. Returned memerlukan version dan note; alokasi tahun, saldo, dan approver dihitung ulang. Revisi dan tugas tahap pertama dibuat pada request yang sama.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: integer, minimum: 1 }
+                note: { type: string, maxLength: 2000 }
+                leave_type_id: { type: string, minLength: 26, maxLength: 26 }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                reason: { type: string, maxLength: 2000 }
+                attachment_file_id: { type: string, nullable: true }
+      responses:
+        '200': { description: Draft diperbarui atau returned dikirim ulang }
+        '409': { description: Status, versi, saldo, atau approver tidak sesuai }
+  /api/v1/admin/leave-calendar:
+    get:
+      tags: [Approvals]
+      operationId: getAdminLeaveCalendar
+      x-permission: cuti.lihat
+      summary: Cuti disetujui pada bulan dan kantor dalam scope
+      parameters:
+        - { in: query, name: month, schema: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$' } }
+        - { in: query, name: office_id, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Rentang cuti terpotong ke bulan tampilan }
+  /api/v1/admin/leave-balances:
+    get:
+      tags: [Approvals]
+      operationId: listAdminLeaveBalances
+      x-permission: cuti.lihat
+      summary: Saldo ledger, reservasi, dan saldo tersedia per karyawan dan jenis
+      parameters:
+        - { in: query, name: year, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: leave_type_id, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Saldo hanya untuk karyawan dalam scope }
+  /api/v1/admin/employees/{id}/leave-balances:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Approvals]
+      operationId: getAdminEmployeeLeaveBalances
+      x-permission: cuti.lihat
+      parameters:
+        - { in: query, name: year, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+      responses:
+        '200': { description: Saldo semua jenis aktif untuk satu karyawan }
+        '404': { description: Karyawan di luar scope }
+  /api/v1/admin/leave-balances/ledger:
+    get:
+      tags: [Approvals]
+      operationId: listAdminLeaveBalanceLedger
+      x-permission: cuti.lihat
+      parameters:
+        - { in: query, name: year, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: leave_type_id, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Mutasi ledger dalam scope karyawan }
   /api/v1/admin/leave-types:
     get:
       tags: [Approvals]
@@ -2924,6 +3023,15 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    LeaveRequestInput:
+      type: object
+      required: [leave_type_id, start_date, end_date]
+      properties:
+        leave_type_id: { type: string, minLength: 26, maxLength: 26 }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        reason: { type: string, maxLength: 2000 }
+        attachment_file_id: { type: string, nullable: true }
     LeaveTypeInput:
       type: object
       required: [code, name, is_paid, requires_attachment]

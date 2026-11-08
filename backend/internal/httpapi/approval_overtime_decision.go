@@ -89,6 +89,7 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak approver berikutnya.")
 			return
 		}
+		nextAssignees = removeApprover(nextAssignees, d.Requester)
 		if len(nextAssignees) == 0 {
 			var fallback sql.NullString
 			if err := tx.QueryRowContext(r.Context(), `SELECT fallback_role_id FROM approval_flows WHERE tenant_id=? AND id=?`, c.tenant.ID, d.FlowID).Scan(&fallback); err != nil {
@@ -106,6 +107,7 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 					writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak fallback.")
 					return
 				}
+				nextAssignees = removeApprover(nextAssignees, d.Requester)
 			}
 		}
 		if len(nextAssignees) == 0 {

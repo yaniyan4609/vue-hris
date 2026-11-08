@@ -106,7 +106,7 @@ GET,/api/v1/admin/employees/{id}/contracts,7.3 Kontrak,active
 GET,/api/v1/admin/employees/{id}/documents,12.2 Dokumen,planned
 GET,/api/v1/admin/employees/{id}/emergency-contacts,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/families,7.2 Data pendukung karyawan,active
-GET,/api/v1/admin/employees/{id}/leave-balances,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/employees/{id}/leave-balances,9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,planned
 GET,/api/v1/admin/employees/{id}/summary,7.1 Karyawan,planned
 GET,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
@@ -117,9 +117,9 @@ GET,/api/v1/admin/imports/templates/{type},14.3 Ekspor dan impor (job generik),p
 GET,/api/v1/admin/imports/{id},14.3 Ekspor dan impor (job generik),planned
 GET,/api/v1/admin/imports/{id}/errors,14.3 Ekspor dan impor (job generik),planned
 GET,/api/v1/admin/imports/{id}/preview,14.3 Ekspor dan impor (job generik),planned
-GET,/api/v1/admin/leave-balances,9.2 Admin: cuti dan izin,planned
-GET,/api/v1/admin/leave-balances/ledger,9.2 Admin: cuti dan izin,planned
-GET,/api/v1/admin/leave-calendar,9.2 Admin: cuti dan izin,planned
+GET,/api/v1/admin/leave-balances,9.2 Admin: cuti dan izin,active
+GET,/api/v1/admin/leave-balances/ledger,9.2 Admin: cuti dan izin,active
+GET,/api/v1/admin/leave-calendar,9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/leave-policies,9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/leave-requests,9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,active
@@ -306,7 +306,7 @@ PATCH,/api/v1/admin/employees/{id}/families/{familyId},7.2 Data pendukung karyaw
 PATCH,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
 PATCH,/api/v1/admin/holidays/{id},"8.3 Admin: master shift, roster, dan libur",active
 PATCH,/api/v1/admin/leave-policies/{id},9.2 Admin: cuti dan izin,active
-PATCH,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,planned
+PATCH,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/leave-types/{id},9.2 Admin: cuti dan izin,active
 PATCH,/api/v1/admin/offices/{id},6.1 Master organisasi,planned
 PATCH,/api/v1/admin/overtime-requests/{id},9.3 Lembur,planned
@@ -383,7 +383,7 @@ POST,/api/v1/admin/imports/{id}/commit,14.3 Ekspor dan impor (job generik),plann
 POST,/api/v1/admin/leave-balances/accrual-run,9.2 Admin: cuti dan izin,planned
 POST,/api/v1/admin/leave-balances/adjustments,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/leave-policies,9.2 Admin: cuti dan izin,active
-POST,/api/v1/admin/leave-requests,9.2 Admin: cuti dan izin,planned
+POST,/api/v1/admin/leave-requests,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/leave-types,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/loans,9.4 Kasbon,planned
 POST,/api/v1/admin/loans/{id}/disburse,9.4 Kasbon,planned
