@@ -169,6 +169,14 @@ func TestStagingApprovalReadScope(t *testing.T) {
 	doJSON(t, ess, "GET", server.URL+"/api/v1/admin/approvals/"+requestID, nil, 403, nil)
 	doJSON(t, ess, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki pengajuan", "level_no": 1, "version": 1}, 403, nil)
 	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki pengajuan", "level_no": 1, "version": 2}, 409, nil)
+	unsupportedRefID, _ := ids.New()
+	if _, err := db.Exec(`UPDATE requests SET ref_table='leave_requests',ref_id=? WHERE tenant_id=? AND id=?`, unsupportedRefID, adminState.SelectedTenantID, requestID); err != nil {
+		t.Fatal(err)
+	}
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/approvals/"+requestID+"/actions", map[string]any{"action": "return", "reason": "Perbaiki pengajuan", "level_no": 1, "version": 1}, 409, nil)
+	if _, err := db.Exec(`UPDATE requests SET ref_table=NULL,ref_id=NULL WHERE tenant_id=? AND id=?`, adminState.SelectedTenantID, requestID); err != nil {
+		t.Fatal(err)
+	}
 	var returned struct {
 		Data struct {
 			Status          string `json:"status"`
@@ -210,6 +218,13 @@ func TestStagingApprovalReadScope(t *testing.T) {
 		} `json:"data"`
 	}
 	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+requestID+"/resubmit", map[string]any{"version": 1, "correction": map[string]any{"note": "Sudah diperbaiki"}}, 409, nil)
+	if _, err := db.Exec(`UPDATE requests SET ref_table='leave_requests',ref_id=? WHERE tenant_id=? AND id=?`, unsupportedRefID, adminState.SelectedTenantID, requestID); err != nil {
+		t.Fatal(err)
+	}
+	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+requestID+"/resubmit", map[string]any{"version": 2, "correction": map[string]any{"note": "Sudah diperbaiki"}}, 409, nil)
+	if _, err := db.Exec(`UPDATE requests SET ref_table=NULL,ref_id=NULL WHERE tenant_id=? AND id=?`, adminState.SelectedTenantID, requestID); err != nil {
+		t.Fatal(err)
+	}
 	doJSON(t, ess, "POST", server.URL+"/api/v1/ess/requests/"+requestID+"/resubmit", map[string]any{"version": 2, "correction": map[string]any{"note": "Sudah diperbaiki"}}, 200, &resubmitted)
 	if resubmitted.Data.RequestID != requestID || resubmitted.Data.Status != "in_review" || resubmitted.Data.AttemptNo != 2 || resubmitted.Data.ApprovalVersion != 3 {
 		t.Fatalf("unexpected resubmit response: %#v", resubmitted.Data)

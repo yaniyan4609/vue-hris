@@ -128,6 +128,10 @@ func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, r, 404, "NOT_FOUND", "Pengajuan tidak ditemukan dalam scope.")
 		return
 	}
+	if body.Action == "return" && refTable.Valid && (kind != "overtime" || refTable.String != "overtime_requests" || !refID.Valid) {
+		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Pengembalian jenis pengajuan ini menunggu handler domain.")
+		return
+	}
 	if body.Action != "return" {
 		if kind != "overtime" || !refTable.Valid || refTable.String != "overtime_requests" || !refID.Valid {
 			writeAPIError(w, r, 409, "ACTION_NOT_READY", "Keputusan akhir jenis pengajuan ini menunggu handler domain.")

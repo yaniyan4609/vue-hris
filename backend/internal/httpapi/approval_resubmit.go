@@ -99,6 +99,10 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perbaikan field domain belum tersedia untuk jenis pengajuan ini.")
 		return
 	}
+	if kind != "overtime" && refTable.Valid {
+		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Kirim ulang jenis pengajuan ini menunggu handler domain.")
+		return
+	}
 	if kind == "overtime" && (!refTable.Valid || refTable.String != "overtime_requests" || !refID.Valid) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi data lembur tidak valid.")
 		return

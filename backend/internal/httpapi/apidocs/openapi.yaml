@@ -2422,7 +2422,7 @@ paths:
       tags: [Approvals]
       operationId: decideApprovalRequest
       summary: Putuskan tugas approval yang ditugaskan kepada pengguna saat ini
-      description: Return tersedia untuk semua jenis. Approve bertahap, approve akhir, dan reject saat ini tersedia untuk lembur; jenis lain menunggu handler domain. Memerlukan tugas pending pada tahap, permission approve jenis pengajuan, dan scope karyawan. Aksi, domain, audit, dan outbox dicatat dalam satu transaksi.
+      description: Return tersedia untuk lembur dan pengajuan tanpa referensi domain. Approve bertahap, approve akhir, dan reject saat ini tersedia untuk lembur; jenis lain menunggu handler domain. Memerlukan tugas pending pada tahap, permission approve jenis pengajuan, dan scope karyawan. Aksi, domain, audit, dan outbox dicatat dalam satu transaksi.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -2478,7 +2478,7 @@ paths:
       tags: [Approvals]
       operationId: resubmitEssRequest
       summary: Kirim ulang pengajuan returned dengan ID yang sama
-      description: Menyimpan catatan perbaikan per percobaan dan membentuk ulang tugas tahap pertama dari alur asli. Untuk lembur, proposed_minutes dan reason dapat diperbaiki atomik. Jenis lain saat ini hanya menerima note.
+      description: Menyimpan catatan perbaikan per percobaan dan membentuk ulang tugas tahap pertama dari alur asli. Untuk lembur, proposed_minutes dan reason dapat diperbaiki atomik. Pengajuan tanpa referensi domain menerima note; modul lain menunggu handler domain.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
