@@ -110,7 +110,7 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perbaikan field domain belum tersedia untuk jenis pengajuan ini.")
 		return
 	}
-	if kind != "overtime" && kind != "leave" && kind != "reimbursement" && refTable.Valid {
+	if kind != "overtime" && kind != "leave" && kind != "reimbursement" && kind != "loan" && refTable.Valid {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Kirim ulang jenis pengajuan ini menunggu handler domain.")
 		return
 	}
@@ -124,6 +124,10 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if kind == "reimbursement" && (!refTable.Valid || refTable.String != "reimbursements" || !refID.Valid) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi klaim tidak valid.")
+		return
+	}
+	if kind == "loan" && (!refTable.Valid || refTable.String != "employee_loans" || !refID.Valid) {
+		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi kasbon tidak valid.")
 		return
 	}
 	if kind == "overtime" {
@@ -325,6 +329,38 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		count, _ := result.RowsAffected()
 		if count != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status klaim telah berubah.")
+			return
+		}
+	}
+	if kind == "loan" {
+		var locked string
+		if err := tx.QueryRowContext(r.Context(), `SELECT id FROM employees WHERE tenant_id=? AND id=? FOR UPDATE`, c.state.SelectedTenantID, subjectID.String).Scan(&locked); err != nil {
+			writeAPIError(w, r, 409, "EMPLOYEE_INVALID", "Karyawan tidak tersedia.")
+			return
+		}
+		var status, amountRaw string
+		var tenor int
+		if err := tx.QueryRowContext(r.Context(), `SELECT status,CAST(amount AS CHAR),tenor_months FROM employee_loans WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.state.SelectedTenantID, refID.String, requestID, subjectID.String).Scan(&status, &amountRaw, &tenor); err != nil || status != "returned" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status kasbon tidak sesuai pengajuan.")
+			return
+		}
+		amount, valid := leaveHundredths(amountRaw)
+		if !valid {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Nominal kasbon tidak valid.")
+			return
+		}
+		if _, err := calculateLoan(r.Context(), tx, c.state.SelectedTenantID, subjectID.String, amount, tenor); err != nil {
+			writeLoanIssue(w, r, err)
+			return
+		}
+		result, err := tx.ExecContext(r.Context(), `UPDATE employee_loans SET status='in_review' WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='returned'`, c.state.SelectedTenantID, refID.String, requestID, subjectID.String)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membuka ulang kasbon.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status kasbon telah berubah.")
 			return
 		}
 	}

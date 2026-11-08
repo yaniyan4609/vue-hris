@@ -124,9 +124,9 @@ GET,/api/v1/admin/leave-policies,9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/leave-requests,9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/leave-requests/{id},9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/leave-types,9.2 Admin: cuti dan izin,active
-GET,/api/v1/admin/loan-policies,9.4 Kasbon,planned
-GET,/api/v1/admin/loans,9.4 Kasbon,planned
-GET,/api/v1/admin/loans/{id},9.4 Kasbon,planned
+GET,/api/v1/admin/loan-policies,9.4 Kasbon,active
+GET,/api/v1/admin/loans,9.4 Kasbon,active
+GET,/api/v1/admin/loans/{id},9.4 Kasbon,active
 GET,/api/v1/admin/locations/tree,6.1 Master organisasi,active
 GET,/api/v1/admin/login-events,14.4 Audit dan keamanan,planned
 GET,/api/v1/admin/notification-deliveries,"13.2 Admin: aturan, template, dan log",planned
@@ -224,8 +224,8 @@ GET,/api/v1/ess/leave-requests/{id},9.1 ESS: cuti dan izin,active
 GET,/api/v1/ess/leave/balances,9.1 ESS: cuti dan izin,active
 GET,/api/v1/ess/leave/balances/{leaveTypeId}/ledger,9.1 ESS: cuti dan izin,active
 GET,/api/v1/ess/leave/types,9.1 ESS: cuti dan izin,active
-GET,/api/v1/ess/loans,9.4 Kasbon,planned
-GET,/api/v1/ess/loans/{id},9.4 Kasbon,planned
+GET,/api/v1/ess/loans,9.4 Kasbon,active
+GET,/api/v1/ess/loans/{id},9.4 Kasbon,active
 GET,/api/v1/ess/overtime-requests,9.3 Lembur,active
 GET,/api/v1/ess/overtime-requests/{id},9.3 Lembur,active
 GET,/api/v1/ess/payslips,11.3 Slip gaji,planned
@@ -385,10 +385,10 @@ POST,/api/v1/admin/leave-balances/adjustments,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/leave-policies,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/leave-requests,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/leave-types,9.2 Admin: cuti dan izin,active
-POST,/api/v1/admin/loans,9.4 Kasbon,planned
-POST,/api/v1/admin/loans/{id}/disburse,9.4 Kasbon,planned
-POST,/api/v1/admin/loans/{id}/installments/{seq}/waive,9.4 Kasbon,planned
-POST,/api/v1/admin/loans/{id}/settle,9.4 Kasbon,planned
+POST,/api/v1/admin/loans,9.4 Kasbon,active
+POST,/api/v1/admin/loans/{id}/disburse,9.4 Kasbon,active
+POST,/api/v1/admin/loans/{id}/installments/{seq}/waive,9.4 Kasbon,active
+POST,/api/v1/admin/loans/{id}/settle,9.4 Kasbon,active
 POST,/api/v1/admin/notification-deliveries/{id}/retry,"13.2 Admin: aturan, template, dan log",planned
 POST,/api/v1/admin/notification-templates/{id}/preview,"13.2 Admin: aturan, template, dan log",planned
 POST,/api/v1/admin/offices,6.1 Master organisasi,planned
@@ -445,8 +445,8 @@ POST,/api/v1/ess/attendance/location-check,8.1 ESS: absensi dan jadwal pribadi,a
 POST,/api/v1/ess/documents,12.2 Dokumen,planned
 POST,/api/v1/ess/leave-requests,9.1 ESS: cuti dan izin,active
 POST,/api/v1/ess/leave-requests/preview,9.1 ESS: cuti dan izin,active
-POST,/api/v1/ess/loans,9.4 Kasbon,planned
-POST,/api/v1/ess/loans/simulate,9.4 Kasbon,planned
+POST,/api/v1/ess/loans,9.4 Kasbon,active
+POST,/api/v1/ess/loans/simulate,9.4 Kasbon,active
 POST,/api/v1/ess/overtime-requests,9.3 Lembur,active
 POST,/api/v1/ess/profile/change-requests,7.8 ESS: profil sendiri,planned
 POST,/api/v1/ess/profile/emergency-contacts,7.8 ESS: profil sendiri,planned
@@ -490,7 +490,7 @@ POST,/api/v1/webhooks/payments/{gateway},16. Webhook dan kesehatan layanan,plann
 PUT,/api/v1/admin/approval-flows/{id}/steps,10.3 Pengaturan alur approval,active
 PUT,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,planned
 PUT,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,planned
-PUT,/api/v1/admin/loan-policies,9.4 Kasbon,planned
+PUT,/api/v1/admin/loan-policies,9.4 Kasbon,active
 PUT,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
 PUT,/api/v1/admin/notification-templates/{id},"13.2 Admin: aturan, template, dan log",planned
 PUT,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,planned

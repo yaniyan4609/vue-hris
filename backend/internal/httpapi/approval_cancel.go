@@ -43,7 +43,7 @@ func (a adminAPI) cancelEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 409, "REQUEST_NOT_CANCELLABLE", "Pengajuan tidak dapat dibatalkan pada status ini.")
 		return
 	}
-	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements"))
+	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements") || (kind == "loan" && refTable.String == "employee_loans"))
 	if refTable.Valid && !domainReady {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Pembatalan jenis pengajuan ini menunggu handler domain.")
 		return
@@ -92,6 +92,18 @@ func (a adminAPI) cancelEssRequest(w http.ResponseWriter, r *http.Request) {
 		count, _ := result.RowsAffected()
 		if count != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status klaim tidak sesuai pengajuan.")
+			return
+		}
+	}
+	if kind == "loan" && domainReady {
+		result, err := tx.ExecContext(r.Context(), `UPDATE employee_loans SET status='cancelled' WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status=?`, tenantID, refID.String, requestID, c.employeeID, status)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membatalkan kasbon.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status kasbon tidak sesuai pengajuan.")
 			return
 		}
 	}

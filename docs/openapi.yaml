@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.19.0
+  version: 0.20.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -30,6 +30,8 @@ tags:
     description: Pembacaan pengajuan dan tugas approval
   - name: Reimbursements
     description: Kategori dan klaim biaya karyawan
+  - name: Loans
+    description: Kasbon tanpa bunga, kebijakan plafon, pencairan, dan pelunasan
   - name: Files
     description: Unggah kuitansi lokal khusus staging
   - name: Employees
@@ -2824,6 +2826,202 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200': { description: Mutasi ledger dalam scope karyawan }
+  /api/v1/ess/loans/simulate:
+    post:
+      tags: [Loans]
+      operationId: simulateEssLoan
+      summary: Simulasi cicilan dan plafon total karyawan
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoanInput' }
+      responses:
+        '200': { description: Cicilan rata, selisih pembulatan pada cicilan terakhir, dan sisa plafon }
+        '409': { description: Kebijakan belum diatur atau plafon/tenor terlampaui }
+  /api/v1/ess/loans:
+    get:
+      tags: [Loans]
+      operationId: listEssLoans
+      summary: Daftar kasbon milik karyawan yang masuk
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Daftar kasbon sendiri }
+    post:
+      tags: [Loans]
+      operationId: submitEssLoan
+      x-permission: kasbon.buat
+      summary: Ajukan kasbon melalui alur approval default
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoanInput' }
+      responses:
+        '201': { description: Kasbon dan request approval dibuat atomik }
+        '409': { description: Kebijakan, plafon, atau alur approver belum memenuhi syarat }
+  /api/v1/ess/loans/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Loans]
+      operationId: getEssLoan
+      responses:
+        '200': { description: Detail kasbon sendiri, cicilan, pembebasan, dan pelunasan }
+        '404': { description: Kasbon bukan milik karyawan }
+  /api/v1/admin/loans:
+    get:
+      tags: [Loans]
+      operationId: listAdminLoans
+      x-permission: kasbon.lihat
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Daftar kasbon sesuai scope karyawan }
+    post:
+      tags: [Loans]
+      operationId: createAdminLoan
+      x-permission: kasbon.buat
+      summary: Ajukan kasbon atas nama karyawan dalam scope
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/LoanInput'
+                - type: object
+                  required: [employee_id]
+                  properties:
+                    employee_id: { type: string, minLength: 26, maxLength: 26 }
+      responses:
+        '201': { description: Pengajuan dan tugas approval dibuat }
+        '404': { description: Karyawan tidak dalam scope }
+  /api/v1/admin/loans/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Loans]
+      operationId: getAdminLoan
+      x-permission: kasbon.lihat
+      responses:
+        '200': { description: Detail kasbon dan cicilan dalam scope karyawan }
+        '404': { description: Kasbon tidak dalam scope }
+  /api/v1/admin/loans/{id}/disburse:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Loans]
+      operationId: disburseAdminLoan
+      x-permission: kasbon.cairkan
+      summary: Cairkan kasbon approved sekali saja
+      description: Perlu reauth. Referensi sama dapat diulang secara idempotent. Cicilan pertama jatuh pada periode bulan setelah pencairan, memakai zona waktu tenant.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [disbursement_ref]
+              properties:
+                disbursement_ref: { type: string, minLength: 1, maxLength: 160 }
+      responses:
+        '200': { description: Kasbon cair atau retry dengan referensi yang sama }
+        '403': { description: Reauth diperlukan }
+        '409': { description: Belum approved atau sudah cair dengan referensi lain }
+  /api/v1/admin/loans/{id}/installments/{seq}/waive:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+      - { in: path, name: seq, required: true, schema: { type: integer, minimum: 1, maximum: 120 } }
+    post:
+      tags: [Loans]
+      operationId: waiveLoanInstallment
+      x-permission: kasbon.kelola
+      summary: Bebaskan satu cicilan pending dan kurangi kewajiban
+      description: Perlu reauth dan kasbon.lihat dalam scope. Cicilan yang sudah terhubung ke payroll tidak dapat dibebaskan.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '200': { description: Cicilan waived dan outstanding berkurang }
+        '403': { description: Permission atau reauth diperlukan }
+        '409': { description: Cicilan telah diproses atau dikunci payroll }
+  /api/v1/admin/loans/{id}/settle:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Loans]
+      operationId: settleAdminLoan
+      x-permission: kasbon.kelola
+      summary: Catat pelunasan penuh di luar payroll
+      description: Perlu reauth dan kasbon.lihat dalam scope. settlement_ref unik per tenant; retry identik idempotent. Semua cicilan pending ditutup. Cicilan yang terhubung ke payroll memblokir pelunasan.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settlement_ref]
+              properties:
+                settlement_ref: { type: string, minLength: 1, maxLength: 160 }
+      responses:
+        '200': { description: Seluruh sisa kasbon lunas atau retry identik }
+        '403': { description: Permission atau reauth diperlukan }
+        '409': { description: Status konflik, payroll terkunci, atau referensi dipakai }
+  /api/v1/admin/loan-policies:
+    get:
+      tags: [Loans]
+      operationId: getLoanPolicy
+      x-permission: kasbon.kelola
+      responses:
+        '200': { description: Kebijakan tenant atau configured false }
+    put:
+      tags: [Loans]
+      operationId: putLoanPolicy
+      x-permission: kasbon.kelola
+      summary: Atur plafon total sisa kasbon dan tenor maksimum
+      description: Perlu reauth. Gunakan version 0 saat membuat dan versi terbaru untuk memperbarui.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [max_outstanding, max_tenor_months, version]
+              properties:
+                max_outstanding: { type: number, exclusiveMinimum: 0, description: Nominal maksimal total eksposur kasbon dalam desimal dua digit }
+                max_tenor_months: { type: integer, minimum: 1, maximum: 120 }
+                version: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: Kebijakan tersimpan dan diaudit }
+        '403': { description: Reauth diperlukan }
+        '409': { description: Versi kebijakan berubah }
   /api/v1/ess/reimbursements:
     get:
       tags: [Reimbursements]
@@ -3338,6 +3536,12 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    LoanInput:
+      type: object
+      required: [amount, tenor_months]
+      properties:
+        amount: { type: number, multipleOf: 0.01, exclusiveMinimum: 0, description: Nominal kasbon tanpa bunga }
+        tenor_months: { type: integer, minimum: 1, maximum: 120 }
     ReceiptUploadInput:
       type: object
       required: [purpose, original_name, mime_type, size_bytes, sha256]
