@@ -47,7 +47,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 	instanceID, _ := ids.New()
 	taskID, _ := ids.New()
 	stepID, _ := ids.New()
-	if _, err := db.Exec(`INSERT INTO approval_flows (tenant_id,id,request_type,name,valid_from) VALUES (?,?,'leave','QA Read Flow','2000-01-01')`, adminState.SelectedTenantID, flowID); err != nil {
+	if _, err := db.Exec(`INSERT INTO approval_flows (tenant_id,id,request_type,name,valid_from) VALUES (?,?,'profile_change','QA Read Flow','2000-01-01')`, adminState.SelectedTenantID, flowID); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
@@ -55,7 +55,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 			t.Errorf("cleanup flow: %v", err)
 		}
 	}()
-	if _, err := db.Exec(`INSERT INTO approval_flow_steps (tenant_id,id,flow_id,level_no,approver_kind,approver_ref_id,required_permission) VALUES (?,?,?,1,'user',?,'cuti.approve')`, adminState.SelectedTenantID, stepID, flowID, adminState.User.ID); err != nil {
+	if _, err := db.Exec(`INSERT INTO approval_flow_steps (tenant_id,id,flow_id,level_no,approver_kind,approver_ref_id,required_permission) VALUES (?,?,?,1,'user',?,'karyawan.approve')`, adminState.SelectedTenantID, stepID, flowID, adminState.User.ID); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
@@ -63,7 +63,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 			t.Errorf("cleanup step: %v", err)
 		}
 	}()
-	if _, err := db.Exec(`INSERT INTO requests (tenant_id,id,request_type,subject_employee_id,requested_by,status,submitted_at) VALUES (?,?,'leave',?,?,'in_review',UTC_TIMESTAMP(6))`, adminState.SelectedTenantID, requestID, employeeID, essState.User.ID); err != nil {
+	if _, err := db.Exec(`INSERT INTO requests (tenant_id,id,request_type,subject_employee_id,requested_by,status,submitted_at) VALUES (?,?,'profile_change',?,?,'in_review',UTC_TIMESTAMP(6))`, adminState.SelectedTenantID, requestID, employeeID, essState.User.ID); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
@@ -90,7 +90,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 	var flows struct {
 		Data []approvalFlow `json:"data"`
 	}
-	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/approval-flows?request_type=leave", nil, 200, &flows)
+	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/approval-flows?request_type=profile_change", nil, 200, &flows)
 	flowFound := false
 	for _, flow := range flows.Data {
 		if flow.ID == flowID {
@@ -110,7 +110,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 	var page struct {
 		Data []requestView `json:"data"`
 	}
-	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/requests?request_type=leave", nil, 200, &page)
+	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/requests?request_type=profile_change", nil, 200, &page)
 	found := false
 	for _, item := range page.Data {
 		if item.ID == requestID {
@@ -127,7 +127,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 	if detail.Data.ID != requestID || detail.Data.AttemptNo != 1 || detail.Data.Version != 1 || detail.Data.Approval == nil || detail.Data.Approval.AttemptNo != 1 {
 		t.Fatalf("ESS detail: %#v", detail.Data)
 	}
-	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/approvals/inbox?request_type=leave", nil, 200, &page)
+	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/approvals/inbox?request_type=profile_change", nil, 200, &page)
 	found = false
 	for _, item := range page.Data {
 		if item.ID == requestID {
@@ -137,7 +137,7 @@ func TestStagingApprovalReadScope(t *testing.T) {
 	if !found {
 		t.Fatal("admin inbox missing")
 	}
-	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/approvals?request_type=leave", nil, 200, &page)
+	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/approvals?request_type=profile_change", nil, 200, &page)
 	found = false
 	for _, item := range page.Data {
 		if item.ID == requestID {

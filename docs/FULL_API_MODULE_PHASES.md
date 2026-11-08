@@ -2,7 +2,9 @@
 
 Status awal: 9 November 2026. Sumber operasi: `full-docs/Spesifikasi API digaji.id — REST + WebSocket.md`; daftar method dan path ada di `API_ENDPOINT_COVERAGE.csv`. Proyek, migrasi, akun demo, dan data staging yang sudah ada dilanjutkan.
 
-**Fase 1 selesai di staging:** lima master organisasi mempunyai GET daftar/detail, POST, PATCH, DELETE arsip, filter status/induk, pohon, dan lookup. Arsip menolak anak serta penugasan aktif; izin `organisasi.hapus` hanya diberikan awal kepada Admin Tenant. Migrasi `00046` diterapkan dan fixture QA dibersihkan setelah uji integrasi. Fase berikutnya: karyawan dan data pendukung.
+**Fase 1 selesai di staging:** lima master organisasi mempunyai GET daftar/detail, POST, PATCH, DELETE arsip, filter status/induk, pohon, dan lookup. Arsip menolak anak serta penugasan aktif; izin `organisasi.hapus` hanya diberikan awal kepada Admin Tenant. Migrasi `00046` diterapkan dan fixture QA dibersihkan setelah uji integrasi.
+
+**Fase 2 selesai di staging:** daftar karyawan kini mendukung seluruh filter spesifikasi dan arsip, kuota paket diperiksa saat membuat, profil pribadi Admin dapat dibaca dan diubah, NIK dienkripsi dengan kunci data per tenant serta blind index terpisah, rekening bank mempunyai daftar/tambah/ubah/nonaktif dengan versi dan penyamaran menurut izin, koreksi assignment bertanggal memakai transaksi dan memeriksa roster/payroll terkunci, akun ESS dapat dibuat atau ditautkan dengan role dan undangan, serta summary, timeline, nomor NIP berikutnya, arsip dan pulih tersedia. Akun tidak diaktifkan otomatis saat pemulihan. Migrasi `00047` diterapkan; seluruh tes integrasi staging dan unit lulus. Endpoint dokumen karyawan tetap termasuk Fase 12. Fase berikutnya: approval inti.
 
 ## Aturan selesai satu modul
 

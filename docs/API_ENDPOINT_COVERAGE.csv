@@ -14,9 +14,9 @@ DELETE,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
 DELETE,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
-DELETE,/api/v1/admin/employees/{id},7.1 Karyawan,planned
+DELETE,/api/v1/admin/employees/{id},7.1 Karyawan,active
 DELETE,/api/v1/admin/employees/{id}/allowed-offices/{allowedId},7.2 Data pendukung karyawan,active
-DELETE,/api/v1/admin/employees/{id}/bank-accounts/{accountId},7.2 Data pendukung karyawan,planned
+DELETE,/api/v1/admin/employees/{id}/bank-accounts/{accountId},7.2 Data pendukung karyawan,active
 DELETE,/api/v1/admin/employees/{id}/emergency-contacts/{contactId},7.2 Data pendukung karyawan,active
 DELETE,/api/v1/admin/employees/{id}/families/{familyId},7.2 Data pendukung karyawan,active
 DELETE,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
@@ -97,20 +97,20 @@ GET,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planne
 GET,/api/v1/admin/employee-documents,12.2 Dokumen,planned
 GET,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
 GET,/api/v1/admin/employees,7.1 Karyawan,active
-GET,/api/v1/admin/employees/next-number,7.1 Karyawan,planned
+GET,/api/v1/admin/employees/next-number,7.1 Karyawan,active
 GET,/api/v1/admin/employees/{id},7.1 Karyawan,active
 GET,/api/v1/admin/employees/{id}/allowed-offices,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/assignments,7.2 Data pendukung karyawan,active
-GET,/api/v1/admin/employees/{id}/bank-accounts,7.2 Data pendukung karyawan,planned
+GET,/api/v1/admin/employees/{id}/bank-accounts,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/contracts,7.3 Kontrak,active
 GET,/api/v1/admin/employees/{id}/documents,12.2 Dokumen,planned
 GET,/api/v1/admin/employees/{id}/emergency-contacts,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/families,7.2 Data pendukung karyawan,active
 GET,/api/v1/admin/employees/{id}/leave-balances,9.2 Admin: cuti dan izin,active
 GET,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,active
-GET,/api/v1/admin/employees/{id}/summary,7.1 Karyawan,planned
+GET,/api/v1/admin/employees/{id}/summary,7.1 Karyawan,active
 GET,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,active
-GET,/api/v1/admin/employees/{id}/timeline,7.1 Karyawan,planned
+GET,/api/v1/admin/employees/{id}/timeline,7.1 Karyawan,active
 GET,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
 GET,/api/v1/admin/holidays,"8.3 Admin: master shift, roster, dan libur",active
 GET,/api/v1/admin/imports/templates/{type},14.3 Ekspor dan impor (job generik),planned
@@ -300,7 +300,7 @@ PATCH,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
 PATCH,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/employees/{id},7.1 Karyawan,active
-PATCH,/api/v1/admin/employees/{id}/bank-accounts/{accountId},7.2 Data pendukung karyawan,planned
+PATCH,/api/v1/admin/employees/{id}/bank-accounts/{accountId},7.2 Data pendukung karyawan,active
 PATCH,/api/v1/admin/employees/{id}/emergency-contacts/{contactId},7.2 Data pendukung karyawan,active
 PATCH,/api/v1/admin/employees/{id}/families/{familyId},7.2 Data pendukung karyawan,active
 PATCH,/api/v1/admin/geofences/{id},6.2 Geofence kantor,active
@@ -366,14 +366,14 @@ POST,/api/v1/admin/employee-changes/{id}/submit,"7.4 Mutasi, promosi, dan demosi
 POST,/api/v1/admin/employee-documents,12.2 Dokumen,planned
 POST,/api/v1/admin/employee-documents/{id}/verify,12.2 Dokumen,planned
 POST,/api/v1/admin/employees,7.1 Karyawan,active
-POST,/api/v1/admin/employees/bulk-archive,7.1 Karyawan,planned
-POST,/api/v1/admin/employees/{id}/account,7.1 Karyawan,planned
+POST,/api/v1/admin/employees/bulk-archive,7.1 Karyawan,active
+POST,/api/v1/admin/employees/{id}/account,7.1 Karyawan,active
 POST,/api/v1/admin/employees/{id}/allowed-offices,7.2 Data pendukung karyawan,active
-POST,/api/v1/admin/employees/{id}/assignments,7.2 Data pendukung karyawan,planned
-POST,/api/v1/admin/employees/{id}/bank-accounts,7.2 Data pendukung karyawan,planned
+POST,/api/v1/admin/employees/{id}/assignments,7.2 Data pendukung karyawan,active
+POST,/api/v1/admin/employees/{id}/bank-accounts,7.2 Data pendukung karyawan,active
 POST,/api/v1/admin/employees/{id}/emergency-contacts,7.2 Data pendukung karyawan,active
 POST,/api/v1/admin/employees/{id}/families,7.2 Data pendukung karyawan,active
-POST,/api/v1/admin/employees/{id}/restore,7.1 Karyawan,planned
+POST,/api/v1/admin/employees/{id}/restore,7.1 Karyawan,active
 POST,/api/v1/admin/exports,14.3 Ekspor dan impor (job generik),planned
 POST,/api/v1/admin/geofences/test-point,6.2 Geofence kantor,active
 POST,/api/v1/admin/holidays,"8.3 Admin: master shift, roster, dan libur",active

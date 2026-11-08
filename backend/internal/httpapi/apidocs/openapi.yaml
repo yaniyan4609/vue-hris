@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.27.0
+  version: 0.28.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -1102,6 +1102,15 @@ paths:
         - in: query
           name: officeId
           schema: { type: string, minLength: 26, maxLength: 26 }
+        - { in: query, name: 'filter[archive]', schema: { type: string, enum: [active, archived, all], default: active } }
+        - { in: query, name: 'filter[region_id]', schema: { type: string } }
+        - { in: query, name: 'filter[division_id]', schema: { type: string } }
+        - { in: query, name: 'filter[department_id]', schema: { type: string } }
+        - { in: query, name: 'filter[position_id]', schema: { type: string } }
+        - { in: query, name: 'filter[reports_to_id]', schema: { type: string } }
+        - { in: query, name: 'filter[joined_from]', schema: { type: string, format: date } }
+        - { in: query, name: 'filter[joined_to]', schema: { type: string, format: date } }
+        - { in: query, name: 'filter[contract_type]', schema: { type: string, enum: [PKWT, PKWTT, PROBASI] } }
         - in: query
           name: sort
           schema: { type: string, enum: [name, number, status], default: name }
@@ -1119,6 +1128,8 @@ paths:
       tags: [Employees]
       summary: Tambah karyawan pada penempatan dalam scope
       operationId: createEmployee
+      x-permission: karyawan.buat
+      description: Nomor karyawan unik per tenant. Profil pribadi opsional; NIK 16 digit memerlukan karyawan.lihat_sensitif dan reauth, disimpan terenkripsi dengan kunci tenant. Penugasan awal dicatat dalam riwayat.
       requestBody:
         required: true
         content:
@@ -1131,6 +1142,39 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Employee' }
         '403': { description: Permission atau scope tidak mencakup penempatan }
+        '422': { description: QUOTA_EXCEEDED jika batas karyawan paket tercapai }
+  /api/v1/admin/employees/next-number:
+    get:
+      tags: [Employees]
+      operationId: nextEmployeeNumber
+      x-permission: karyawan.buat
+      summary: Saran nomor karyawan EMP berikutnya
+      description: Saran belum dipesan. POST tetap memeriksa keunikan dalam transaksi.
+      responses:
+        '200': { description: 'data.suggestion berisi nomor berikutnya; data.reserved selalu false' }
+        '409': { description: Rentang nomor otomatis penuh }
+  /api/v1/admin/employees/bulk-archive:
+    post:
+      tags: [Employees]
+      operationId: bulkArchiveEmployees
+      x-permission: karyawan.hapus
+      summary: Arsip atomik 1–100 karyawan nonaktif
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, minItems: 1, maxItems: 100, uniqueItems: true, items: { type: string, minLength: 26, maxLength: 26 } }
+      responses:
+        '200': { description: Semua ID berhasil diarsipkan dalam satu transaksi }
+        '403': { description: Hak arsip tidak tersedia }
+        '404': { description: Salah satu ID di luar tenant atau scope }
+        '409': { description: Salah satu karyawan masih aktif atau menjadi atasan aktif; seluruh perubahan dibatalkan }
   /api/v1/admin/employees/{id}:
     parameters:
       - in: path
@@ -1141,6 +1185,8 @@ paths:
       tags: [Employees]
       summary: Detail karyawan dalam scope
       operationId: getEmployee
+      x-permission: karyawan.lihat
+      description: Profil pribadi dan penugasan. NIK disamarkan tanpa karyawan.lihat_sensitif dalam scope yang sama; respons no-store.
       responses:
         '200':
           description: Detail karyawan
@@ -1150,9 +1196,10 @@ paths:
         '404': { description: Tidak ditemukan atau di luar scope }
     patch:
       tags: [Employees]
-      summary: Ubah karyawan dalam scope dan catat audit
+      summary: Ubah profil pribadi karyawan dalam scope
       operationId: updateEmployee
-      description: Status resigned/terminated belum tersedia; gunakan alur terminasi bertanggal ketika sudah diimplementasikan.
+      x-permission: karyawan.ubah
+      description: Field pribadi dapat dikirim parsial. Perubahan NIK memerlukan karyawan.lihat_sensitif dan reauth. Penugasan hanya lewat koreksi assignment atau mutasi; status resigned/terminated lewat terminasi. Legacy PATCH status active/probation/leave tetap tersedia.
       requestBody:
         required: true
         content:
@@ -1165,6 +1212,147 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Employee' }
         '403': { description: Permission atau scope tidak mencakup data }
+        '409': { description: WORKFLOW_REQUIRED untuk perubahan penugasan, NIK_DUPLICATE, atau konflik }
+    delete:
+      tags: [Employees]
+      operationId: archiveEmployee
+      x-permission: karyawan.hapus
+      summary: Arsip karyawan resigned/terminated
+      description: Menolak karyawan aktif atau yang masih menjadi atasan aktif. Penugasan terbuka ditutup; keanggotaan, role, dan sesi terkait dinonaktifkan dalam transaksi yang sama.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Karyawan terarsip atau sudah terarsip }
+        '404': { description: Karyawan di luar tenant atau scope }
+        '409': { description: Karyawan aktif atau masih menjadi atasan aktif }
+  /api/v1/admin/employees/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Employees]
+      operationId: restoreEmployee
+      x-permission: karyawan.hapus
+      summary: Pulihkan visibilitas karyawan terarsip
+      description: Akun yang sebelumnya dinonaktifkan tidak aktif kembali otomatis.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '200': { description: Karyawan pulih; account_reactivated false }
+        '404': { description: Karyawan di luar tenant atau scope }
+  /api/v1/admin/employees/{id}/summary:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: getEmployeeSummary
+      x-permission: karyawan.lihat
+      summary: Ringkasan identitas, penugasan, dan kontrak terbaru
+      responses:
+        '200': { description: Ringkasan slide-over }
+        '404': { description: Karyawan di luar tenant atau scope }
+  /api/v1/admin/employees/{id}/timeline:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: getEmployeeTimeline
+      x-permission: karyawan.lihat
+      summary: Riwayat penugasan, kontrak, dan status karyawan
+      responses:
+        '200': { description: Event terbaru, maksimal 200 }
+        '404': { description: Karyawan di luar tenant atau scope }
+  /api/v1/admin/employees/{id}/account:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Employees]
+      operationId: linkEmployeeAccount
+      x-permission: karyawan.ubah
+      summary: Buat atau tautkan akun ESS
+      description: Memerlukan pengguna.buat dan reauth. Akun baru mendapat role KARYAWAN dan tautan set kata sandi melalui SMTP. Kegagalan pengiriman dilaporkan sebagai invitation_status failed agar dapat dicoba ulang oleh admin.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 320 }
+                name: { type: string, maxLength: 200 }
+                phone: { type: string, maxLength: 32 }
+      responses:
+        '201': { description: Akun tertaut, invitation_status sent atau failed }
+        '200': { description: Akun yang sama sudah tertaut }
+        '403': { description: Permission, scope, atau reauth tidak cukup }
+        '409': { description: Akun atau keanggotaan sudah tertaut ke karyawan lain }
+        '422': { description: Kuota pengguna paket habis }
+        '503': { description: SMTP belum dikonfigurasi }
+  /api/v1/admin/employees/{id}/bank-accounts:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: listEmployeeBankAccounts
+      x-permission: karyawan.lihat
+      summary: Daftar rekening, termasuk yang dinonaktifkan
+      description: Nomor hanya penuh bagi karyawan.lihat_sensitif dalam scope sama; pembacaan penuh diaudit. Cache-Control no-store.
+      responses:
+        '200': { description: Daftar rekening dengan account_masked dan account_no yang disamarkan menurut izin }
+        '404': { description: Karyawan di luar tenant atau scope }
+    post:
+      tags: [Employees]
+      operationId: createEmployeeBankAccount
+      x-permission: karyawan.ubah
+      summary: Tambah rekening terenkripsi
+      description: Memerlukan karyawan.lihat_sensitif dan reauth. Rekening utama hanya boleh berlaku sejak hari ini atau sebelumnya tanpa tanggal akhir.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeeBankAccountInput' }
+      responses:
+        '201': { description: ID dan versi rekening baru }
+        '403': { description: Permission, scope, atau reauth tidak cukup }
+        '409': { description: Konflik rekening utama }
+        '503': { description: Kunci enkripsi tidak tersedia }
+  /api/v1/admin/employees/{id}/bank-accounts/{accountId}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+      - { in: path, name: accountId, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
+    patch:
+      tags: [Employees]
+      operationId: patchEmployeeBankAccount
+      x-permission: karyawan.ubah
+      summary: Ubah rekening dengan versi optimistis
+      description: Memerlukan karyawan.lihat_sensitif dan reauth. Nomor serta pemilik terenkripsi ulang bila berubah.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeeBankAccountPatch' }
+      responses:
+        '200': { description: Rekening diubah dan versi bertambah }
+        '403': { description: Permission, scope, atau reauth tidak cukup }
+        '409': { description: Versi stale atau rekening sudah nonaktif }
+    delete:
+      tags: [Employees]
+      operationId: revokeEmployeeBankAccount
+      x-permission: karyawan.ubah
+      summary: Nonaktifkan rekening tanpa menghapus riwayat
+      description: Memerlukan karyawan.lihat_sensitif dan reauth.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Rekening nonaktif atau sudah nonaktif }
+        '403': { description: Permission, scope, atau reauth tidak cukup }
+        '404': { description: Rekening tidak ditemukan dalam tenant dan karyawan }
   /api/v1/admin/employees/{id}/tax-bpjs:
     parameters:
       - $ref: '#/components/parameters/ResourceID'
@@ -1283,6 +1471,32 @@ paths:
       responses:
         '200': { description: Riwayat dan penugasan saat ini menurut valid_from }
         '404': { description: Karyawan di luar tenant atau scope }
+    post:
+      tags: [Employees]
+      operationId: createEmployeeAssignmentCorrection
+      x-permission: karyawan.ubah
+      summary: Koreksi penugasan bertanggal efektif
+      description: Memerlukan reauth. Tanggal harus setelah awal penugasan kini dan tidak di masa depan. Memeriksa scope lama dan baru, siklus atasan, roster terbit, dan payroll final. Perubahan reguler terjadwal melalui mutasi.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_assignment_id, effective_from, office_id, position_id, reason]
+              properties:
+                current_assignment_id: { type: string, minLength: 26, maxLength: 26 }
+                effective_from: { type: string, format: date }
+                office_id: { type: string, minLength: 26, maxLength: 26 }
+                position_id: { type: string, minLength: 26, maxLength: 26 }
+                reports_to_employee_id: { type: string, nullable: true }
+                reason: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        '201': { description: Penugasan baru dan versi karyawan }
+        '403': { description: Hak, scope, atau reauth tidak cukup }
+        '409': { description: Konflik versi, tanggal, rantai atasan, roster, atau payroll }
   /api/v1/admin/employees/{id}/families/{familyId}:
     parameters:
       - $ref: '#/components/parameters/ResourceID'
@@ -4278,7 +4492,39 @@ components:
         positionId: { type: string }
         positionName: { type: string, readOnly: true }
         reportsToId: { type: string }
-        userId: { type: string, description: Opsional saat membuat; tidak dapat diubah lewat PATCH }
+        userId: { type: string, readOnly: true, description: Hubungkan melalui POST account }
+        nickname: { type: string, nullable: true, maxLength: 120 }
+        gender: { type: string, nullable: true, enum: [male, female, other] }
+        birth_date: { type: string, format: date, nullable: true }
+        birth_place: { type: string, nullable: true, maxLength: 160 }
+        marital_status: { type: string, nullable: true, enum: [single, married, divorced, widowed] }
+        work_email: { type: string, format: email, nullable: true }
+        mobile: { type: string, nullable: true, maxLength: 32 }
+        join_date: { type: string, format: date, nullable: true }
+        end_date: { type: string, format: date, nullable: true }
+        photo_file_id: { type: string, nullable: true }
+        nik: { type: string, nullable: true, description: 16 digit saat tulis; plaintext hanya bagi pembaca sensitif dalam scope }
+    EmployeeBankAccountInput:
+      type: object
+      required: [bank_code, account_no, holder_name, valid_from]
+      properties:
+        bank_code: { type: string, pattern: '^[A-Z0-9_]{2,32}$' }
+        account_no: { type: string, pattern: '^[0-9]{1,32}$' }
+        holder_name: { type: string, maxLength: 200 }
+        is_primary: { type: boolean, default: false }
+        valid_from: { type: string, format: date }
+        valid_to: { type: string, format: date, nullable: true }
+    EmployeeBankAccountPatch:
+      type: object
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 1 }
+        bank_code: { type: string, pattern: '^[A-Z0-9_]{2,32}$' }
+        account_no: { type: string, pattern: '^[0-9]{1,32}$' }
+        holder_name: { type: string, maxLength: 200 }
+        is_primary: { type: boolean }
+        valid_from: { type: string, format: date }
+        valid_to: { type: string, format: date, nullable: true }
     EmployeePage:
       type: object
       required: [items, total, page, pageSize]
