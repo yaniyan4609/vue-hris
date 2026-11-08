@@ -128,17 +128,19 @@ func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, r, 404, "NOT_FOUND", "Pengajuan tidak ditemukan dalam scope.")
 		return
 	}
-	if body.Action == "return" && refTable.Valid && (kind != "overtime" || refTable.String != "overtime_requests" || !refID.Valid) {
+	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests"))
+	if body.Action == "return" && refTable.Valid && !domainReady {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Pengembalian jenis pengajuan ini menunggu handler domain.")
 		return
 	}
 	if body.Action != "return" {
-		if kind != "overtime" || !refTable.Valid || refTable.String != "overtime_requests" || !refID.Valid {
+		if !domainReady {
 			writeAPIError(w, r, 409, "ACTION_NOT_READY", "Keputusan akhir jenis pengajuan ini menunggu handler domain.")
 			return
 		}
 		a.decideOvertimeApproval(w, r, tx, c, overtimeDecision{
 			Action: body.Action, Reason: body.Reason, Data: body.Data, RequestID: requestID,
+			Kind:  kind,
 			RefID: refID.String, InstanceID: instanceID, FlowID: flowID, TaskID: taskID,
 			Requester: requester, Employee: employee, Target: target, Level: level,
 			AttemptNo: attemptNo, RequestVersion: requestVersion, InstanceVersion: instanceVersion,
@@ -154,6 +156,18 @@ func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		rows, _ := result.RowsAffected()
 		if rows != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
+			return
+		}
+	}
+	if kind == "leave" && domainReady {
+		result, err := tx.ExecContext(r.Context(), `UPDATE leave_requests SET status='returned' WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='in_review'`, c.tenant.ID, refID.String, requestID, subjectID.String)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengembalikan data cuti.")
+			return
+		}
+		rows, _ := result.RowsAffected()
+		if rows != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data cuti tidak sesuai pengajuan.")
 			return
 		}
 	}

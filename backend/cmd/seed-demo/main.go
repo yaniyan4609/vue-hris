@@ -106,20 +106,22 @@ func seed(ctx context.Context, db *sql.DB, password string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO role_permissions (tenant_id,role_id,permission_code) VALUES (?,?,'lembur.buat')`, tenantID, employeeRoleID); err != nil {
-		return err
-	}
-	var overtimeSelfScope int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM role_scope_rules WHERE tenant_id=? AND role_id=? AND permission_code='lembur.buat' AND kind='self'`, tenantID, employeeRoleID).Scan(&overtimeSelfScope); err != nil {
-		return err
-	}
-	if overtimeSelfScope == 0 {
-		scopeID, err := ids.New()
-		if err != nil {
+	for _, code := range []string{"lembur.buat", "cuti.buat"} {
+		if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO role_permissions (tenant_id,role_id,permission_code) VALUES (?,?,?)`, tenantID, employeeRoleID, code); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO role_scope_rules (tenant_id,id,role_id,permission_code,kind) VALUES (?,?,?,'lembur.buat','self')`, tenantID, scopeID, employeeRoleID); err != nil {
+		var selfScope int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM role_scope_rules WHERE tenant_id=? AND role_id=? AND permission_code=? AND kind='self'`, tenantID, employeeRoleID, code).Scan(&selfScope); err != nil {
 			return err
+		}
+		if selfScope == 0 {
+			scopeID, err := ids.New()
+			if err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT INTO role_scope_rules (tenant_id,id,role_id,permission_code,kind) VALUES (?,?,?,?, 'self')`, tenantID, scopeID, employeeRoleID, code); err != nil {
+				return err
+			}
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO role_permissions (tenant_id, role_id, permission_code) VALUES (?, ?, 'panel.admin')`, tenantID, adminRoleID); err != nil {

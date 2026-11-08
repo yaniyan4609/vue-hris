@@ -30,7 +30,7 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var correction map[string]any
-	if body.Version == 0 || len(body.Correction) > 8192 || json.Unmarshal(body.Correction, &correction) != nil || len(correction) < 1 || len(correction) > 3 {
+	if body.Version == 0 || len(body.Correction) > 8192 || json.Unmarshal(body.Correction, &correction) != nil || len(correction) < 1 || len(correction) > 7 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Versi dan catatan perbaikan pengajuan wajib diisi.")
 		return
 	}
@@ -59,6 +59,17 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			normalized[key] = reason
+		case "start_date", "end_date", "leave_type_id", "attachment_file_id":
+			if value == nil && key == "attachment_file_id" {
+				normalized[key] = nil
+				break
+			}
+			text, ok := value.(string)
+			if !ok || text == "" || len(text) > 26 {
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field cuti perbaikan tidak valid.")
+				return
+			}
+			normalized[key] = text
 		default:
 			writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field perbaikan tidak dikenal.")
 			return
@@ -95,17 +106,35 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Jenis atau jumlah kirim ulang pengajuan tidak valid.")
 		return
 	}
-	if kind != "overtime" && len(normalized) > 1 {
+	if kind != "overtime" && kind != "leave" && len(normalized) > 1 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perbaikan field domain belum tersedia untuk jenis pengajuan ini.")
 		return
 	}
-	if kind != "overtime" && refTable.Valid {
+	if kind != "overtime" && kind != "leave" && refTable.Valid {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Kirim ulang jenis pengajuan ini menunggu handler domain.")
 		return
 	}
 	if kind == "overtime" && (!refTable.Valid || refTable.String != "overtime_requests" || !refID.Valid) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi data lembur tidak valid.")
 		return
+	}
+	if kind == "leave" && (!refTable.Valid || refTable.String != "leave_requests" || !refID.Valid) {
+		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi data cuti tidak valid.")
+		return
+	}
+	if kind == "overtime" {
+		for _, key := range []string{"start_date", "end_date", "leave_type_id", "attachment_file_id"} {
+			if _, exists := normalized[key]; exists {
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field cuti tidak berlaku untuk lembur.")
+				return
+			}
+		}
+	}
+	if kind == "leave" {
+		if _, exists := normalized["proposed_minutes"]; exists {
+			writeAPIError(w, r, 400, "VALIDATION_FAILED", "Menit lembur tidak berlaku untuk cuti.")
+			return
+		}
 	}
 	var instanceID, flowID, instanceStatus string
 	var instanceAttempt, instanceVersion uint64
@@ -184,6 +213,77 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		rows, _ := result.RowsAffected()
 		if rows != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
+			return
+		}
+	}
+	if kind == "leave" {
+		var oldType, oldStatus string
+		var oldStart, oldEnd time.Time
+		var oldReason, oldAttachment sql.NullString
+		if err := tx.QueryRowContext(r.Context(), `SELECT leave_type_id,start_date,end_date,reason,attachment_file_id,status FROM leave_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.state.SelectedTenantID, refID.String, requestID, subjectID.String).Scan(&oldType, &oldStart, &oldEnd, &oldReason, &oldAttachment, &oldStatus); err != nil || oldStatus != "returned" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data cuti tidak sesuai pengajuan.")
+			return
+		}
+		in := leaveInput{LeaveTypeID: oldType, StartDate: oldStart.Format("2006-01-02"), EndDate: oldEnd.Format("2006-01-02"), Reason: oldReason.String}
+		if oldAttachment.Valid {
+			in.AttachmentFileID = &oldAttachment.String
+		}
+		if value, ok := normalized["leave_type_id"]; ok {
+			in.LeaveTypeID = value.(string)
+		}
+		if value, ok := normalized["start_date"]; ok {
+			in.StartDate = value.(string)
+		}
+		if value, ok := normalized["end_date"]; ok {
+			in.EndDate = value.(string)
+		}
+		if value, ok := normalized["reason"]; ok {
+			in.Reason = value.(string)
+		}
+		if value, ok := normalized["attachment_file_id"]; ok {
+			in.AttachmentFileID = nil
+			if value != nil {
+				v := value.(string)
+				in.AttachmentFileID = &v
+			}
+		}
+		var locked string
+		if err := tx.QueryRowContext(r.Context(), `SELECT id FROM employees WHERE tenant_id=? AND id=? FOR UPDATE`, c.state.SelectedTenantID, subjectID.String).Scan(&locked); err != nil {
+			writeAPIError(w, r, 409, "EMPLOYEE_INVALID", "Karyawan tidak tersedia.")
+			return
+		}
+		prepared, err := a.prepareLeave(r, tx, c.state.SelectedTenantID, subjectID.String, c.zone.String(), in)
+		if err != nil {
+			writeLeaveIssue(w, r, err)
+			return
+		}
+		if prepared.Flow.ID != flowID {
+			writeAPIError(w, r, 409, "FLOW_CHANGED", "Alur approval cuti telah berubah. Hubungi admin.")
+			return
+		}
+		if _, err = tx.ExecContext(r.Context(), `DELETE FROM leave_request_allocations WHERE tenant_id=? AND leave_request_id=?`, c.state.SelectedTenantID, refID.String); err != nil {
+			writeLeaveIssue(w, r, err)
+			return
+		}
+		for _, allocation := range prepared.Allocations {
+			allocationID, e := ids.New()
+			if e != nil {
+				writeLeaveIssue(w, r, e)
+				return
+			}
+			if _, e = tx.ExecContext(r.Context(), `INSERT INTO leave_request_allocations (tenant_id,id,leave_request_id,period_year,first_work_date,days) VALUES (?,?,?,?,?,?)`, c.state.SelectedTenantID, allocationID, refID.String, allocation.Year, allocation.FirstWorkDate, allocation.Days); e != nil {
+				writeLeaveIssue(w, r, e)
+				return
+			}
+		}
+		result, err := tx.ExecContext(r.Context(), `UPDATE leave_requests SET leave_type_id=?,start_date=?,end_date=?,days=?,reason=?,attachment_file_id=?,status='in_review' WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='returned'`, in.LeaveTypeID, in.StartDate, in.EndDate, prepared.Days, in.Reason, in.AttachmentFileID, c.state.SelectedTenantID, refID.String, requestID, subjectID.String)
+		if err != nil {
+			writeLeaveIssue(w, r, err)
+			return
+		}
+		affected, _ := result.RowsAffected()
+		if affected != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data cuti tidak sesuai pengajuan.")
 			return
 		}
 	}

@@ -11,6 +11,7 @@ import (
 )
 
 type overtimeDecision struct {
+	Kind            string
 	Action          string
 	Reason          string
 	Data            json.RawMessage
@@ -31,9 +32,16 @@ type overtimeDecision struct {
 func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request, tx *sql.Tx, c adminContext, d overtimeDecision) {
 	var proposed int
 	var domainStatus string
-	if err := tx.QueryRowContext(r.Context(), `SELECT proposed_minutes,status FROM overtime_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&proposed, &domainStatus); err != nil || domainStatus != "in_review" {
-		writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
-		return
+	if d.Kind == "leave" {
+		if err := tx.QueryRowContext(r.Context(), `SELECT status FROM leave_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&domainStatus); err != nil || domainStatus != "in_review" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data cuti tidak sesuai pengajuan.")
+			return
+		}
+	} else {
+		if err := tx.QueryRowContext(r.Context(), `SELECT proposed_minutes,status FROM overtime_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&proposed, &domainStatus); err != nil || domainStatus != "in_review" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
+			return
+		}
 	}
 	var maxLevel int
 	if err := tx.QueryRowContext(r.Context(), `SELECT COALESCE(MAX(level_no),0) FROM approval_flow_steps WHERE tenant_id=? AND flow_id=?`, c.tenant.ID, d.FlowID).Scan(&maxLevel); err != nil || maxLevel < d.Level {
@@ -43,7 +51,7 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 	final := d.Action == "reject" || d.Level == maxLevel
 	var approvedMinutes *int
 	var actionData any
-	if d.Action == "approve" && final {
+	if d.Kind == "overtime" && d.Action == "approve" && final {
 		var fields map[string]json.RawMessage
 		var data struct {
 			ApprovedMinutes *int `json:"approved_minutes"`
@@ -62,7 +70,7 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 	nextAssignees := []string{}
 	if d.Action == "approve" && !final {
 		step, err := scanFlowStep(tx.QueryRowContext(r.Context(), `SELECT id,level_no,approver_kind,approver_ref_id,required_permission,sla_hours FROM approval_flow_steps WHERE tenant_id=? AND flow_id=? AND level_no=?`, c.tenant.ID, d.FlowID, d.Level+1))
-		if err != nil || (step.RequiredPermission != nil && *step.RequiredPermission != "lembur.approve") {
+		if err != nil || (step.RequiredPermission != nil && *step.RequiredPermission != approvalPermissions[d.Kind]) {
 			writeAPIError(w, r, 409, "FLOW_INVALID", "Tahap berikutnya tidak valid.")
 			return
 		}
@@ -76,7 +84,7 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan approver tahap berikutnya.")
 			return
 		}
-		nextAssignees, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, d.Employee, d.Target, "lembur.approve", candidates)
+		nextAssignees, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, d.Employee, d.Target, approvalPermissions[d.Kind], candidates)
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak approver berikutnya.")
 			return
@@ -93,7 +101,7 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 					writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan fallback approver.")
 					return
 				}
-				nextAssignees, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, d.Employee, d.Target, "lembur.approve", candidates)
+				nextAssignees, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, d.Employee, d.Target, approvalPermissions[d.Kind], candidates)
 				if err != nil {
 					writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak fallback.")
 					return
@@ -136,12 +144,26 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 	} else {
 		nextLevel++
 	}
-	if resultStatus == "approved" {
+	if d.Kind == "leave" && resultStatus == "approved" {
+		if err := approveLeaveLedger(r, tx, c.tenant.ID, d); err != nil {
+			writeLeaveIssue(w, r, err)
+			return
+		}
+		if _, err := tx.ExecContext(r.Context(), `UPDATE leave_requests SET status='approved' WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, c.tenant.ID, d.RefID, d.RequestID); err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyetujui cuti.")
+			return
+		}
+	} else if d.Kind == "leave" && resultStatus == "rejected" {
+		if _, err := tx.ExecContext(r.Context(), `UPDATE leave_requests SET status='rejected' WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, c.tenant.ID, d.RefID, d.RequestID); err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menolak cuti.")
+			return
+		}
+	} else if d.Kind == "overtime" && resultStatus == "approved" {
 		if _, err := tx.ExecContext(r.Context(), `UPDATE overtime_requests SET status='approved',approved_minutes=? WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, approvedMinutes, c.tenant.ID, d.RefID, d.RequestID); err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyetujui lembur.")
 			return
 		}
-	} else if resultStatus == "rejected" {
+	} else if d.Kind == "overtime" && resultStatus == "rejected" {
 		if _, err := tx.ExecContext(r.Context(), `UPDATE overtime_requests SET status='rejected' WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, c.tenant.ID, d.RefID, d.RequestID); err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menolak lembur.")
 			return

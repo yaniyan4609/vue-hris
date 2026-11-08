@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.13.0
+  version: 0.15.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2422,7 +2422,7 @@ paths:
       tags: [Approvals]
       operationId: decideApprovalRequest
       summary: Putuskan tugas approval yang ditugaskan kepada pengguna saat ini
-      description: Return tersedia untuk lembur dan pengajuan tanpa referensi domain. Approve bertahap, approve akhir, dan reject saat ini tersedia untuk lembur; jenis lain menunggu handler domain. Memerlukan tugas pending pada tahap, permission approve jenis pengajuan, dan scope karyawan. Aksi, domain, audit, dan outbox dicatat dalam satu transaksi.
+      description: Return, approve bertahap/akhir, dan reject tersedia untuk lembur serta cuti. Cuti memotong ledger satu kali per alokasi tahun pada persetujuan akhir. Pengajuan tanpa referensi domain dapat dikembalikan; jenis domain lain menunggu handler. Memerlukan tugas pending, permission approve, dan scope karyawan. Aksi, domain, audit, dan outbox dicatat dalam satu transaksi.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -2478,7 +2478,7 @@ paths:
       tags: [Approvals]
       operationId: resubmitEssRequest
       summary: Kirim ulang pengajuan returned dengan ID yang sama
-      description: Menyimpan catatan perbaikan per percobaan dan membentuk ulang tugas tahap pertama dari alur asli. Untuk lembur, proposed_minutes dan reason dapat diperbaiki atomik. Pengajuan tanpa referensi domain menerima note; modul lain menunggu handler domain.
+      description: Menyimpan catatan perbaikan per percobaan dan membentuk ulang tugas tahap pertama dari alur asli. Lembur dapat memperbaiki proposed_minutes/reason. Cuti dapat memperbaiki jenis, tanggal, alasan, dan lampiran; alokasi tahun serta saldo dihitung ulang. Pengajuan tanpa referensi domain menerima note.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -2497,7 +2497,11 @@ paths:
                   properties:
                     note: { type: string, minLength: 1, maxLength: 2000 }
                     proposed_minutes: { type: integer, minimum: 1, maximum: 1440, description: Khusus lembur }
-                    reason: { type: string, minLength: 1, maxLength: 2000, description: Khusus lembur }
+                    reason: { type: string, minLength: 1, maxLength: 2000, description: Lembur atau cuti }
+                    leave_type_id: { type: string, minLength: 26, maxLength: 26, description: Khusus cuti }
+                    start_date: { type: string, format: date, description: Khusus cuti }
+                    end_date: { type: string, format: date, description: Khusus cuti }
+                    attachment_file_id: { type: string, nullable: true, description: Khusus cuti }
       responses:
         '200': { description: Percobaan dan versi baru pada request yang sama }
         '404': { description: Pengajuan bukan milik karyawan }
@@ -2509,7 +2513,7 @@ paths:
       tags: [Approvals]
       operationId: cancelEssRequest
       summary: Batalkan pengajuan sendiri yang masih ditinjau atau dikembalikan
-      description: Pembatalan domain saat ini tersedia untuk lembur; pengajuan tanpa referensi domain juga dapat dibatalkan. Tugas pending, request, instance, data lembur, audit, dan outbox diperbarui atomik.
+      description: Pembatalan domain tersedia untuk lembur dan cuti. Tugas pending, request, instance, data domain, audit, dan outbox diperbarui atomik.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       responses:
@@ -2560,6 +2564,100 @@ paths:
       responses:
         '200': { description: Detail lembur pribadi }
         '404': { description: Di luar karyawan atau tenant saat ini }
+  /api/v1/ess/leave/types:
+    get:
+      tags: [Approvals]
+      operationId: listEssLeaveTypes
+      summary: Jenis cuti aktif pada tenant terpilih
+      responses:
+        '200': { description: Jenis cuti dan kebutuhan lampiran }
+  /api/v1/ess/leave/balances:
+    get:
+      tags: [Approvals]
+      operationId: listEssLeaveBalances
+      summary: Saldo ledger cuti karyawan per jenis dan tahun
+      parameters:
+        - { in: query, name: year, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+      responses:
+        '200': { description: Saldo ledger tahun terpilih; reservasi pengajuan tampil pada preview }
+  /api/v1/ess/leave/balances/{leaveTypeId}/ledger:
+    parameters:
+      - { in: path, name: leaveTypeId, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
+    get:
+      tags: [Approvals]
+      operationId: listEssLeaveLedger
+      parameters:
+        - { in: query, name: year, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Mutasi saldo milik karyawan pada tahun terpilih }
+  /api/v1/ess/leave-requests/preview:
+    post:
+      tags: [Approvals]
+      operationId: previewEssLeaveRequest
+      summary: Hitung cuti dari roster terbit tanpa menyimpan
+      description: Semua tanggal memerlukan roster terbit. Hari shift dihitung per tahun, termasuk saat melintasi 31 Desember. Kebijakan aktif, saldo ledger setelah reservasi, lampiran bersih, dan approver diperiksa. Aturan kelayakan khusus dalam eligibility_json belum aktif dan ditolak sampai evaluator tersedia.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leave_type_id, start_date, end_date]
+              properties:
+                leave_type_id: { type: string, minLength: 26, maxLength: 26 }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                reason: { type: string, maxLength: 2000 }
+                attachment_file_id: { type: string, nullable: true }
+      responses:
+        '200': { description: Hari kerja, alokasi dan saldo setelah per tahun, serta jalur approval }
+        '409': { description: Roster, kebijakan, saldo, lampiran, atau approver belum siap }
+  /api/v1/ess/leave-requests:
+    get:
+      tags: [Approvals]
+      operationId: listEssLeaveRequests
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Pengajuan cuti karyawan aktif }
+    post:
+      tags: [Approvals]
+      operationId: submitEssLeaveRequest
+      x-permission: cuti.buat
+      summary: Ajukan cuti dengan alokasi saldo per tahun
+      description: Validasi preview dihitung ulang setelah karyawan dikunci dalam transaksi. Request, alokasi, approval, audit, dan outbox disimpan atomik. Saldo dipotong saat persetujuan akhir.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leave_type_id, start_date, end_date]
+              properties:
+                leave_type_id: { type: string, minLength: 26, maxLength: 26 }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                reason: { type: string, maxLength: 2000 }
+                attachment_file_id: { type: string, nullable: true }
+      responses:
+        '201': { description: Pengajuan dalam status in_review dan saldo per tahun direservasi }
+        '409': { description: Cuti bentrok, roster, kebijakan, saldo, atau approver tidak siap }
+  /api/v1/ess/leave-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Approvals]
+      operationId: getEssLeaveRequest
+      responses:
+        '200': { description: Detail dan alokasi tahun pengajuan sendiri }
+        '404': { description: Di luar karyawan atau tenant saat ini }
   /api/v1/admin/overtime-requests:
     get:
       tags: [Approvals]
@@ -2574,6 +2672,174 @@ paths:
         - { in: query, name: to, schema: { type: string, format: date } }
       responses:
         '200': { description: Lembur dalam scope pengguna Admin }
+  /api/v1/admin/leave-requests:
+    get:
+      tags: [Approvals]
+      operationId: listAdminLeaveRequests
+      x-permission: cuti.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: leave_type_id, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Pengajuan cuti dalam scope pengguna Admin }
+  /api/v1/admin/leave-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Approvals]
+      operationId: getAdminLeaveRequest
+      x-permission: cuti.lihat
+      responses:
+        '200': { description: Detail cuti dalam scope }
+        '404': { description: Di luar tenant atau scope }
+  /api/v1/admin/leave-types:
+    get:
+      tags: [Approvals]
+      operationId: listAdminLeaveTypes
+      x-permission: cuti.kelola
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Jenis cuti termasuk yang nonaktif }
+    post:
+      tags: [Approvals]
+      operationId: createAdminLeaveType
+      x-permission: cuti.kelola
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeaveTypeInput' }
+      responses:
+        '201': { description: Jenis cuti dibuat aktif }
+        '409': { description: Kode sudah dipakai }
+  /api/v1/admin/leave-types/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    patch:
+      tags: [Approvals]
+      operationId: updateAdminLeaveType
+      summary: Ganti representasi jenis cuti lengkap
+      x-permission: cuti.kelola
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeaveTypeInput' }
+      responses:
+        '200': { description: Jenis cuti diperbarui }
+        '409': { description: Kode sudah dipakai }
+    delete:
+      tags: [Approvals]
+      operationId: deactivateAdminLeaveType
+      x-permission: cuti.kelola
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Jenis cuti dinonaktifkan tanpa menghapus riwayat }
+  /api/v1/admin/leave-policies:
+    get:
+      tags: [Approvals]
+      operationId: listAdminLeavePolicies
+      x-permission: cuti.kelola
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: leave_type_id, schema: { type: string } }
+      responses:
+        '200': { description: Versi kebijakan cuti tenant }
+    post:
+      tags: [Approvals]
+      operationId: createAdminLeavePolicy
+      x-permission: cuti.kelola
+      summary: Buat kebijakan manual tanpa masa berlaku yang bertumpang tindih
+      description: Carry-over, masa kedaluwarsa, akrual otomatis, dan eligibility khusus menunggu keputusan aturan bisnis.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leave_type_id, accrual_type, valid_from]
+              properties:
+                leave_type_id: { type: string, minLength: 26, maxLength: 26 }
+                accrual_type: { type: string, enum: [manual] }
+                quota_days: { type: number, nullable: true, multipleOf: 0.01 }
+                valid_from: { type: string, format: date }
+                valid_to: { type: string, format: date, nullable: true }
+      responses:
+        '201': { description: Versi kebijakan dibuat }
+        '409': { description: Masa berlaku bertumpang tindih }
+  /api/v1/admin/leave-policies/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    patch:
+      tags: [Approvals]
+      operationId: endAdminLeavePolicy
+      x-permission: cuti.kelola
+      summary: Perpendek masa berlaku versi kebijakan
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [valid_to]
+              properties:
+                valid_to: { type: string, format: date }
+      responses:
+        '200': { description: Tanggal akhir diperbarui }
+        '409': { description: Pengajuan aktif atau tanggal bertentangan }
+    delete:
+      tags: [Approvals]
+      operationId: deactivateAdminLeavePolicy
+      x-permission: cuti.kelola
+      summary: Akhiri kebijakan kemarin dalam zona tenant
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Kebijakan berakhir tanpa menghapus riwayat }
+        '409': { description: Kebijakan masa depan atau pengajuan aktif }
+  /api/v1/admin/leave-balances/adjustments:
+    post:
+      tags: [Approvals]
+      operationId: adjustAdminLeaveBalance
+      x-permission: cuti.kelola
+      summary: Penyesuaian ledger saldo dalam scope karyawan
+      description: Membutuhkan autentikasi ulang, alasan, saldo tersedia tidak negatif, dan audit atomik. Nilai days boleh positif atau negatif dengan dua desimal.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id, leave_type_id, days, effective_date, reason]
+              properties:
+                employee_id: { type: string, minLength: 26, maxLength: 26 }
+                leave_type_id: { type: string, minLength: 26, maxLength: 26 }
+                days: { type: number, multipleOf: 0.01 }
+                effective_date: { type: string, format: date }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '201': { description: Mutasi ledger dibuat dan saldo tahun diperbarui }
+        '403': { description: Autentikasi ulang diperlukan }
+        '409': { description: Saldo tersedia akan negatif }
   /api/v1/admin/overtime-requests/{id}:
     parameters:
       - $ref: '#/components/parameters/ResourceID'
@@ -2658,6 +2924,16 @@ components:
       name: q
       schema: { type: string, maxLength: 100 }
   schemas:
+    LeaveTypeInput:
+      type: object
+      required: [code, name, is_paid, requires_attachment]
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,47}$' }
+        name: { type: string, minLength: 1, maxLength: 160 }
+        is_paid: { type: boolean }
+        requires_attachment: { type: boolean }
+        max_consecutive_days: { type: integer, minimum: 1, maximum: 366, nullable: true }
+        is_active: { type: boolean, description: Diperlukan saat PATCH; POST selalu aktif }
     Geofence:
       type: object
       properties:
