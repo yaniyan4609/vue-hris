@@ -145,8 +145,8 @@ GET,/api/v1/admin/overtime-summary,9.3 Lembur,active
 GET,/api/v1/admin/payroll/bank-formats,11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
 GET,/api/v1/admin/payroll/components/{id},11.1 Komponen dan aturan,planned
-GET,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,planned
-GET,/api/v1/admin/payroll/periods/{id},11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,active
+GET,/api/v1/admin/payroll/periods/{id},11.2 Periode dan payroll run,active
 GET,/api/v1/admin/payroll/rules/bpjs,11.1 Komponen dan aturan,planned
 GET,/api/v1/admin/payroll/rules/tax,11.1 Komponen dan aturan,planned
 GET,/api/v1/admin/payroll/runs,11.2 Periode dan payroll run,planned
@@ -395,7 +395,7 @@ POST,/api/v1/admin/offices,6.1 Master organisasi,planned
 POST,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
 POST,/api/v1/admin/overtime-requests,9.3 Lembur,active
 POST,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,planned
-POST,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,active
 POST,/api/v1/admin/payroll/periods/{id}/close,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/payroll/periods/{id}/runs,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/payroll/runs/{id}/adjustments,11.2 Periode dan payroll run,planned

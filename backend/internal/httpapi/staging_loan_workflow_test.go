@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -49,8 +51,16 @@ func TestStagingLoanWorkflow(t *testing.T) {
 	if policyCount != 0 || flowCount != 0 {
 		t.Skip("tenant already has loan configuration")
 	}
-	flowID, stepID, loanID, requestID := "", "", "", ""
+	flowID, stepID, loanID, requestID, periodID, createdPeriodID := "", "", "", "", "", ""
 	t.Cleanup(func() {
+		if createdPeriodID != "" {
+			if _, e := db.Exec(`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='payroll_periods' AND entity_id=?`, tenantID, createdPeriodID); e != nil {
+				t.Errorf("cleanup payroll period audit: %v", e)
+			}
+			if _, e := db.Exec(`DELETE FROM payroll_periods WHERE tenant_id=? AND id=?`, tenantID, createdPeriodID); e != nil {
+				t.Errorf("cleanup payroll period: %v", e)
+			}
+		}
 		if requestID == "" && loanID != "" {
 			_ = db.QueryRow(`SELECT request_id FROM employee_loans WHERE tenant_id=? AND id=?`, tenantID, loanID).Scan(&requestID)
 		}
@@ -171,6 +181,36 @@ func TestStagingLoanWorkflow(t *testing.T) {
 	if detail.Data.Installments[0].DuePeriod != want {
 		t.Fatalf("first due period: %s want %s", detail.Data.Installments[0].DuePeriod, want)
 	}
+	periodYear, periodMonth := now.Year(), int(now.Month())+1
+	if periodMonth == 13 {
+		periodYear, periodMonth = periodYear+1, 1
+	}
+	var existingPeriod string
+	if e := db.QueryRow(`SELECT id FROM payroll_periods WHERE tenant_id=? AND period_year=? AND period_month=?`, tenantID, periodYear, periodMonth).Scan(&existingPeriod); e != nil && !errors.Is(e, sql.ErrNoRows) {
+		t.Fatal(e)
+	}
+	if existingPeriod == "" {
+		periodID, _ = ids.New()
+		createdPeriodID = periodID
+		start := time.Date(periodYear, time.Month(periodMonth), 1, 0, 0, 0, 0, zone)
+		end := start.AddDate(0, 1, -1)
+		if _, e := db.Exec(`INSERT INTO payroll_periods (tenant_id,id,period_year,period_month,start_date,end_date,status) VALUES (?,?,?,?,?,?,'open')`, tenantID, periodID, periodYear, periodMonth, start.Format("2006-01-02"), end.Format("2006-01-02")); e != nil {
+			t.Fatal(e)
+		}
+	} else {
+		periodID = existingPeriod
+	}
+	doJSON(t, admin, "POST", server.URL+"/api/v1/admin/payroll/periods", map[string]int{"year": periodYear, "month": periodMonth}, 403, nil)
+	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/payroll/periods", nil, 200, nil)
+	doJSON(t, admin, "GET", server.URL+"/api/v1/admin/payroll/periods/"+periodID, nil, 200, nil)
+	previewURL := server.URL + "/api/v1/admin/payroll/periods/" + periodID + "/loan-deductions?loan_id=" + loanID
+	var preview struct {
+		Data []payrollLoanDeductionView `json:"data"`
+	}
+	doJSON(t, admin, "GET", previewURL, nil, 200, &preview)
+	if len(preview.Data) != 1 || preview.Data[0].Amount != "333.33" {
+		t.Fatalf("loan deduction preview: %#v", preview.Data)
+	}
 	doJSON(t, admin, "POST", server.URL+"/api/v1/auth/reauth", map[string]string{"password": "password"}, 200, nil)
 	waiveURL := server.URL + "/api/v1/admin/loans/" + loanID + "/installments/1/waive"
 	doJSON(t, admin, "POST", waiveURL, map[string]string{"reason": "Pembebasan QA"}, 200, nil)
@@ -178,6 +218,10 @@ func TestStagingLoanWorkflow(t *testing.T) {
 	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/loans/"+loanID, nil, 200, &detail)
 	if detail.Data.Loan.Outstanding != "666.67" || detail.Data.Installments[0].Status != "waived" || detail.Data.Installments[0].WaiveReason == nil {
 		t.Fatalf("waiver detail: %#v", detail.Data)
+	}
+	doJSON(t, admin, "GET", previewURL, nil, 200, &preview)
+	if len(preview.Data) != 0 {
+		t.Fatalf("waived installment still in payroll preview: %#v", preview.Data)
 	}
 	settlementRef := "SETTLE-" + uid
 	settleURL := server.URL + "/api/v1/admin/loans/" + loanID + "/settle"
@@ -187,5 +231,9 @@ func TestStagingLoanWorkflow(t *testing.T) {
 	doJSON(t, ess, "GET", server.URL+"/api/v1/ess/loans/"+loanID, nil, 200, &detail)
 	if detail.Data.Loan.Status != "settled" || detail.Data.Loan.Outstanding != "0.00" || detail.Data.Loan.ClosedAt == nil || detail.Data.Settlement == nil || detail.Data.Settlement.Amount != "666.67" || detail.Data.Installments[1].Status != "settled" || detail.Data.Installments[2].Status != "settled" {
 		t.Fatalf("settlement detail: %#v", detail.Data)
+	}
+	doJSON(t, admin, "GET", previewURL, nil, 200, &preview)
+	if len(preview.Data) != 0 {
+		t.Fatalf("settled loan still in payroll preview: %#v", preview.Data)
 	}
 }

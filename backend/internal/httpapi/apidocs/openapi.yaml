@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.20.0
+  version: 0.21.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -32,6 +32,8 @@ tags:
     description: Kategori dan klaim biaya karyawan
   - name: Loans
     description: Kasbon tanpa bunga, kebijakan plafon, pencairan, dan pelunasan
+  - name: Payroll
+    description: Periode payroll dan pratinjau cicilan kasbon yang jatuh tempo
   - name: Files
     description: Unggah kuitansi lokal khusus staging
   - name: Employees
@@ -2826,6 +2828,62 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200': { description: Mutasi ledger dalam scope karyawan }
+  /api/v1/admin/payroll/periods:
+    get:
+      tags: [Payroll]
+      operationId: listPayrollPeriods
+      x-permission: penggajian.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Periode payroll tenant yang aktif }
+    post:
+      tags: [Payroll]
+      operationId: createPayrollPeriod
+      x-permission: penggajian.proses
+      summary: Buka periode payroll bulanan
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year, month]
+              properties:
+                year: { type: integer, minimum: 2000, maximum: 2100 }
+                month: { type: integer, minimum: 1, maximum: 12 }
+      responses:
+        '201': { description: Periode open dibuat dan diaudit }
+        '409': { description: Periode tenant untuk bulan yang sama sudah ada }
+  /api/v1/admin/payroll/periods/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Payroll]
+      operationId: getPayrollPeriod
+      x-permission: penggajian.lihat
+      responses:
+        '200': { description: Detail periode dan jumlah run }
+        '404': { description: Periode tidak ditemukan dalam tenant }
+  /api/v1/admin/payroll/periods/{id}/loan-deductions:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Payroll]
+      operationId: previewPayrollLoanDeductions
+      x-permission: penggajian.lihat
+      summary: Pratinjau cicilan kasbon untuk periode payroll
+      description: Baca saja. Menampilkan cicilan pending yang jatuh tempo sampai akhir periode, tidak terhubung ke baris payroll, dan karyawannya dalam scope. Belum membuat payroll run atau mengurangi outstanding.
+      parameters:
+        - { in: query, name: loan_id, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { description: Daftar cicilan, total nominal, dan preview_only true }
+        '404': { description: Periode tidak ditemukan }
   /api/v1/ess/loans/simulate:
     post:
       tags: [Loans]
