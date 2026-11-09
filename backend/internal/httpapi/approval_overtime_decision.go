@@ -57,6 +57,11 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status terminasi tidak sesuai pengajuan.")
 			return
 		}
+	} else if d.Kind == "shift_swap" {
+		if err := tx.QueryRowContext(r.Context(), `SELECT status FROM shift_swaps WHERE tenant_id=? AND id=? AND request_id=? AND requester_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&domainStatus); err != nil || domainStatus != "in_review" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status pertukaran shift tidak sesuai pengajuan.")
+			return
+		}
 	} else {
 		if err := tx.QueryRowContext(r.Context(), `SELECT proposed_minutes,status FROM overtime_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&proposed, &domainStatus); err != nil || domainStatus != "in_review" {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
@@ -210,6 +215,17 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 		count, _ := result.RowsAffected()
 		if count != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status kasbon telah berubah.")
+			return
+		}
+	} else if d.Kind == "shift_swap" && (resultStatus == "approved" || resultStatus == "rejected") {
+		if resultStatus == "approved" {
+			if err := a.applyApprovedShiftSwap(r, tx, c, d); err != nil {
+				writeAPIError(w, r, 409, "SHIFT_SWAP_CONFLICT", err.Error())
+				return
+			}
+		}
+		if _, err := tx.ExecContext(r.Context(), `UPDATE shift_swaps SET status=?,version=version+1,applied_at=IF(?='approved',UTC_TIMESTAMP(6),NULL) WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, resultStatus, resultStatus, c.tenant.ID, d.RefID, d.RequestID); err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyimpan keputusan pertukaran shift.")
 			return
 		}
 	} else if d.Kind == "termination" && (resultStatus == "approved" || resultStatus == "rejected") {

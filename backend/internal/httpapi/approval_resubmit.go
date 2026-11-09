@@ -110,7 +110,7 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perbaikan field domain belum tersedia untuk jenis pengajuan ini.")
 		return
 	}
-	if kind != "overtime" && kind != "leave" && kind != "reimbursement" && kind != "loan" && refTable.Valid {
+	if kind != "overtime" && kind != "leave" && kind != "reimbursement" && kind != "loan" && kind != "shift_swap" && refTable.Valid {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Kirim ulang jenis pengajuan ini menunggu handler domain.")
 		return
 	}
@@ -128,6 +128,10 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if kind == "loan" && (!refTable.Valid || refTable.String != "employee_loans" || !refID.Valid) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi kasbon tidak valid.")
+		return
+	}
+	if kind == "shift_swap" && (!refTable.Valid || refTable.String != "shift_swaps" || !refID.Valid) {
+		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi pertukaran shift tidak valid.")
 		return
 	}
 	if kind == "overtime" {
@@ -361,6 +365,40 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		count, _ := result.RowsAffected()
 		if count != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status kasbon telah berubah.")
+			return
+		}
+	}
+	if kind == "shift_swap" {
+		var swap shiftSwap
+		swap, err = scanSwap(tx.QueryRowContext(r.Context(), `SELECT `+strings.ReplaceAll(swapColumns, "s.", "")+` FROM shift_swaps WHERE tenant_id=? AND id=? AND request_id=? FOR UPDATE`, c.state.SelectedTenantID, refID.String, requestID))
+		if err != nil || swap.Status != "returned" || swap.RequesterID != c.employeeID {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Pertukaran shift tidak tersedia untuk kirim ulang.")
+			return
+		}
+		first, second := swap.InstanceAID, swap.InstanceBID
+		if first > second {
+			first, second = second, first
+		}
+		for _, id := range []string{first, second} {
+			instance, e := scanInstance(tx.QueryRowContext(r.Context(), `SELECT `+strings.ReplaceAll(instanceColumns, "i.", "")+` FROM shift_instances WHERE tenant_id=? AND id=? FOR UPDATE`, c.state.SelectedTenantID, id))
+			if e != nil || instance.Status != "scheduled" || instance.WorkDate < time.Now().In(c.zone).Format("2006-01-02") {
+				writeAPIError(w, r, 409, "SHIFT_UNAVAILABLE", "Shift sudah berubah atau berlalu.")
+				return
+			}
+		}
+		var occupied int
+		if err = tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM attendance_events WHERE tenant_id=? AND shift_instance_id IN (?,?)`, c.state.SelectedTenantID, first, second).Scan(&occupied); err != nil || occupied > 0 {
+			writeAPIError(w, r, 409, "SHIFT_IN_USE", "Shift sudah dipakai presensi.")
+			return
+		}
+		result, e := tx.ExecContext(r.Context(), `UPDATE shift_swaps SET status='in_review',version=version+1 WHERE tenant_id=? AND id=? AND request_id=? AND status='returned'`, c.state.SelectedTenantID, refID.String, requestID)
+		if e != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengirim ulang pertukaran shift.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Pertukaran shift sudah berubah.")
 			return
 		}
 	}

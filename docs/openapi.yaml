@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.33.0
+  version: 0.34.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2895,6 +2895,58 @@ paths:
       responses:
         '204': { description: Draft dibatalkan }
         '409': { description: Roster sudah diterbitkan }
+  /api/v1/admin/roster:
+    get:
+      tags: [Schedule]
+      operationId: getRosterGrid
+      summary: Grid karyawan dan tanggal dalam satu kantor atau departemen
+      x-permission: jadwal.lihat
+      x-scope: Karyawan dalam scope hak efektif; hanya satu filter kantor atau departemen
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - in: query
+          name: office_id
+          schema: { type: string }
+        - in: query
+          name: department_id
+          schema: { type: string }
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Karyawan berpaginasi dengan sel roster draft dan terbit dalam rentang maksimal 31 hari }
+        '400': { description: Rentang atau filter tidak valid }
+        '403': { description: Hak jadwal.lihat tidak tersedia }
+  /api/v1/admin/shift-instances/generate:
+    post:
+      tags: [Schedule]
+      operationId: generateShiftInstances
+      summary: Materialisasi roster terbit yang belum memiliki shift instance
+      x-permission: jadwal.publikasi
+      x-scope: Hanya roster karyawan dalam scope hak efektif
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+                employee_ids: { type: array, maxItems: 100, items: { type: string } }
+      responses:
+        '200': { description: Instance yang dibuat; pemanggilan ulang untuk roster yang sama mengembalikan count 0 }
+        '400': { description: Rentang lebih dari 31 hari atau lebih dari 200 instance }
+        '409': { description: Roster, shift, kantor, atau instance berubah saat transaksi }
   /api/v1/admin/shift-instances:
     get:
       tags: [Schedule]
@@ -2927,6 +2979,48 @@ paths:
       responses:
         '200': { description: Detail instance dan snapshot aturan saat publikasi }
         '404': { description: Tidak ditemukan dalam tenant atau scope }
+  /api/v1/admin/shift-instances/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Schedule]
+      operationId: cancelShiftInstance
+      x-permission: jadwal.ubah
+      x-scope: Karyawan pemilik instance harus berada dalam scope hak efektif
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200': { description: Instance dibatalkan dan pengingat pending ditutup; roster tetap terbit }
+        '403': { description: Hak jadwal.ubah tidak tersedia }
+        '404': { description: Instance tidak ditemukan dalam tenant atau scope }
+        '409': { description: Sudah dipakai, ditukar, ada cuti disetujui, payroll final, atau tanggal berlalu }
+  /api/v1/admin/shift-swaps:
+    get:
+      tags: [Schedule]
+      operationId: listAdminShiftSwaps
+      x-permission: jadwal.lihat
+      x-scope: Pengaju dan rekan harus sama-sama berada dalam scope hak efektif
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - in: query
+          name: employee_id
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending_partner, in_review, returned, approved, rejected, cancelled] }
+      responses:
+        '200': { description: Pertukaran shift dalam scope, berpaginasi }
+        '403': { description: Hak jadwal.lihat tidak tersedia }
   /api/v1/ess/schedule:
     get:
       tags: [Schedule]
@@ -2942,6 +3036,66 @@ paths:
       responses:
         '200': { description: Roster dan instance milik karyawan, maksimum 91 hari }
         '403': { description: Keanggotaan ESS tidak tersedia }
+  /api/v1/ess/shift-swaps:
+    get:
+      tags: [Schedule]
+      operationId: listEssShiftSwaps
+      summary: Usulan milik saya atau yang diajukan kepada saya
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending_partner, in_review, returned, approved, rejected, cancelled] }
+      responses:
+        '200': { description: Daftar pertukaran dalam tenant dan karyawan sesi }
+    post:
+      tags: [Schedule]
+      operationId: createEssShiftSwap
+      x-permission: jadwal.ubah
+      x-scope: Diri sendiri sebagai pemilik instance A; instance B milik rekan aktif dalam tenant yang sama
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance_a_id, instance_b_id, reason]
+              properties:
+                instance_a_id: { type: string }
+                instance_b_id: { type: string }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '201': { description: Usulan pending_partner dibuat; belum mengubah shift }
+        '403': { description: Hak jadwal.ubah diri sendiri tidak tersedia }
+        '404': { description: Instance tidak ditemukan dalam tenant }
+        '409': { description: Shift berlalu, dipakai presensi, atau sedang dalam pertukaran lain }
+  /api/v1/ess/shift-swaps/{id}/respond:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Schedule]
+      operationId: respondEssShiftSwap
+      summary: Rekan menerima untuk membuka approval atau menolak usulan
+      x-scope: Hanya karyawan rekan pada usulan dalam tenant sesi
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accept, version]
+              properties:
+                accept: { type: boolean }
+                version: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Ditolak atau masuk in_review; final approval menukar snapshot dan roster secara atomik. Return dapat dikirim ulang pada request yang sama dengan correction.note }
+        '404': { description: Rekan atau usulan tidak ditemukan }
+        '409': { description: Versi, shift, alur approval, atau approver tidak tersedia }
   /api/v1/ess/attendance/today:
     get:
       tags: [Schedule]

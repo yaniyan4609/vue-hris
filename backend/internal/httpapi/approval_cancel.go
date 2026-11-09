@@ -43,7 +43,7 @@ func (a adminAPI) cancelEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 409, "REQUEST_NOT_CANCELLABLE", "Pengajuan tidak dapat dibatalkan pada status ini.")
 		return
 	}
-	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements") || (kind == "loan" && refTable.String == "employee_loans"))
+	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements") || (kind == "loan" && refTable.String == "employee_loans") || (kind == "shift_swap" && refTable.String == "shift_swaps"))
 	if refTable.Valid && !domainReady {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Pembatalan jenis pengajuan ini menunggu handler domain.")
 		return
@@ -104,6 +104,18 @@ func (a adminAPI) cancelEssRequest(w http.ResponseWriter, r *http.Request) {
 		count, _ := result.RowsAffected()
 		if count != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status kasbon tidak sesuai pengajuan.")
+			return
+		}
+	}
+	if kind == "shift_swap" && domainReady {
+		result, e := tx.ExecContext(r.Context(), `UPDATE shift_swaps SET status='cancelled',version=version+1 WHERE tenant_id=? AND id=? AND request_id=? AND requester_id=? AND status IN ('in_review','returned')`, tenantID, refID.String, requestID, c.employeeID)
+		if e != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membatalkan pertukaran shift.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Pertukaran shift sudah berubah.")
 			return
 		}
 	}

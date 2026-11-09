@@ -42,6 +42,13 @@ func main() {
 			if applied > 0 {
 				slog.Info("perubahan karyawan diterapkan", "count", applied)
 			}
+			generated, err := httpapi.RunUpcomingShiftInstances(workerContext, db)
+			if err != nil {
+				slog.Error("materialisasi jadwal mendatang gagal", "error", err)
+			}
+			if generated > 0 {
+				slog.Info("shift instance mendatang dibuat", "count", generated)
+			}
 		}
 		run()
 		ticker := time.NewTicker(time.Minute)

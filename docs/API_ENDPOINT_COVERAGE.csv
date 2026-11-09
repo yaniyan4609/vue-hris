@@ -175,12 +175,12 @@ GET,/api/v1/admin/reports/{key},14.2 Laporan,planned
 GET,/api/v1/admin/roles,5.2 Role dan registry permission,active
 GET,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
 GET,/api/v1/admin/roles/{id}/scopes,5.2 Role dan registry permission,active
-GET,/api/v1/admin/roster,"8.3 Admin: master shift, roster, dan libur",planned
+GET,/api/v1/admin/roster,"8.3 Admin: master shift, roster, dan libur",active
 GET,/api/v1/admin/security/overview,14.4 Audit dan keamanan,planned
 GET,/api/v1/admin/settings/{group},14.5 Pengaturan tenant dan langganan,planned
 GET,/api/v1/admin/shift-instances,"8.3 Admin: master shift, roster, dan libur",active
 GET,/api/v1/admin/shift-instances/{id},"8.3 Admin: master shift, roster, dan libur",active
-GET,/api/v1/admin/shift-swaps,"8.3 Admin: master shift, roster, dan libur",planned
+GET,/api/v1/admin/shift-swaps,"8.3 Admin: master shift, roster, dan libur",active
 GET,/api/v1/admin/shift-templates,"8.3 Admin: master shift, roster, dan libur",active
 GET,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
 GET,/api/v1/admin/subscription,14.5 Pengaturan tenant dan langganan,planned
@@ -240,7 +240,7 @@ GET,/api/v1/ess/requests,10.2 ESS: pengajuan saya,active
 GET,/api/v1/ess/requests/{requestId},10.2 ESS: pengajuan saya,active
 GET,/api/v1/ess/resignation,7.8 ESS: profil sendiri,active
 GET,/api/v1/ess/schedule,8.1 ESS: absensi dan jadwal pribadi,active
-GET,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
+GET,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,active
 GET,/api/v1/files/{id},12.1 Berkas,active
 GET,/api/v1/files/{id}/download,12.1 Berkas,active
 GET,/api/v1/holidays,"8.3 Admin: master shift, roster, dan libur",active
@@ -411,8 +411,8 @@ POST,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,active
 POST,/api/v1/admin/reimbursements/{id}/pay,9.5 Reimbursement,active
 POST,/api/v1/admin/reports/{key}/export,14.2 Laporan,planned
 POST,/api/v1/admin/roles,5.2 Role dan registry permission,active
-POST,/api/v1/admin/shift-instances/generate,"8.3 Admin: master shift, roster, dan libur",planned
-POST,/api/v1/admin/shift-instances/{id}/cancel,"8.3 Admin: master shift, roster, dan libur",planned
+POST,/api/v1/admin/shift-instances/generate,"8.3 Admin: master shift, roster, dan libur",active
+POST,/api/v1/admin/shift-instances/{id}/cancel,"8.3 Admin: master shift, roster, dan libur",active
 POST,/api/v1/admin/shift-templates,"8.3 Admin: master shift, roster, dan libur",active
 POST,/api/v1/admin/shift-templates/{id}/duplicate,"8.3 Admin: master shift, roster, dan libur",active
 POST,/api/v1/admin/support/tickets,14.5 Pengaturan tenant dan langganan,planned
@@ -456,8 +456,8 @@ POST,/api/v1/ess/reimbursements/{id}/receipts,9.5 Reimbursement,active
 POST,/api/v1/ess/requests/{requestId}/cancel,10.2 ESS: pengajuan saya,active
 POST,/api/v1/ess/requests/{requestId}/resubmit,10.2 ESS: pengajuan saya,active
 POST,/api/v1/ess/resignation,7.8 ESS: profil sendiri,active
-POST,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
-POST,/api/v1/ess/shift-swaps/{id}/respond,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,active
+POST,/api/v1/ess/shift-swaps/{id}/respond,8.1 ESS: absensi dan jadwal pribadi,active
 POST,/api/v1/files/uploads,12.1 Berkas,active
 POST,/api/v1/files/{id}/complete,12.1 Berkas,active
 POST,/api/v1/notifications/read-all,13.1 Inbox dan preferensi (semua pengguna),active

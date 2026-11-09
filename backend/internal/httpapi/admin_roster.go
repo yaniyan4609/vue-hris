@@ -37,8 +37,12 @@ func (a adminAPI) mountWorkSchedules(r chi.Router, config Options) {
 	r.With(checkOrigin(config)).Post("/work-schedules/publish", a.publishWorkSchedules)
 	r.With(checkOrigin(config)).Patch("/work-schedules/{id}", a.updateWorkSchedule)
 	r.With(checkOrigin(config)).Delete("/work-schedules/{id}", a.cancelWorkSchedule)
-	r.Get("/shift-instances",a.listShiftInstances)
-	r.Get("/shift-instances/{id}",a.getShiftInstance)
+	r.Get("/shift-instances", a.listShiftInstances)
+	r.Get("/shift-instances/{id}", a.getShiftInstance)
+	r.Get("/roster", a.rosterGrid)
+	r.With(checkOrigin(config)).Post("/shift-instances/generate", a.generateShiftInstances)
+	r.With(checkOrigin(config)).Post("/shift-instances/{id}/cancel", a.cancelShiftInstance)
+	r.Get("/shift-swaps", a.listAdminShiftSwaps)
 }
 func scanWorkSchedule(row interface{ Scan(...any) error }) (workSchedule, error) {
 	var item workSchedule
