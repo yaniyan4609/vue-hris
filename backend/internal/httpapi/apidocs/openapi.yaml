@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.30.0
+  version: 0.31.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -1593,6 +1593,102 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Employee' }
         '403': { description: Akun tidak terhubung ke karyawan aktif }
+  /api/v1/admin/disciplinary-actions:
+    get:
+      tags: [Employees]
+      operationId: listDisciplinaryActions
+      x-permission: disiplin.lihat
+      summary: Daftar konseling dan SP sesuai scope karyawan
+      description: Memerlukan entitlement core_hr. Status active menunjukkan belum dibatalkan; gunakan active_on untuk memastikan berlaku pada tanggal tertentu.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Search'
+        - { in: query, name: employee_id, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - { in: query, name: severity, schema: { type: string, enum: [KONSELING, SP1, SP2, SP3] } }
+        - { in: query, name: status, schema: { type: string, enum: [active, cancelled] } }
+        - { in: query, name: issued_from, schema: { type: string, format: date } }
+        - { in: query, name: issued_to, schema: { type: string, format: date } }
+        - { in: query, name: active_on, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Daftar berpaginasi dan total sesuai scope }
+        '400': { description: Filter tidak valid }
+        '403': { description: Permission atau entitlement tidak tersedia }
+    post:
+      tags: [Employees]
+      operationId: createDisciplinaryAction
+      x-permission: disiplin.buat
+      summary: Catat konseling atau terbitkan SP
+      description: SP2 memerlukan SP1 yang berlaku pada issued_date; SP3 memerlukan SP2. Satu tingkat SP tidak boleh tumpang tindih. Karyawan harus aktif dan dalam scope. File harus milik tenant, bertujuan discipline, dan lolos scan. Unggah file umum diselesaikan pada Fase 12.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DisciplinaryActionInput' }
+      responses:
+        '201': { description: ID, status active, dan versi awal; audit metadata tersimpan }
+        '400': { description: Tingkat, tanggal, uraian, atau lampiran tidak valid }
+        '403': { description: Permission atau entitlement tidak tersedia }
+        '404': { description: Karyawan di luar scope atau file tidak siap }
+        '409': { description: Karyawan tidak aktif, SP pendahulu tidak berlaku, atau tingkat SP tumpang tindih }
+  /api/v1/admin/disciplinary-actions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: getDisciplinaryAction
+      x-permission: disiplin.lihat
+      summary: Detail tindakan dan riwayat perubahan
+      responses:
+        '200':
+          description: Detail konseling atau SP beserta riwayat audit tanpa uraian sensitif
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/DisciplinaryAction' }
+        '403': { description: Permission atau entitlement tidak tersedia }
+        '404': { description: Tindakan di luar tenant atau scope }
+    patch:
+      tags: [Employees]
+      operationId: patchDisciplinaryAction
+      x-permission: disiplin.ubah
+      summary: Koreksi tanggal, uraian, atau lampiran tindakan aktif
+      description: Body adalah penggantian lengkap termasuk version. Tingkat dan karyawan tidak dapat diganti. Koreksi tidak boleh memutus SP berikutnya yang aktif.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DisciplinaryActionUpdate' }
+      responses:
+        '200': { description: Versi naik; audit metadata tersimpan }
+        '400': { description: Body atau versi tidak valid }
+        '403': { description: Permission atau entitlement tidak tersedia }
+        '404': { description: Tindakan di luar tenant atau scope, atau file tidak siap }
+        '409': { description: Versi bentrok, dibatalkan, SP pendahulu tidak berlaku, SP tumpang tindih, atau SP penerus akan terputus }
+    delete:
+      tags: [Employees]
+      operationId: cancelDisciplinaryAction
+      x-permission: disiplin.hapus
+      summary: Batalkan tindakan tanpa menghapus riwayat
+      description: Memerlukan autentikasi ulang terbaru. Pembatalan SP ditolak bila SP berikutnya yang aktif masih bergantung padanya. Body opsional memuat reason dan version untuk kontrol konkurensi.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DisciplinaryActionCancellation' }
+      responses:
+        '204': { description: Status cancelled, versi naik, riwayat dipertahankan }
+        '400': { description: Alasan atau versi tidak valid }
+        '403': { description: Permission, entitlement, atau autentikasi ulang tidak tersedia }
+        '404': { description: Tindakan di luar tenant atau scope }
+        '409': { description: Sudah dibatalkan, versi bentrok, atau SP berikutnya masih bergantung }
   /api/v1/admin/employee-changes:
     get:
       tags: [Employees]
@@ -4541,6 +4637,52 @@ components:
           properties:
             id: { type: string }
             employee_id: { type: string }
+    DisciplinaryActionInput:
+      type: object
+      required: [employee_id, severity, issued_date, description]
+      properties:
+        employee_id: { type: string, minLength: 26, maxLength: 26 }
+        severity: { type: string, enum: [KONSELING, SP1, SP2, SP3] }
+        issued_date: { type: string, format: date, description: Tidak boleh melewati tanggal lokal tenant saat ini }
+        valid_until: { type: string, format: date, nullable: true, description: Wajib untuk SP; tidak sebelum issued_date }
+        description: { type: string, minLength: 10, maxLength: 5000 }
+        file_id: { type: string, minLength: 26, maxLength: 26, nullable: true }
+    DisciplinaryActionUpdate:
+      type: object
+      required: [issued_date, description, version]
+      properties:
+        issued_date: { type: string, format: date }
+        valid_until: { type: string, format: date, nullable: true, description: Wajib untuk SP }
+        description: { type: string, minLength: 10, maxLength: 5000 }
+        file_id: { type: string, minLength: 26, maxLength: 26, nullable: true }
+        version: { type: integer, minimum: 1 }
+    DisciplinaryActionCancellation:
+      type: object
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 500, description: Jika diisi }
+        version: { type: integer, minimum: 1, description: Jika diisi }
+    DisciplinaryAction:
+      allOf:
+        - $ref: '#/components/schemas/DisciplinaryActionInput'
+        - type: object
+          properties:
+            id: { type: string }
+            status: { type: string, enum: [active, cancelled] }
+            version: { type: integer }
+            created_by: { type: string, nullable: true }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+            cancelled_by: { type: string, nullable: true }
+            cancelled_at: { type: string, format: date-time, nullable: true }
+            cancellation_reason: { type: string, nullable: true }
+            history:
+              type: array
+              items:
+                type: object
+                properties:
+                  action: { type: string, enum: [issue, update, cancel] }
+                  actor_user_id: { type: string }
+                  at: { type: string, format: date-time }
     EmployeeChangeInput:
       type: object
       required: [employee_id, change_type, effective_date, office_id, position_id, reason]

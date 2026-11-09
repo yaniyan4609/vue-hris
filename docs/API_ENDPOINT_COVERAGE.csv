@@ -8,7 +8,7 @@ DELETE,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
 DELETE,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/contracts/{id},7.3 Kontrak,active
 DELETE,/api/v1/admin/departments/{id},6.1 Master organisasi,active
-DELETE,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
+DELETE,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,active
 DELETE,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 DELETE,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
@@ -84,8 +84,8 @@ GET,/api/v1/admin/dashboard/payroll-cost,14.1 Dashboard,planned
 GET,/api/v1/admin/dashboard/summary,14.1 Dashboard,planned
 GET,/api/v1/admin/departments,6.1 Master organisasi,active
 GET,/api/v1/admin/departments/{id},6.1 Master organisasi,active
-GET,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,planned
-GET,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
+GET,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,active
+GET,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,active
 GET,/api/v1/admin/divisions,6.1 Master organisasi,active
 GET,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 GET,/api/v1/admin/document-templates,12.2 Dokumen,planned
@@ -293,7 +293,7 @@ PATCH,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/company-profile,14.5 Pengaturan tenant dan langganan,planned
 PATCH,/api/v1/admin/contracts/{id},7.3 Kontrak,active
 PATCH,/api/v1/admin/departments/{id},6.1 Master organisasi,active
-PATCH,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
+PATCH,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,active
 PATCH,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 PATCH,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
@@ -354,7 +354,7 @@ POST,/api/v1/admin/company-profile/logo,14.5 Pengaturan tenant dan langganan,pla
 POST,/api/v1/admin/contracts,7.3 Kontrak,active
 POST,/api/v1/admin/contracts/{id}/renew,7.3 Kontrak,active
 POST,/api/v1/admin/departments,6.1 Master organisasi,active
-POST,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,planned
+POST,/api/v1/admin/disciplinary-actions,7.5 SP dan konseling,active
 POST,/api/v1/admin/divisions,6.1 Master organisasi,active
 POST,/api/v1/admin/document-templates,12.2 Dokumen,planned
 POST,/api/v1/admin/document-templates/{id}/render,12.2 Dokumen,planned
