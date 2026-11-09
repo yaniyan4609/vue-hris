@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.32.0
+  version: 0.33.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -1593,6 +1593,134 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Employee' }
         '403': { description: Akun tidak terhubung ke karyawan aktif }
+  /api/v1/admin/assets:
+    get:
+      tags: [Employees]
+      operationId: listAssets
+      x-permission: aset.lihat
+      summary: Daftar master aset
+      description: Pengguna dengan scope seluruh tenant melihat semua aset. Scope terbatas hanya melihat aset yang pernah dipinjam karyawan dalam scope tersebut. Arsip tetap terlihat untuk riwayat.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Search'
+        - { in: query, name: status, schema: { type: string, enum: [available, assigned, maintenance, archived] } }
+        - { in: query, name: category, schema: { type: string, maxLength: 64 } }
+      responses:
+        '200': { description: Daftar berpaginasi sesuai scope dan entitlement core_hr }
+        '400': { description: Filter tidak valid }
+        '403': { description: Hak atau entitlement tidak tersedia }
+    post:
+      tags: [Employees]
+      operationId: createAsset
+      x-permission: aset.buat
+      summary: Buat master aset tersedia
+      description: Memerlukan scope seluruh tenant. Kode unik per tenant dan tidak dipakai ulang oleh arsip.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssetInput' }
+      responses:
+        '201': { description: Aset berstatus available dibuat }
+        '400': { description: Kode, nama, atau kategori tidak valid }
+        '403': { description: Hak, entitlement, atau scope tidak tersedia }
+        '409': { description: Kode aset sudah dipakai }
+  /api/v1/admin/assets/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    patch:
+      tags: [Employees]
+      operationId: patchAsset
+      x-permission: aset.ubah
+      summary: Ubah metadata atau status perawatan aset
+      description: Body lengkap memerlukan version. Status assigned hanya berubah melalui penyerahan/pengembalian. Aset yang dipinjam dapat dikoreksi metadatanya tanpa mengubah status.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssetUpdate' }
+      responses:
+        '200': { description: Aset diperbarui dan versi naik }
+        '400': { description: Body atau status tidak valid }
+        '403': { description: Hak, entitlement, atau scope tidak tersedia }
+        '404': { description: Aset di luar tenant }
+        '409': { description: Versi, kode, arsip, atau peminjaman bentrok }
+    delete:
+      tags: [Employees]
+      operationId: archiveAsset
+      x-permission: aset.hapus
+      summary: Arsipkan master aset tanpa menghapus riwayat
+      description: Memerlukan autentikasi ulang dan scope seluruh tenant. Peminjaman aktif menahan arsip.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Aset diarsipkan }
+        '403': { description: Hak, entitlement, scope, atau autentikasi ulang tidak tersedia }
+        '404': { description: Aset di luar tenant }
+        '409': { description: Aset masih dipinjam atau sudah diarsipkan }
+  /api/v1/admin/employee-assets:
+    get:
+      tags: [Employees]
+      operationId: listEmployeeAssets
+      x-permission: aset.lihat
+      summary: Daftar pinjaman aktif dan riwayat pengembalian
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Search'
+        - { in: query, name: employee_id, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - { in: query, name: asset_id, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - { in: query, name: status, schema: { type: string, enum: [active, returned] } }
+      responses:
+        '200': { description: Peminjaman berpaginasi sesuai scope karyawan }
+        '400': { description: Filter tidak valid }
+        '403': { description: Hak atau entitlement tidak tersedia }
+    post:
+      tags: [Employees]
+      operationId: issueEmployeeAsset
+      x-permission: aset.buat
+      summary: Serahkan aset tersedia ke karyawan aktif
+      description: Satu aset hanya boleh mempunyai satu pinjaman aktif. Terminasi yang sudah approved atau checklist exit aset selesai menahan penyerahan baru. Catatan tidak disalin ke audit.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeeAssetIssue' }
+      responses:
+        '201': { description: Peminjaman aktif dan status aset assigned }
+        '400': { description: ID atau catatan tidak valid }
+        '403': { description: Hak atau entitlement tidak tersedia }
+        '404': { description: Karyawan di luar scope atau aset di luar tenant }
+        '409': { description: Aset tidak tersedia atau exit karyawan sudah disetujui }
+  /api/v1/admin/employee-assets/{id}/return:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Employees]
+      operationId: returnEmployeeAsset
+      x-permission: aset.ubah
+      summary: Catat pengembalian tanpa menghapus peminjaman
+      description: Kondisi good mengembalikan status available; damaged menjadi maintenance. Catatan pengembalian tidak disalin ke audit.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeeAssetReturn' }
+      responses:
+        '200': { description: Peminjaman returned dan status aset diperbarui }
+        '400': { description: Kondisi, catatan, atau versi tidak valid }
+        '403': { description: Hak atau entitlement tidak tersedia }
+        '404': { description: Peminjaman di luar tenant atau scope }
+        '409': { description: Sudah kembali, versi bentrok, atau status aset tidak sesuai }
   /api/v1/admin/terminations:
     get:
       tags: [Employees]
@@ -1690,7 +1818,7 @@ paths:
         '400': { description: Item atau versi tidak valid }
         '403': { description: Hak atau entitlement tidak tersedia }
         '404': { description: Terminasi di luar scope }
-        '409': { description: Versi bentrok atau proses ditutup }
+        '409': { description: Versi bentrok, proses ditutup, atau aset masih dipinjam }
   /api/v1/admin/terminations/{id}/submit:
     parameters:
       - $ref: '#/components/parameters/ResourceID'
@@ -4798,6 +4926,64 @@ components:
           properties:
             id: { type: string }
             employee_id: { type: string }
+    AssetInput:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, pattern: '^[A-Z0-9][A-Z0-9._-]{1,63}$' }
+        name: { type: string, minLength: 3, maxLength: 160 }
+        category: { type: string, maxLength: 64 }
+    AssetUpdate:
+      allOf:
+        - $ref: '#/components/schemas/AssetInput'
+        - type: object
+          required: [version]
+          properties:
+            status: { type: string, enum: [available, maintenance], description: Opsional; kosong mempertahankan status }
+            version: { type: integer, minimum: 1 }
+    Asset:
+      allOf:
+        - $ref: '#/components/schemas/AssetInput'
+        - type: object
+          properties:
+            id: { type: string }
+            status: { type: string, enum: [available, assigned, maintenance, archived] }
+            version: { type: integer }
+            archived_at: { type: string, format: date-time, nullable: true }
+            created_by: { type: string, nullable: true }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    EmployeeAssetIssue:
+      type: object
+      required: [employee_id, asset_id]
+      properties:
+        employee_id: { type: string, minLength: 26, maxLength: 26 }
+        asset_id: { type: string, minLength: 26, maxLength: 26 }
+        note: { type: string, maxLength: 500 }
+    EmployeeAssetReturn:
+      type: object
+      required: [return_condition, version]
+      properties:
+        return_condition: { type: string, enum: [good, damaged] }
+        note: { type: string, maxLength: 500 }
+        version: { type: integer, minimum: 1 }
+    EmployeeAsset:
+      allOf:
+        - $ref: '#/components/schemas/EmployeeAssetIssue'
+        - type: object
+          properties:
+            id: { type: string }
+            asset_code: { type: string }
+            asset_name: { type: string }
+            status: { type: string, enum: [active, returned] }
+            issued_at: { type: string, format: date-time }
+            returned_at: { type: string, format: date-time, nullable: true }
+            issue_note: { type: string, nullable: true }
+            return_note: { type: string, nullable: true }
+            return_condition: { type: string, enum: [good, damaged], nullable: true }
+            issued_by: { type: string, nullable: true }
+            returned_by: { type: string, nullable: true }
+            version: { type: integer }
     TerminationInput:
       type: object
       required: [employee_id, termination_type, effective_date, reason]

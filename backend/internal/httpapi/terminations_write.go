@@ -233,6 +233,19 @@ func (a adminAPI) putTerminationChecklist(w http.ResponseWriter, r *http.Request
 		return
 	}
 	for _, item := range body.Items {
+		if item.Code == "assets_returned" && item.Done {
+			var active int
+			if err = tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM employee_assets WHERE tenant_id=? AND employee_id=? AND active_flag=1`, c.tenant.ID, old.EmployeeID).Scan(&active); err != nil {
+				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa aset karyawan.")
+				return
+			}
+			if active > 0 {
+				writeAPIError(w, r, 409, "ASSETS_OUTSTANDING", "Masih ada aset yang belum dikembalikan.")
+				return
+			}
+		}
+	}
+	for _, item := range body.Items {
 		if _, err = tx.ExecContext(r.Context(), `UPDATE termination_checklist SET is_done=?,note=?,updated_by=? WHERE tenant_id=? AND termination_id=? AND item_code=?`, item.Done, nullableString(strings.TrimSpace(item.Note)), c.state.User.ID, c.tenant.ID, id, item.Code); err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyimpan checklist.")
 			return

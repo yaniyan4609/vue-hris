@@ -3,7 +3,7 @@ DELETE,/api/v1/admin/agenda-events/{id},12.3 Agenda,planned
 DELETE,/api/v1/admin/api-keys/{id},14.5 Pengaturan tenant dan langganan,planned
 DELETE,/api/v1/admin/approval-delegations/{id},10.3 Pengaturan alur approval,active
 DELETE,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,active
-DELETE,/api/v1/admin/assets/{id},7.7 Aset karyawan,planned
+DELETE,/api/v1/admin/assets/{id},7.7 Aset karyawan,active
 DELETE,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
 DELETE,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/contracts/{id},7.3 Kontrak,active
@@ -56,7 +56,7 @@ GET,/api/v1/admin/approvals,10.1 Admin: inbox dan keputusan,active
 GET,/api/v1/admin/approvals/inbox,10.1 Admin: inbox dan keputusan,active
 GET,/api/v1/admin/approvals/summary,10.1 Admin: inbox dan keputusan,active
 GET,/api/v1/admin/approvals/{requestId},10.1 Admin: inbox dan keputusan,active
-GET,/api/v1/admin/assets,7.7 Aset karyawan,planned
+GET,/api/v1/admin/assets,7.7 Aset karyawan,active
 GET,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,planned
 GET,/api/v1/admin/attendance/corrections/{id},8.2 Admin: monitor dan rekap,planned
 GET,/api/v1/admin/attendance/daily,8.2 Admin: monitor dan rekap,planned
@@ -91,7 +91,7 @@ GET,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 GET,/api/v1/admin/document-templates,12.2 Dokumen,planned
 GET,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 GET,/api/v1/admin/document-types,12.2 Dokumen,planned
-GET,/api/v1/admin/employee-assets,7.7 Aset karyawan,planned
+GET,/api/v1/admin/employee-assets,7.7 Aset karyawan,active
 GET,/api/v1/admin/employee-changes,"7.4 Mutasi, promosi, dan demosi",active
 GET,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",active
 GET,/api/v1/admin/employee-documents,12.2 Dokumen,planned
@@ -287,7 +287,7 @@ GET,/healthz,16. Webhook dan kesehatan layanan,active
 GET,/readyz,16. Webhook dan kesehatan layanan,active
 PATCH,/api/v1/admin/agenda-events/{id},12.3 Agenda,planned
 PATCH,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,active
-PATCH,/api/v1/admin/assets/{id},7.7 Aset karyawan,planned
+PATCH,/api/v1/admin/assets/{id},7.7 Aset karyawan,active
 PATCH,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
 PATCH,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/company-profile,14.5 Pengaturan tenant dan langganan,planned
@@ -337,7 +337,7 @@ POST,/api/v1/admin/approval-flows/{id}/set-default,10.3 Pengaturan alur approval
 POST,/api/v1/admin/approvals/bulk-actions,10.1 Admin: inbox dan keputusan,active
 POST,/api/v1/admin/approvals/{requestId}/actions,10.1 Admin: inbox dan keputusan,active
 POST,/api/v1/admin/approvals/{requestId}/reassign,10.1 Admin: inbox dan keputusan,active
-POST,/api/v1/admin/assets,7.7 Aset karyawan,planned
+POST,/api/v1/admin/assets,7.7 Aset karyawan,active
 POST,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,planned
 POST,/api/v1/admin/attendance/recalculate,8.2 Admin: monitor dan rekap,planned
 POST,/api/v1/admin/audit-logs/export,14.4 Audit dan keamanan,planned
@@ -359,8 +359,8 @@ POST,/api/v1/admin/divisions,6.1 Master organisasi,active
 POST,/api/v1/admin/document-templates,12.2 Dokumen,planned
 POST,/api/v1/admin/document-templates/{id}/render,12.2 Dokumen,planned
 POST,/api/v1/admin/document-types,12.2 Dokumen,planned
-POST,/api/v1/admin/employee-assets,7.7 Aset karyawan,planned
-POST,/api/v1/admin/employee-assets/{id}/return,7.7 Aset karyawan,planned
+POST,/api/v1/admin/employee-assets,7.7 Aset karyawan,active
+POST,/api/v1/admin/employee-assets/{id}/return,7.7 Aset karyawan,active
 POST,/api/v1/admin/employee-changes,"7.4 Mutasi, promosi, dan demosi",active
 POST,/api/v1/admin/employee-changes/{id}/submit,"7.4 Mutasi, promosi, dan demosi",active
 POST,/api/v1/admin/employee-documents,12.2 Dokumen,planned
