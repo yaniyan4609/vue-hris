@@ -54,9 +54,6 @@ func (a adminAPI) createEmployeeAssignmentCorrection(w http.ResponseWriter, r *h
 	}
 	localDate, _ := time.ParseInLocation("2006-01-02", body.EffectiveFrom, zone)
 	effectiveAt := localDate.UTC()
-	if body.EffectiveFrom == today {
-		effectiveAt = time.Now().UTC()
-	}
 	targetEmployee := employee{ID: employeeID, BaseOfficeID: body.OfficeID, PositionID: body.PositionID, ReportsToID: body.ReportsToEmployeeID}
 	target, err := a.targetFor(r.Context(), c.tenant.ID, targetEmployee)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -104,6 +101,12 @@ func (a adminAPI) createEmployeeAssignmentCorrection(w http.ResponseWriter, r *h
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca penugasan lama.")
 		return
+	}
+	if body.EffectiveFrom == today {
+		if err = tx.QueryRowContext(r.Context(), `SELECT UTC_TIMESTAMP(6)`).Scan(&effectiveAt); err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca waktu koreksi.")
+			return
+		}
 	}
 	if !effectiveAt.After(oldFrom) {
 		writeAPIError(w, r, 409, "DATE_CONFLICT", "Tanggal koreksi harus setelah awal penugasan saat ini.")

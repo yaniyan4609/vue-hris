@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.31.0
+  version: 0.32.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -1593,6 +1593,167 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Employee' }
         '403': { description: Akun tidak terhubung ke karyawan aktif }
+  /api/v1/admin/terminations:
+    get:
+      tags: [Employees]
+      operationId: listTerminations
+      x-permission: terminasi.lihat
+      summary: Daftar resign, pemutusan, dan pensiun dalam scope
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Search'
+        - { in: query, name: employee_id, schema: { type: string, minLength: 26, maxLength: 26 } }
+        - { in: query, name: termination_type, schema: { type: string, enum: [resign, dismissal, retirement] } }
+        - { in: query, name: status, schema: { type: string, enum: [draft, in_review, returned, approved, rejected, cancelled, processed] } }
+        - { in: query, name: effective_from, schema: { type: string, format: date } }
+        - { in: query, name: effective_to, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Daftar berpaginasi sesuai permission, entitlement core_hr, dan scope }
+        '400': { description: Filter tidak valid }
+        '403': { description: Hak atau entitlement tidak tersedia }
+    post:
+      tags: [Employees]
+      operationId: createTermination
+      x-permission: terminasi.buat
+      summary: Buat draft terminasi
+      description: Karyawan harus aktif dan belum punya proses terminasi aktif. Tanggal efektif tidak boleh lampau menurut zona tenant. Alasan tidak masuk audit.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TerminationInput' }
+      responses:
+        '201': { description: Draft, versi awal, dan checklist exit dibuat }
+        '400': { description: Jenis, tanggal, atau alasan tidak valid }
+        '403': { description: Hak atau entitlement tidak tersedia }
+        '404': { description: Karyawan di luar scope }
+        '409': { description: Karyawan tidak aktif atau proses terminasi aktif sudah ada }
+  /api/v1/admin/terminations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: getTermination
+      x-permission: terminasi.lihat
+      summary: Detail terminasi, checklist, dan status approval
+      responses:
+        '200':
+          description: Detail sesuai scope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Termination' }
+        '403': { description: Hak atau entitlement tidak tersedia }
+        '404': { description: Terminasi di luar tenant atau scope }
+    patch:
+      tags: [Employees]
+      operationId: patchTermination
+      x-permission: terminasi.ubah
+      summary: Koreksi tanggal dan alasan draft atau pengajuan dikembalikan
+      description: Body lengkap memerlukan version. Jenis dan karyawan tidak dapat diganti. Sesudah disetujui, batalkan sebelum tanggal efektif lalu buat pengajuan baru.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TerminationUpdate' }
+      responses:
+        '200': { description: Koreksi disimpan dan versi naik }
+        '400': { description: Body tidak valid }
+        '403': { description: Hak atau entitlement tidak tersedia }
+        '404': { description: Terminasi di luar scope }
+        '409': { description: Status terkunci atau versi bentrok }
+  /api/v1/admin/terminations/{id}/checklist:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    put:
+      tags: [Employees]
+      operationId: putTerminationChecklist
+      x-permission: terminasi.ubah
+      summary: Perbarui aset kembali dan serah terima
+      description: Kedua item dikirim bersama version. Checklist dapat diselesaikan setelah approval dan penerapan; tidak menunda pencabutan akses pada tanggal efektif.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TerminationChecklistUpdate' }
+      responses:
+        '200': { description: Checklist tersimpan dan versi naik }
+        '400': { description: Item atau versi tidak valid }
+        '403': { description: Hak atau entitlement tidak tersedia }
+        '404': { description: Terminasi di luar scope }
+        '409': { description: Versi bentrok atau proses ditutup }
+  /api/v1/admin/terminations/{id}/submit:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Employees, Approvals]
+      operationId: submitTermination
+      x-permission: terminasi.buat
+      summary: Ajukan atau kirim ulang terminasi yang dikembalikan
+      description: Pembuat mengirim draft atau request returned yang sama. Memerlukan alur approval termination aktif dan approver lain dengan terminasi.approve. Approval akhir menjadwalkan penerapan pada tanggal lokal tenant.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '200': { description: Request dan tugas approval dibuat atau dibuka ulang }
+        '403': { description: Hak atau entitlement tidak tersedia }
+        '404': { description: Terminasi di luar scope }
+        '409': { description: Status, penugasan, tanggal, alur, atau approver tidak memenuhi syarat }
+  /api/v1/admin/terminations/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Employees, Approvals]
+      operationId: cancelTermination
+      x-permission: terminasi.ubah
+      summary: Batalkan terminasi sebelum berlaku
+      description: Memerlukan autentikasi ulang dan versi. Approval aktif ditutup atomik. Terminasi approved hanya dapat dibatalkan sebelum tanggal efektif lokal tenant.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TerminationCancellation' }
+      responses:
+        '200': { description: Terminasi dan approval dibatalkan; riwayat dipertahankan }
+        '400': { description: Versi atau alasan tidak valid }
+        '403': { description: Hak, entitlement, atau autentikasi ulang tidak tersedia }
+        '404': { description: Terminasi di luar scope }
+        '409': { description: Tanggal efektif tiba, status final, atau versi bentrok }
+  /api/v1/ess/resignation:
+    get:
+      tags: [Employees]
+      operationId: getEssResignation
+      summary: Status pengajuan resign terbaru milik sendiri
+      responses:
+        '200': { description: Resign terbaru atau data null bila belum ada }
+        '403': { description: Panel ESS tidak tersedia }
+    post:
+      tags: [Employees, Approvals]
+      operationId: submitEssResignation
+      summary: Ajukan resign melalui approval termination
+      description: Permintaan returned diperbaiki dan dikirim ulang sebagai request yang sama. Jika alur atau approver belum tersedia, draft tersimpan agar dapat dicoba kembali.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EssResignationInput' }
+      responses:
+        '200': { description: Pengajuan in_review dan request_id }
+        '400': { description: Tanggal atau alasan tidak valid }
+        '403': { description: Panel ESS tidak tersedia }
+        '409': { description: Proses aktif, alur, atau approver tidak tersedia }
   /api/v1/admin/disciplinary-actions:
     get:
       tags: [Employees]
@@ -4637,6 +4798,77 @@ components:
           properties:
             id: { type: string }
             employee_id: { type: string }
+    TerminationInput:
+      type: object
+      required: [employee_id, termination_type, effective_date, reason]
+      properties:
+        employee_id: { type: string, minLength: 26, maxLength: 26 }
+        termination_type: { type: string, enum: [resign, dismissal, retirement] }
+        notice_date: { type: string, format: date, nullable: true }
+        effective_date: { type: string, format: date }
+        reason: { type: string, minLength: 10, maxLength: 2000 }
+    TerminationUpdate:
+      type: object
+      required: [effective_date, reason, version]
+      properties:
+        notice_date: { type: string, format: date, nullable: true }
+        effective_date: { type: string, format: date }
+        reason: { type: string, minLength: 10, maxLength: 2000 }
+        version: { type: integer, minimum: 1 }
+    EssResignationInput:
+      type: object
+      required: [effective_date, reason]
+      properties:
+        notice_date: { type: string, format: date, nullable: true }
+        effective_date: { type: string, format: date }
+        reason: { type: string, minLength: 10, maxLength: 2000 }
+    TerminationChecklistUpdate:
+      type: object
+      required: [version, items]
+      properties:
+        version: { type: integer, minimum: 1 }
+        items:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: object
+            required: [code, is_done]
+            properties:
+              code: { type: string, enum: [assets_returned, handover_complete] }
+              is_done: { type: boolean }
+              note: { type: string, maxLength: 500 }
+    TerminationCancellation:
+      type: object
+      required: [version, reason]
+      properties:
+        version: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 10, maxLength: 500 }
+    Termination:
+      allOf:
+        - $ref: '#/components/schemas/TerminationInput'
+        - type: object
+          properties:
+            id: { type: string }
+            status: { type: string, enum: [draft, in_review, returned, approved, rejected, cancelled, processed] }
+            request_id: { type: string, nullable: true }
+            source_assignment_id: { type: string, nullable: true }
+            version: { type: integer }
+            apply_error: { type: string, nullable: true }
+            processed_at: { type: string, format: date-time, nullable: true }
+            created_by: { type: string, nullable: true }
+            created_at: { type: string, format: date-time }
+            checklist:
+              type: array
+              items:
+                type: object
+                properties:
+                  code: { type: string, enum: [assets_returned, handover_complete] }
+                  is_done: { type: boolean }
+                  note: { type: string, nullable: true }
+                  updated_by: { type: string, nullable: true }
+                  updated_at: { type: string, format: date-time }
+            approval: { type: object, nullable: true }
     DisciplinaryActionInput:
       type: object
       required: [employee_id, severity, issued_date, description]

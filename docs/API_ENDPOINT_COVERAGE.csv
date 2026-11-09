@@ -187,8 +187,8 @@ GET,/api/v1/admin/subscription,14.5 Pengaturan tenant dan langganan,planned
 GET,/api/v1/admin/subscription/usage,14.5 Pengaturan tenant dan langganan,planned
 GET,/api/v1/admin/support/tickets,14.5 Pengaturan tenant dan langganan,planned
 GET,/api/v1/admin/support/tickets/{id},14.5 Pengaturan tenant dan langganan,planned
-GET,/api/v1/admin/terminations,7.6 Resign dan terminasi,planned
-GET,/api/v1/admin/terminations/{id},7.6 Resign dan terminasi,planned
+GET,/api/v1/admin/terminations,7.6 Resign dan terminasi,active
+GET,/api/v1/admin/terminations/{id},7.6 Resign dan terminasi,active
 GET,/api/v1/admin/users,5.1 Pengguna,active
 GET,/api/v1/admin/users/{id},5.1 Pengguna,active
 GET,/api/v1/admin/users/{id}/access-history,5.3 Hak akses per pengguna,active
@@ -238,7 +238,7 @@ GET,/api/v1/ess/reimbursements,9.5 Reimbursement,active
 GET,/api/v1/ess/reimbursements/{id},9.5 Reimbursement,active
 GET,/api/v1/ess/requests,10.2 ESS: pengajuan saya,active
 GET,/api/v1/ess/requests/{requestId},10.2 ESS: pengajuan saya,active
-GET,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
+GET,/api/v1/ess/resignation,7.8 ESS: profil sendiri,active
 GET,/api/v1/ess/schedule,8.1 ESS: absensi dan jadwal pribadi,active
 GET,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
 GET,/api/v1/files/{id},12.1 Berkas,active
@@ -316,7 +316,7 @@ PATCH,/api/v1/admin/regions/{id},6.1 Master organisasi,active
 PATCH,/api/v1/admin/reimbursement-categories/{id},9.5 Reimbursement,active
 PATCH,/api/v1/admin/roles/{id},5.2 Role dan registry permission,active
 PATCH,/api/v1/admin/shift-templates/{id},"8.3 Admin: master shift, roster, dan libur",active
-PATCH,/api/v1/admin/terminations/{id},7.6 Resign dan terminasi,planned
+PATCH,/api/v1/admin/terminations/{id},7.6 Resign dan terminasi,active
 PATCH,/api/v1/admin/users/{id},5.1 Pengguna,active
 PATCH,/api/v1/admin/users/{id}/roles/{userRoleId},5.3 Hak akses per pengguna,planned
 PATCH,/api/v1/admin/webhooks/{id},14.5 Pengaturan tenant dan langganan,planned
@@ -417,9 +417,9 @@ POST,/api/v1/admin/shift-templates,"8.3 Admin: master shift, roster, dan libur",
 POST,/api/v1/admin/shift-templates/{id}/duplicate,"8.3 Admin: master shift, roster, dan libur",active
 POST,/api/v1/admin/support/tickets,14.5 Pengaturan tenant dan langganan,planned
 POST,/api/v1/admin/support/tickets/{id}/messages,14.5 Pengaturan tenant dan langganan,planned
-POST,/api/v1/admin/terminations,7.6 Resign dan terminasi,planned
-POST,/api/v1/admin/terminations/{id}/cancel,7.6 Resign dan terminasi,planned
-POST,/api/v1/admin/terminations/{id}/submit,7.6 Resign dan terminasi,planned
+POST,/api/v1/admin/terminations,7.6 Resign dan terminasi,active
+POST,/api/v1/admin/terminations/{id}/cancel,7.6 Resign dan terminasi,active
+POST,/api/v1/admin/terminations/{id}/submit,7.6 Resign dan terminasi,active
 POST,/api/v1/admin/users,5.1 Pengguna,active
 POST,/api/v1/admin/users/{id}/disable,5.1 Pengguna,active
 POST,/api/v1/admin/users/{id}/effective-access/preview,5.3 Hak akses per pengguna,active
@@ -455,7 +455,7 @@ POST,/api/v1/ess/reimbursements,9.5 Reimbursement,active
 POST,/api/v1/ess/reimbursements/{id}/receipts,9.5 Reimbursement,active
 POST,/api/v1/ess/requests/{requestId}/cancel,10.2 ESS: pengajuan saya,active
 POST,/api/v1/ess/requests/{requestId}/resubmit,10.2 ESS: pengajuan saya,active
-POST,/api/v1/ess/resignation,7.8 ESS: profil sendiri,planned
+POST,/api/v1/ess/resignation,7.8 ESS: profil sendiri,active
 POST,/api/v1/ess/shift-swaps,8.1 ESS: absensi dan jadwal pribadi,planned
 POST,/api/v1/ess/shift-swaps/{id}/respond,8.1 ESS: absensi dan jadwal pribadi,planned
 POST,/api/v1/files/uploads,12.1 Berkas,active
@@ -498,7 +498,7 @@ PUT,/api/v1/admin/position-role-suggestions,5.3 Hak akses per pengguna,planned
 PUT,/api/v1/admin/roles/{id}/permissions,5.2 Role dan registry permission,active
 PUT,/api/v1/admin/roles/{id}/scopes,5.2 Role dan registry permission,active
 PUT,/api/v1/admin/settings/{group},14.5 Pengaturan tenant dan langganan,planned
-PUT,/api/v1/admin/terminations/{id}/checklist,7.6 Resign dan terminasi,planned
+PUT,/api/v1/admin/terminations/{id}/checklist,7.6 Resign dan terminasi,active
 PUT,/api/v1/admin/users/{id}/permission-overrides,5.3 Hak akses per pengguna,active
 PUT,/api/v1/admin/users/{id}/scopes/{module},5.3 Hak akses per pengguna,planned
 PUT,/api/v1/notifications/preferences,13.1 Inbox dan preferensi (semua pengguna),planned

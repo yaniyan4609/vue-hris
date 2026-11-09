@@ -95,7 +95,7 @@ func mountRealtime(r interface {
 		}
 		poll := time.NewTicker(5 * time.Second)
 		defer poll.Stop()
-		verify := time.NewTicker(25 * time.Second)
+		verify := time.NewTicker(5 * time.Second)
 		defer verify.Stop()
 		for {
 			select {

@@ -28,6 +28,13 @@ func main() {
 		run := func() {
 			workerContext, stop := context.WithTimeout(context.Background(), 45*time.Second)
 			defer stop()
+			processed, err := httpapi.RunDueTerminations(workerContext, db)
+			if err != nil {
+				slog.Error("penerapan terminasi gagal", "error", err)
+			}
+			if processed > 0 {
+				slog.Info("terminasi diterapkan", "count", processed)
+			}
 			applied, err := httpapi.RunDueEmployeeChanges(workerContext, db)
 			if err != nil {
 				slog.Error("penerapan perubahan karyawan gagal", "error", err)
