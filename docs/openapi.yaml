@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.29.0
+  version: 0.30.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -1593,6 +1593,101 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Employee' }
         '403': { description: Akun tidak terhubung ke karyawan aktif }
+  /api/v1/admin/employee-changes:
+    get:
+      tags: [Employees]
+      operationId: listEmployeeChanges
+      x-permission: mutasi.lihat
+      summary: Daftar mutasi, promosi, dan demosi dalam scope
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: change_type, schema: { type: string, enum: [mutasi, promosi, demosi] } }
+        - { in: query, name: status, schema: { type: string, enum: [draft, in_review, returned, approved, rejected, cancelled, applied] } }
+        - { in: query, name: effective_from, schema: { type: string, format: date } }
+        - { in: query, name: effective_to, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Daftar paginasi dengan data sesuai scope }
+        '403': { description: Hak mutasi.lihat atau entitlement tidak tersedia }
+    post:
+      tags: [Employees]
+      operationId: createEmployeeChange
+      x-permission: mutasi.buat
+      summary: Buat draft perubahan penugasan
+      description: Satu karyawan hanya boleh punya satu perubahan aktif. Tujuan harus berbeda dari penugasan kini, berada dalam scope pembuat, dan tanggal efektif setelah awal penugasan.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeeChangeInput' }
+      responses:
+        '201': { description: Draft dibuat dan diaudit }
+        '400': { description: Tujuan, tanggal, atau alasan tidak valid }
+        '403': { description: Tujuan di luar scope }
+        '409': { description: Perubahan aktif, penugasan sama, atau organisasi tidak tersedia }
+  /api/v1/admin/employee-changes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Employees]
+      operationId: getEmployeeChange
+      x-permission: mutasi.lihat
+      summary: Detail perubahan dan status approval
+      responses:
+        '200': { description: Detail dan posisi approval }
+        '404': { description: Perubahan di luar tenant atau scope }
+    patch:
+      tags: [Employees]
+      operationId: patchEmployeeChange
+      x-permission: mutasi.ubah
+      summary: Ganti tujuan draft atau pengajuan yang dikembalikan
+      description: Body lengkap termasuk version. employee_id dan change_type tidak dapat diganti. Pengajuan returned dikirim ulang melalui submit pada request yang sama.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/EmployeeChangeInput'
+                - type: object
+                  required: [version]
+                  properties: { version: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: Draft diperbarui dan versi naik }
+        '403': { description: Tujuan di luar scope }
+        '404': { description: Perubahan di luar tenant atau scope }
+        '409': { description: Status, versi, atau penugasan bentrok }
+    delete:
+      tags: [Employees]
+      operationId: deleteEmployeeChange
+      x-permission: mutasi.ubah
+      summary: Hapus draft yang belum diajukan
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Draft dihapus, audit dipertahankan }
+        '404': { description: Draft di luar tenant atau scope }
+        '409': { description: Perubahan sudah diajukan }
+  /api/v1/admin/employee-changes/{id}/submit:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    post:
+      tags: [Employees, Approvals]
+      operationId: submitEmployeeChange
+      x-permission: mutasi.buat
+      summary: Ajukan draft atau kirim ulang perubahan yang dikembalikan
+      description: Memerlukan alur approval aktif untuk mutation atau promotion dan approver lain yang berhak. Demosi memakai alur mutation. Persetujuan akhir menjadwalkan perubahan; worker menerapkan assignment pada tanggal efektif menurut zona waktu tenant. Konflik roster/payroll atau penugasan dicatat sebagai apply_error dan dicoba ulang.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '200': { description: Pengajuan dan tugas approver dibuat secara atomik }
+        '404': { description: Perubahan di luar tenant atau scope }
+        '409': { description: Alur, approver, tanggal, atau penugasan tidak memenuhi syarat }
   /api/v1/admin/contracts:
     get:
       tags: [Employees]
@@ -4446,6 +4541,32 @@ components:
           properties:
             id: { type: string }
             employee_id: { type: string }
+    EmployeeChangeInput:
+      type: object
+      required: [employee_id, change_type, effective_date, office_id, position_id, reason]
+      properties:
+        employee_id: { type: string, minLength: 26, maxLength: 26 }
+        change_type: { type: string, enum: [mutasi, promosi, demosi] }
+        effective_date: { type: string, format: date }
+        office_id: { type: string, minLength: 26, maxLength: 26 }
+        position_id: { type: string, minLength: 26, maxLength: 26 }
+        reports_to_employee_id: { type: string, minLength: 26, maxLength: 26, nullable: true }
+        reason: { type: string, minLength: 10, maxLength: 500 }
+    EmployeeChange:
+      allOf:
+        - $ref: '#/components/schemas/EmployeeChangeInput'
+        - type: object
+          properties:
+            id: { type: string }
+            request_id: { type: string, nullable: true }
+            status: { type: string, enum: [draft, in_review, returned, approved, rejected, cancelled, applied] }
+            source_assignment_id: { type: string }
+            version: { type: integer }
+            applied_assignment_id: { type: string, nullable: true }
+            applied_at: { type: string, format: date-time, nullable: true }
+            apply_error: { type: string, nullable: true }
+            created_by: { type: string }
+            created_at: { type: string, format: date-time }
     EmployeeAssignment:
       type: object
       properties:

@@ -12,7 +12,7 @@ import (
 )
 
 func (a adminAPI) approvalStepRefExists(ctx context.Context, tenantID string, step approvalFlowStep) (bool, error) {
-	if step.ApproverKind == "reports_to" {
+	if step.ApproverKind == "reports_to" || step.ApproverKind == "manager" {
 		return step.ApproverRefID == nil, nil
 	}
 	if step.ApproverRefID == nil || len(*step.ApproverRefID) != 26 {
@@ -20,11 +20,11 @@ func (a adminAPI) approvalStepRefExists(ctx context.Context, tenantID string, st
 	}
 	var query string
 	switch step.ApproverKind {
-	case "role":
+	case "role", "fallback_role":
 		query = `SELECT COUNT(*) FROM roles WHERE tenant_id=? AND id=?`
 	case "position":
 		query = `SELECT COUNT(*) FROM positions WHERE tenant_id=? AND id=? AND deleted_at IS NULL`
-	case "membership":
+	case "membership", "user":
 		query = `SELECT COUNT(*) FROM tenant_memberships WHERE tenant_id=? AND user_id=? AND status='active'`
 	default:
 		return false, nil

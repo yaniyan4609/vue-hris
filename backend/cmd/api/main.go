@@ -24,6 +24,25 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+	go func() {
+		run := func() {
+			workerContext, stop := context.WithTimeout(context.Background(), 45*time.Second)
+			defer stop()
+			applied, err := httpapi.RunDueEmployeeChanges(workerContext, db)
+			if err != nil {
+				slog.Error("penerapan perubahan karyawan gagal", "error", err)
+			}
+			if applied > 0 {
+				slog.Info("perubahan karyawan diterapkan", "count", applied)
+			}
+		}
+		run()
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			run()
+		}
+	}()
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.Router(db, httpapi.Options{

@@ -12,7 +12,7 @@ DELETE,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
 DELETE,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 DELETE,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
-DELETE,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
+DELETE,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",active
 DELETE,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/employees/{id},7.1 Karyawan,active
 DELETE,/api/v1/admin/employees/{id}/allowed-offices/{allowedId},7.2 Data pendukung karyawan,active
@@ -92,8 +92,8 @@ GET,/api/v1/admin/document-templates,12.2 Dokumen,planned
 GET,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 GET,/api/v1/admin/document-types,12.2 Dokumen,planned
 GET,/api/v1/admin/employee-assets,7.7 Aset karyawan,planned
-GET,/api/v1/admin/employee-changes,"7.4 Mutasi, promosi, dan demosi",planned
-GET,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
+GET,/api/v1/admin/employee-changes,"7.4 Mutasi, promosi, dan demosi",active
+GET,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",active
 GET,/api/v1/admin/employee-documents,12.2 Dokumen,planned
 GET,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
 GET,/api/v1/admin/employees,7.1 Karyawan,active
@@ -297,7 +297,7 @@ PATCH,/api/v1/admin/disciplinary-actions/{id},7.5 SP dan konseling,planned
 PATCH,/api/v1/admin/divisions/{id},6.1 Master organisasi,active
 PATCH,/api/v1/admin/document-templates/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/document-types/{id},12.2 Dokumen,planned
-PATCH,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",planned
+PATCH,/api/v1/admin/employee-changes/{id},"7.4 Mutasi, promosi, dan demosi",active
 PATCH,/api/v1/admin/employee-documents/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/employees/{id},7.1 Karyawan,active
 PATCH,/api/v1/admin/employees/{id}/bank-accounts/{accountId},7.2 Data pendukung karyawan,active
@@ -361,8 +361,8 @@ POST,/api/v1/admin/document-templates/{id}/render,12.2 Dokumen,planned
 POST,/api/v1/admin/document-types,12.2 Dokumen,planned
 POST,/api/v1/admin/employee-assets,7.7 Aset karyawan,planned
 POST,/api/v1/admin/employee-assets/{id}/return,7.7 Aset karyawan,planned
-POST,/api/v1/admin/employee-changes,"7.4 Mutasi, promosi, dan demosi",planned
-POST,/api/v1/admin/employee-changes/{id}/submit,"7.4 Mutasi, promosi, dan demosi",planned
+POST,/api/v1/admin/employee-changes,"7.4 Mutasi, promosi, dan demosi",active
+POST,/api/v1/admin/employee-changes/{id}/submit,"7.4 Mutasi, promosi, dan demosi",active
 POST,/api/v1/admin/employee-documents,12.2 Dokumen,planned
 POST,/api/v1/admin/employee-documents/{id}/verify,12.2 Dokumen,planned
 POST,/api/v1/admin/employees,7.1 Karyawan,active

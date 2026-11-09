@@ -47,6 +47,11 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status kasbon tidak sesuai pengajuan.")
 			return
 		}
+	} else if d.Kind == "mutation" || d.Kind == "promotion" {
+		if err := tx.QueryRowContext(r.Context(), `SELECT status FROM employee_changes WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&domainStatus); err != nil || domainStatus != "in_review" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status perubahan karyawan tidak sesuai pengajuan.")
+			return
+		}
 	} else {
 		if err := tx.QueryRowContext(r.Context(), `SELECT proposed_minutes,status FROM overtime_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&proposed, &domainStatus); err != nil || domainStatus != "in_review" {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
@@ -200,6 +205,33 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 		count, _ := result.RowsAffected()
 		if count != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status kasbon telah berubah.")
+			return
+		}
+	} else if (d.Kind == "mutation" || d.Kind == "promotion") && (resultStatus == "approved" || resultStatus == "rejected") {
+		if resultStatus == "approved" {
+			var sourceID, currentID string
+			var effectiveDate time.Time
+			if err := tx.QueryRowContext(r.Context(), `SELECT source_assignment_id,effective_date FROM employee_changes WHERE tenant_id=? AND id=?`, c.tenant.ID, d.RefID).Scan(&sourceID, &effectiveDate); err != nil {
+				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa sumber perubahan.")
+				return
+			}
+			if err := tx.QueryRowContext(r.Context(), `SELECT id FROM employee_assignments WHERE tenant_id=? AND employee_id=? AND current_flag=1 FOR UPDATE`, c.tenant.ID, d.Employee.ID).Scan(&currentID); err != nil || currentID != sourceID {
+				writeAPIError(w, r, 409, "ASSIGNMENT_CHANGED", "Penugasan karyawan sudah berubah.")
+				return
+			}
+			if effectiveDate.Format("2006-01-02") < tenantToday(c.tenant.Timezone) {
+				writeAPIError(w, r, 409, "DATE_CONFLICT", "Tanggal efektif perubahan sudah berlalu.")
+				return
+			}
+		}
+		result, err := tx.ExecContext(r.Context(), `UPDATE employee_changes SET status=?,version=version+1 WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, resultStatus, c.tenant.ID, d.RefID, d.RequestID)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mencatat keputusan perubahan karyawan.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status perubahan karyawan telah berubah.")
 			return
 		}
 	}

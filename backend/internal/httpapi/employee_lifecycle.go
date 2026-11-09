@@ -133,6 +133,32 @@ func (a adminAPI) getEmployeeTimeline(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca timeline kontrak.")
 		return
 	}
+	rows, err = a.db.QueryContext(r.Context(), `SELECT id,created_at,change_type,status,DATE_FORMAT(effective_date,'%Y-%m-%d'),applied_at FROM employee_changes WHERE tenant_id=? AND employee_id=? ORDER BY created_at DESC LIMIT 100`, c.tenant.ID, id)
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca timeline mutasi.")
+		return
+	}
+	for rows.Next() {
+		var ref, kind, status, effective string
+		var at time.Time
+		var applied sql.NullTime
+		if err = rows.Scan(&ref, &at, &kind, &status, &effective, &applied); err != nil {
+			break
+		}
+		details := map[string]any{"change_type": kind, "status": status, "effective_date": effective, "applied_at": nil}
+		if applied.Valid {
+			details["applied_at"] = applied.Time
+		}
+		events = append(events, employeeTimelineEvent{at, "employee_change_request", ref, details})
+	}
+	if err == nil {
+		err = rows.Err()
+	}
+	rows.Close()
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca timeline mutasi.")
+		return
+	}
 	rows, err = a.db.QueryContext(r.Context(), `SELECT id,created_at,action FROM audit_logs WHERE tenant_id=? AND entity_type='employees' AND entity_id=? ORDER BY created_at DESC LIMIT 100`, c.tenant.ID, id)
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca timeline status.")

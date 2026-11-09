@@ -36,7 +36,7 @@ func (a adminAPI) roleApproverCandidates(r *http.Request, tenantID, roleID, date
 
 func (a adminAPI) stepApproverCandidates(r *http.Request, tenantID, date string, employee employee, step approvalFlowStep) ([]string, error) {
 	switch step.ApproverKind {
-	case "reports_to":
+	case "reports_to", "manager":
 		if employee.ReportsToID == "" {
 			return []string{}, nil
 		}
@@ -52,7 +52,7 @@ func (a adminAPI) stepApproverCandidates(r *http.Request, tenantID, date string,
 			return []string{userID.String}, nil
 		}
 		return []string{}, nil
-	case "role":
+	case "role", "fallback_role":
 		if step.ApproverRefID == nil {
 			return []string{}, nil
 		}
@@ -75,7 +75,7 @@ func (a adminAPI) stepApproverCandidates(r *http.Request, tenantID, date string,
 			items = append(items, id)
 		}
 		return items, rows.Err()
-	case "membership":
+	case "membership", "user":
 		if step.ApproverRefID == nil {
 			return []string{}, nil
 		}
