@@ -43,7 +43,7 @@ func (a adminAPI) authorizedReceiptFile(w http.ResponseWriter, r *http.Request) 
 		return item, state, false
 	}
 	var uploader, claim sql.NullString
-	err = a.db.QueryRowContext(r.Context(), `SELECT f.id,f.original_name,f.mime_type,f.size_bytes,f.purpose,f.scan_status,f.created_at,f.uploaded_by,rr.reimbursement_id FROM files f LEFT JOIN reimbursement_receipts rr ON rr.tenant_id=f.tenant_id AND rr.file_id=f.id WHERE f.tenant_id=? AND f.id=? AND f.purpose='receipt' AND f.deleted_at IS NULL`, state.SelectedTenantID, id).Scan(&item.ID, &item.OriginalName, &item.MimeType, &item.SizeBytes, &item.Purpose, &item.ScanStatus, &item.CreatedAt, &uploader, &claim)
+	err = a.db.QueryRowContext(r.Context(), `SELECT f.id,f.original_name,f.mime_type,f.size_bytes,f.purpose,f.scan_status,f.created_at,f.uploaded_by,rr.reimbursement_id FROM files f LEFT JOIN reimbursement_receipts rr ON rr.tenant_id=f.tenant_id AND rr.file_id=f.id WHERE f.tenant_id=? AND f.id=? AND f.purpose IN ('receipt','selfie') AND f.deleted_at IS NULL`, state.SelectedTenantID, id).Scan(&item.ID, &item.OriginalName, &item.MimeType, &item.SizeBytes, &item.Purpose, &item.ScanStatus, &item.CreatedAt, &uploader, &claim)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
 		return item, state, false
@@ -61,7 +61,7 @@ func (a adminAPI) authorizedReceiptFile(w http.ResponseWriter, r *http.Request) 
 	if uploader.Valid && uploader.String == state.User.ID {
 		return item, state, true
 	}
-	if !claim.Valid {
+	if !claim.Valid && item.Purpose != "selfie" {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
 		return item, state, false
 	}
@@ -76,7 +76,11 @@ func (a adminAPI) authorizedReceiptFile(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
 		return item, state, false
 	}
-	subject, decision, err := a.access.Decide(r.Context(), tenant.ID, state.User.ID, tenant.Timezone, "reimbursement.lihat")
+	permission := "reimbursement.lihat"
+	if item.Purpose == "selfie" {
+		permission = "absensi.lihat"
+	}
+	subject, decision, err := a.access.Decide(r.Context(), tenant.ID, state.User.ID, tenant.Timezone, permission)
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak berkas.")
 		return item, state, false
@@ -86,7 +90,11 @@ func (a adminAPI) authorizedReceiptFile(w http.ResponseWriter, r *http.Request) 
 		return item, state, false
 	}
 	var employeeID string
-	err = a.db.QueryRowContext(r.Context(), `SELECT employee_id FROM reimbursements WHERE tenant_id=? AND id=?`, tenant.ID, claim.String).Scan(&employeeID)
+	if item.Purpose == "selfie" {
+		err = a.db.QueryRowContext(r.Context(), `SELECT employee_id FROM attendance_events WHERE tenant_id=? AND selfie_file_id=? ORDER BY created_at DESC LIMIT 1`, tenant.ID, id).Scan(&employeeID)
+	} else {
+		err = a.db.QueryRowContext(r.Context(), `SELECT employee_id FROM reimbursements WHERE tenant_id=? AND id=?`, tenant.ID, claim.String).Scan(&employeeID)
+	}
 	if err != nil {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Klaim tidak ditemukan.")
 		return item, state, false
@@ -175,7 +183,7 @@ func (a adminAPI) getReceiptContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	if err = audit(r.Context(), tx, state.SelectedTenantID, state.User.ID, "download", "files", id, nil, map[string]any{"reimbursement_id": item.ClaimID}); err != nil {
+	if err = audit(r.Context(), tx, state.SelectedTenantID, state.User.ID, "download", "files", id, nil, map[string]any{"purpose": item.Purpose}); err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mencatat unduhan.")
 		return
 	}
@@ -191,13 +199,16 @@ func (a adminAPI) getReceiptContent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a adminAPI) deleteReceiptFile(w http.ResponseWriter, r *http.Request) {
-	if receiptStorageRoot() == "" { writeAPIError(w, r, 503, "STORAGE_UNAVAILABLE", "Penyimpanan kuitansi staging belum dikonfigurasi."); return }
+	if receiptStorageRoot() == "" {
+		writeAPIError(w, r, 503, "STORAGE_UNAVAILABLE", "Penyimpanan kuitansi staging belum dikonfigurasi.")
+		return
+	}
 	item, state, ok := a.authorizedReceiptFile(w, r)
 	if !ok {
 		return
 	}
 	if item.UploadedBy != state.User.ID {
-		writeAPIError(w, r, 403, "PERMISSION_DENIED", "Hanya pengunggah yang dapat menghapus kuitansi bebas.")
+		writeAPIError(w, r, 403, "PERMISSION_DENIED", "Hanya pengunggah yang dapat menghapus berkas bebas.")
 		return
 	}
 	tx, err := a.db.BeginTx(r.Context(), nil)
@@ -215,8 +226,15 @@ func (a adminAPI) deleteReceiptFile(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa tautan berkas.")
 		return
 	}
+	if item.Purpose == "selfie" && bound == 0 {
+		err = tx.QueryRowContext(r.Context(), `SELECT (SELECT COUNT(*) FROM attendance_events WHERE tenant_id=? AND selfie_file_id=?) + (SELECT COUNT(*) FROM attendance_corrections WHERE tenant_id=? AND attachment_file_id=?)`, state.SelectedTenantID, item.ID, state.SelectedTenantID, item.ID).Scan(&bound)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa tautan selfie.")
+			return
+		}
+	}
 	if bound != 0 {
-		writeAPIError(w, r, 409, "FILE_ATTACHED", "Kuitansi yang terikat ke klaim tidak dapat dihapus.")
+		writeAPIError(w, r, 409, "FILE_ATTACHED", "Berkas yang terikat ke data tidak dapat dihapus.")
 		return
 	}
 	if _, err = tx.ExecContext(r.Context(), `UPDATE files SET deleted_at=UTC_TIMESTAMP(6) WHERE tenant_id=? AND id=?`, state.SelectedTenantID, item.ID); err != nil {

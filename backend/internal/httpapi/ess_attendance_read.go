@@ -3,6 +3,7 @@ package httpapi
 import (
 	"database/sql"
 	"net/http"
+	"strings"
 	"time"
 
 	"digaji.id/hris/internal/auth"
@@ -57,26 +58,30 @@ func (a adminAPI) mountEssAttendance(r chi.Router) {
 }
 
 type essAttendanceEvent struct {
-	ID              string     `json:"id"`
-	ShiftInstanceID string     `json:"shift_instance_id"`
-	EventType       string     `json:"event_type"`
-	OccurredAt      time.Time  `json:"occurred_at"`
-	Latitude        *float64   `json:"latitude"`
-	Longitude       *float64   `json:"longitude"`
-	LocationStatus  *string    `json:"location_status"`
-	TimingStatus    *string    `json:"timing_status"`
-	SelfieFileID    *string    `json:"selfie_file_id"`
-	DeviceTime      *time.Time `json:"device_time"`
+	ID                string     `json:"id"`
+	ShiftInstanceID   string     `json:"shift_instance_id"`
+	EventType         string     `json:"event_type"`
+	OccurredAt        time.Time  `json:"occurred_at"`
+	Latitude          *float64   `json:"latitude"`
+	Longitude         *float64   `json:"longitude"`
+	AccuracyM         *float64   `json:"accuracy_m"`
+	OfficeID          *string    `json:"office_id"`
+	GeofenceID        *string    `json:"geofence_id"`
+	LocationStatus    *string    `json:"location_status"`
+	TimingStatus      *string    `json:"timing_status"`
+	SelfieFileID      *string    `json:"selfie_file_id"`
+	SelfieDownloadURL *string    `json:"selfie_download_url,omitempty"`
+	DeviceTime        *time.Time `json:"device_time"`
 }
 
-const essEventColumns = `id,shift_instance_id,event_type,occurred_at,device_time,latitude,longitude,location_status,timing_status,selfie_file_id`
+const essEventColumns = `id,shift_instance_id,event_type,occurred_at,device_time,latitude,longitude,location_status,timing_status,selfie_file_id,accuracy_m,office_id,geofence_id`
 
 func scanEssEvent(row interface{ Scan(...any) error }) (essAttendanceEvent, error) {
 	var item essAttendanceEvent
 	var device sql.NullTime
-	var lat, lng sql.NullFloat64
-	var location, timing, selfie sql.NullString
-	err := row.Scan(&item.ID, &item.ShiftInstanceID, &item.EventType, &item.OccurredAt, &device, &lat, &lng, &location, &timing, &selfie)
+	var lat, lng, accuracy sql.NullFloat64
+	var location, timing, selfie, office, geofence sql.NullString
+	err := row.Scan(&item.ID, &item.ShiftInstanceID, &item.EventType, &item.OccurredAt, &device, &lat, &lng, &location, &timing, &selfie, &accuracy, &office, &geofence)
 	if device.Valid {
 		item.DeviceTime = &device.Time
 	}
@@ -85,6 +90,15 @@ func scanEssEvent(row interface{ Scan(...any) error }) (essAttendanceEvent, erro
 	}
 	if lng.Valid {
 		item.Longitude = &lng.Float64
+	}
+	if accuracy.Valid {
+		item.AccuracyM = &accuracy.Float64
+	}
+	if office.Valid {
+		item.OfficeID = &office.String
+	}
+	if geofence.Valid {
+		item.GeofenceID = &geofence.String
 	}
 	if location.Valid {
 		item.LocationStatus = &location.String
@@ -206,7 +220,7 @@ func (a adminAPI) essAttendanceHistory(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca riwayat.")
 		return
 	}
-	rows, err := a.db.QueryContext(r.Context(), `SELECT ev.`+essEventColumns+where+` ORDER BY ev.occurred_at DESC,ev.id DESC LIMIT ? OFFSET ?`, append(args, page.PageSize, page.Offset)...)
+	rows, err := a.db.QueryContext(r.Context(), `SELECT ev.`+strings.ReplaceAll(essEventColumns, ",", ",ev.")+where+` ORDER BY ev.occurred_at DESC,ev.id DESC LIMIT ? OFFSET ?`, append(args, page.PageSize, page.Offset)...)
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca riwayat.")
 		return

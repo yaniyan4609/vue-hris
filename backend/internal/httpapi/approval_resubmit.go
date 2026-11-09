@@ -70,6 +70,17 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			normalized[key] = text
+		case "requested_type", "requested_time", "original_event_id":
+			if key == "original_event_id" && value == nil {
+				normalized[key] = nil
+				break
+			}
+			text, ok := value.(string)
+			if !ok || text == "" || len(text) > 64 {
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field koreksi presensi tidak valid.")
+				return
+			}
+			normalized[key] = text
 		default:
 			writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field perbaikan tidak dikenal.")
 			return
@@ -106,11 +117,11 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Jenis atau jumlah kirim ulang pengajuan tidak valid.")
 		return
 	}
-	if kind != "overtime" && kind != "leave" && len(normalized) > 1 {
+	if kind != "overtime" && kind != "leave" && kind != "attendance_correction" && len(normalized) > 1 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perbaikan field domain belum tersedia untuk jenis pengajuan ini.")
 		return
 	}
-	if kind != "overtime" && kind != "leave" && kind != "reimbursement" && kind != "loan" && kind != "shift_swap" && refTable.Valid {
+	if kind != "overtime" && kind != "leave" && kind != "reimbursement" && kind != "loan" && kind != "shift_swap" && kind != "attendance_correction" && refTable.Valid {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Kirim ulang jenis pengajuan ini menunggu handler domain.")
 		return
 	}
@@ -132,6 +143,29 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if kind == "shift_swap" && (!refTable.Valid || refTable.String != "shift_swaps" || !refID.Valid) {
 		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi pertukaran shift tidak valid.")
+		return
+	}
+	if kind == "attendance_correction" && (!refTable.Valid || refTable.String != "attendance_corrections" || !refID.Valid) {
+		writeAPIError(w, r, 409, "REQUEST_INVALID", "Referensi koreksi tidak valid.")
+		return
+	}
+	if kind == "attendance_correction" {
+		for key := range normalized {
+			switch key {
+			case "note", "reason", "requested_type", "requested_time", "original_event_id", "attachment_file_id":
+			default:
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field perbaikan tidak berlaku untuk koreksi presensi.")
+				return
+			}
+		}
+	} else if _, has := normalized["requested_time"]; has {
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field koreksi presensi tidak berlaku untuk pengajuan ini.")
+		return
+	} else if _, has := normalized["requested_type"]; has {
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field koreksi presensi tidak berlaku untuk pengajuan ini.")
+		return
+	} else if _, has := normalized["original_event_id"]; has {
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Field koreksi presensi tidak berlaku untuk pengajuan ini.")
 		return
 	}
 	if kind == "overtime" {
@@ -399,6 +433,81 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 		count, _ := result.RowsAffected()
 		if count != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Pertukaran shift sudah berubah.")
+			return
+		}
+	}
+	if kind == "attendance_correction" {
+		item, e := scanCorrection(tx.QueryRowContext(r.Context(), `SELECT `+correctionColumns+` FROM attendance_corrections c WHERE c.tenant_id=? AND c.id=? AND c.request_id=? AND c.employee_id=? FOR UPDATE`, c.state.SelectedTenantID, refID.String, requestID, c.employeeID))
+		if e != nil || item.Status != "returned" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Koreksi sudah berubah.")
+			return
+		}
+		in := attendanceCorrectionInput{EmployeeID: c.employeeID, ShiftInstanceID: item.ShiftInstanceID, OriginalEventID: item.OriginalEventID, RequestedType: item.RequestedType, RequestedTime: item.RequestedTime.Format(time.RFC3339Nano), Reason: item.Reason, AttachmentFileID: item.AttachmentFileID}
+		if value, ok := normalized["reason"].(string); ok {
+			in.Reason = value
+		}
+		if value, ok := normalized["requested_type"].(string); ok {
+			in.RequestedType = value
+		}
+		if value, ok := normalized["requested_time"].(string); ok {
+			in.RequestedTime = value
+		}
+		if value, exists := normalized["original_event_id"]; exists {
+			if value == nil {
+				in.OriginalEventID = nil
+			} else {
+				id := value.(string)
+				in.OriginalEventID = &id
+			}
+		}
+		if value, exists := normalized["attachment_file_id"]; exists {
+			if value == nil {
+				in.AttachmentFileID = nil
+			} else {
+				id := value.(string)
+				in.AttachmentFileID = &id
+			}
+		}
+		at, valid := validCorrectionInput(in, c.zone)
+		if !valid {
+			writeAPIError(w, r, 400, "VALIDATION_FAILED", "Perbaikan koreksi tidak valid.")
+			return
+		}
+		instance, e := scanInstance(tx.QueryRowContext(r.Context(), `SELECT `+strings.ReplaceAll(instanceColumns, "i.", "")+` FROM shift_instances WHERE tenant_id=? AND id=? AND employee_id=? AND status<>'cancelled' FOR UPDATE`, c.state.SelectedTenantID, in.ShiftInstanceID, c.employeeID))
+		if e != nil || at.Before(instance.ExpectedStart.Add(-24*time.Hour)) || at.After(instance.ExpectedEnd.Add(24*time.Hour)) {
+			writeAPIError(w, r, 409, "SHIFT_UNAVAILABLE", "Shift koreksi tidak tersedia.")
+			return
+		}
+		if in.OriginalEventID != nil {
+			var originalType string
+			e = tx.QueryRowContext(r.Context(), `SELECT event_type FROM attendance_events WHERE tenant_id=? AND id=? AND employee_id=? AND shift_instance_id=?`, c.state.SelectedTenantID, *in.OriginalEventID, c.employeeID, in.ShiftInstanceID).Scan(&originalType)
+			if e != nil || originalType != in.RequestedType {
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Event asli tidak sesuai koreksi.")
+				return
+			}
+		}
+		if in.AttachmentFileID != nil {
+			var count int
+			e = tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND purpose='selfie' AND scan_status='clean' AND deleted_at IS NULL`, c.state.SelectedTenantID, *in.AttachmentFileID, c.state.User.ID).Scan(&count)
+			if e != nil || count != 1 {
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Lampiran tidak tersedia.")
+				return
+			}
+		}
+		var duplicate int
+		e = tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM attendance_corrections WHERE tenant_id=? AND shift_instance_id=? AND requested_type=? AND id<>? AND status IN ('in_review','returned')`, c.state.SelectedTenantID, in.ShiftInstanceID, in.RequestedType, item.ID).Scan(&duplicate)
+		if e != nil || duplicate > 0 {
+			writeAPIError(w, r, 409, "CORRECTION_EXISTS", "Koreksi aktif lain sudah ada.")
+			return
+		}
+		result, e := tx.ExecContext(r.Context(), `UPDATE attendance_corrections SET requested_type=?,requested_time=?,reason=?,original_event_id=?,attachment_file_id=?,status='in_review',version=version+1 WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='returned'`, in.RequestedType, at, in.Reason, in.OriginalEventID, in.AttachmentFileID, c.state.SelectedTenantID, refID.String, requestID, c.employeeID)
+		if e != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengirim ulang koreksi.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Koreksi sudah berubah.")
 			return
 		}
 	}

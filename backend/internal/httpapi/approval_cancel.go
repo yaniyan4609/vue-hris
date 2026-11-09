@@ -43,7 +43,7 @@ func (a adminAPI) cancelEssRequest(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 409, "REQUEST_NOT_CANCELLABLE", "Pengajuan tidak dapat dibatalkan pada status ini.")
 		return
 	}
-	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements") || (kind == "loan" && refTable.String == "employee_loans") || (kind == "shift_swap" && refTable.String == "shift_swaps"))
+	domainReady := refTable.Valid && refID.Valid && ((kind == "attendance_correction" && refTable.String == "attendance_corrections") || (kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements") || (kind == "loan" && refTable.String == "employee_loans") || (kind == "shift_swap" && refTable.String == "shift_swaps"))
 	if refTable.Valid && !domainReady {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Pembatalan jenis pengajuan ini menunggu handler domain.")
 		return
@@ -68,6 +68,18 @@ func (a adminAPI) cancelEssRequest(w http.ResponseWriter, r *http.Request) {
 		rows, _ := result.RowsAffected()
 		if rows != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status lembur tidak sesuai pengajuan.")
+			return
+		}
+	}
+	if kind == "attendance_correction" && domainReady {
+		result, e := tx.ExecContext(r.Context(), `UPDATE attendance_corrections SET status='cancelled',version=version+1 WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status IN ('in_review','returned')`, tenantID, refID.String, requestID, c.employeeID)
+		if e != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membatalkan koreksi.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Koreksi sudah berubah.")
 			return
 		}
 	}

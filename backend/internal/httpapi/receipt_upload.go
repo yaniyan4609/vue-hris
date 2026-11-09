@@ -22,6 +22,7 @@ import (
 )
 
 const maxReceiptBytes int64 = 10 << 20
+const maxSelfieBytes int64 = 5 << 20
 const stagingTenantStorageBytes int64 = 100 << 20
 
 var fileIDPattern = regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{26}$`)
@@ -48,18 +49,24 @@ func validReceiptContent(content []byte, mime string) bool {
 }
 
 func (a adminAPI) receiptUploader(w http.ResponseWriter, r *http.Request) (essAttendanceContext, bool) {
+	return a.uploaderForPurpose(w, r, "receipt")
+}
+
+func (a adminAPI) uploaderForPurpose(w http.ResponseWriter, r *http.Request, purpose string) (essAttendanceContext, bool) {
 	c, ok := a.essAttendanceContext(w, r)
 	if !ok {
 		return c, false
 	}
-	_, decision, err := a.access.Decide(r.Context(), c.state.SelectedTenantID, c.state.User.ID, c.zone.String(), "reimbursement.buat")
-	if err != nil {
-		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak unggah kuitansi.")
-		return c, false
-	}
-	if !decision.Allowed {
-		writeAPIError(w, r, 403, "PERMISSION_DENIED", "Hak mengajukan reimbursement tidak tersedia.")
-		return c, false
+	if purpose == "receipt" {
+		_, decision, err := a.access.Decide(r.Context(), c.state.SelectedTenantID, c.state.User.ID, c.zone.String(), "reimbursement.buat")
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak unggah kuitansi.")
+			return c, false
+		}
+		if !decision.Allowed {
+			writeAPIError(w, r, 403, "PERMISSION_DENIED", "Hak mengajukan reimbursement tidak tersedia.")
+			return c, false
+		}
 	}
 	if receiptStorageRoot() == "" {
 		writeAPIError(w, r, 503, "STORAGE_UNAVAILABLE", "Penyimpanan kuitansi staging belum dikonfigurasi.")
@@ -68,11 +75,26 @@ func (a adminAPI) receiptUploader(w http.ResponseWriter, r *http.Request) (essAt
 	return c, true
 }
 
-func (a adminAPI) createReceiptUpload(w http.ResponseWriter, r *http.Request) {
-	c, ok := a.receiptUploader(w, r)
-	if !ok {
-		return
+func (a adminAPI) existingUploadPurpose(w http.ResponseWriter, r *http.Request) (string, bool) {
+	state, err := a.auth.Current(r.Context(), cookieToken(r))
+	if err != nil {
+		writeAuthError(w, err)
+		return "", false
 	}
+	var purpose string
+	err = a.db.QueryRowContext(r.Context(), `SELECT purpose FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND deleted_at IS NULL AND purpose IN ('receipt','selfie')`, state.SelectedTenantID, chi.URLParam(r, "id"), state.User.ID).Scan(&purpose)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
+		return "", false
+	}
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca metadata berkas.")
+		return "", false
+	}
+	return purpose, true
+}
+
+func (a adminAPI) createReceiptUpload(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Purpose      string `json:"purpose"`
 		OriginalName string `json:"original_name"`
@@ -83,8 +105,16 @@ func (a adminAPI) createReceiptUpload(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &body) {
 		return
 	}
+	c, ok := a.uploaderForPurpose(w, r, body.Purpose)
+	if !ok {
+		return
+	}
 	body.OriginalName = strings.TrimSpace(body.OriginalName)
-	if body.Purpose != "receipt" || !receiptMimes[body.MimeType] || body.SizeBytes < 1 || body.SizeBytes > maxReceiptBytes || body.OriginalName == "" || len([]rune(body.OriginalName)) > 255 || strings.ContainsAny(body.OriginalName, "\\/\x00\r\n") || len(body.SHA256) != 64 {
+	maxSize := maxReceiptBytes
+	if body.Purpose == "selfie" {
+		maxSize = maxSelfieBytes
+	}
+	if (body.Purpose != "receipt" && body.Purpose != "selfie") || !receiptMimes[body.MimeType] || (body.Purpose == "selfie" && body.MimeType == "application/pdf") || body.SizeBytes < 1 || body.SizeBytes > maxSize || body.OriginalName == "" || len([]rune(body.OriginalName)) > 255 || strings.ContainsAny(body.OriginalName, "\\/\x00\r\n") || len(body.SHA256) != 64 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Metadata kuitansi tidak valid.")
 		return
 	}
@@ -98,7 +128,7 @@ func (a adminAPI) createReceiptUpload(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membuat ID berkas.")
 		return
 	}
-	storageKey := "receipt/" + c.state.SelectedTenantID + "/" + id
+	storageKey := body.Purpose + "/" + c.state.SelectedTenantID + "/" + id
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyimpan metadata kuitansi.")
@@ -119,11 +149,11 @@ func (a adminAPI) createReceiptUpload(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, 422, "STORAGE_QUOTA_EXCEEDED", "Kuota kuitansi staging terlampaui.")
 		return
 	}
-	if _, err = tx.ExecContext(r.Context(), `INSERT INTO files (tenant_id,id,storage_key,original_name,mime_type,size_bytes,sha256,purpose,uploaded_by,scan_status) VALUES (?,?,?,?,?,?,?,'receipt',?,'pending')`, c.state.SelectedTenantID, id, storageKey, body.OriginalName, body.MimeType, body.SizeBytes, hash, c.state.User.ID); err != nil {
+	if _, err = tx.ExecContext(r.Context(), `INSERT INTO files (tenant_id,id,storage_key,original_name,mime_type,size_bytes,sha256,purpose,uploaded_by,scan_status) VALUES (?,?,?,?,?,?,?,?,?,'pending')`, c.state.SelectedTenantID, id, storageKey, body.OriginalName, body.MimeType, body.SizeBytes, hash, body.Purpose, c.state.User.ID); err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyimpan metadata kuitansi.")
 		return
 	}
-	if err = audit(r.Context(), tx, c.state.SelectedTenantID, c.state.User.ID, "create", "files", id, nil, map[string]any{"purpose": "receipt", "name": body.OriginalName, "size_bytes": body.SizeBytes}); err != nil {
+	if err = audit(r.Context(), tx, c.state.SelectedTenantID, c.state.User.ID, "create", "files", id, nil, map[string]any{"purpose": body.Purpose, "size_bytes": body.SizeBytes}); err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mencatat unggah kuitansi.")
 		return
 	}
@@ -135,7 +165,11 @@ func (a adminAPI) createReceiptUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a adminAPI) putReceiptContent(w http.ResponseWriter, r *http.Request) {
-	c, ok := a.receiptUploader(w, r)
+	purpose, ok := a.existingUploadPurpose(w, r)
+	if !ok {
+		return
+	}
+	c, ok := a.uploaderForPurpose(w, r, purpose)
 	if !ok {
 		return
 	}
@@ -157,9 +191,13 @@ func (a adminAPI) putReceiptContent(w http.ResponseWriter, r *http.Request) {
 	}
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath)
-	length, err := io.Copy(tmp, http.MaxBytesReader(w, r.Body, maxReceiptBytes+1))
+	maxSize := maxReceiptBytes
+	if purpose == "selfie" {
+		maxSize = maxSelfieBytes
+	}
+	length, err := io.Copy(tmp, http.MaxBytesReader(w, r.Body, maxSize+1))
 	closeErr := tmp.Close()
-	if err != nil || closeErr != nil || length < 1 || length > maxReceiptBytes {
+	if err != nil || closeErr != nil || length < 1 || length > maxSize {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Isi kuitansi tidak valid atau terlalu besar.")
 		return
 	}
@@ -172,7 +210,7 @@ func (a adminAPI) putReceiptContent(w http.ResponseWriter, r *http.Request) {
 	var declared int64
 	var mime, status string
 	var created time.Time
-	err = tx.QueryRowContext(r.Context(), `SELECT size_bytes,mime_type,scan_status,created_at FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND purpose='receipt' AND deleted_at IS NULL FOR UPDATE`, c.state.SelectedTenantID, id, c.state.User.ID).Scan(&declared, &mime, &status, &created)
+	err = tx.QueryRowContext(r.Context(), `SELECT size_bytes,mime_type,scan_status,created_at FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND purpose=? AND deleted_at IS NULL FOR UPDATE`, c.state.SelectedTenantID, id, c.state.User.ID, purpose).Scan(&declared, &mime, &status, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
 		return
@@ -206,7 +244,11 @@ func (a adminAPI) putReceiptContent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a adminAPI) completeReceiptUpload(w http.ResponseWriter, r *http.Request) {
-	c, ok := a.receiptUploader(w, r)
+	purpose, ok := a.existingUploadPurpose(w, r)
+	if !ok {
+		return
+	}
+	c, ok := a.uploaderForPurpose(w, r, purpose)
 	if !ok {
 		return
 	}
@@ -224,7 +266,7 @@ func (a adminAPI) completeReceiptUpload(w http.ResponseWriter, r *http.Request) 
 	var declared int64
 	var expected []byte
 	var mime, status string
-	err = tx.QueryRowContext(r.Context(), `SELECT size_bytes,sha256,mime_type,scan_status FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND purpose='receipt' AND deleted_at IS NULL FOR UPDATE`, c.state.SelectedTenantID, id, c.state.User.ID).Scan(&declared, &expected, &mime, &status)
+	err = tx.QueryRowContext(r.Context(), `SELECT size_bytes,sha256,mime_type,scan_status FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND purpose=? AND deleted_at IS NULL FOR UPDATE`, c.state.SelectedTenantID, id, c.state.User.ID, purpose).Scan(&declared, &expected, &mime, &status)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
 		return

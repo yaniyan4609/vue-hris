@@ -128,7 +128,7 @@ func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, r, 404, "NOT_FOUND", "Pengajuan tidak ditemukan dalam scope.")
 		return
 	}
-	domainReady := refTable.Valid && refID.Valid && ((kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements") || (kind == "loan" && refTable.String == "employee_loans") || ((kind == "mutation" || kind == "promotion") && refTable.String == "employee_changes") || (kind == "termination" && refTable.String == "terminations") || (kind == "shift_swap" && refTable.String == "shift_swaps"))
+	domainReady := refTable.Valid && refID.Valid && ((kind == "attendance_correction" && refTable.String == "attendance_corrections") || (kind == "overtime" && refTable.String == "overtime_requests") || (kind == "leave" && refTable.String == "leave_requests") || (kind == "reimbursement" && refTable.String == "reimbursements") || (kind == "loan" && refTable.String == "employee_loans") || ((kind == "mutation" || kind == "promotion") && refTable.String == "employee_changes") || (kind == "termination" && refTable.String == "terminations") || (kind == "shift_swap" && refTable.String == "shift_swaps"))
 	if body.Action == "return" && refTable.Valid && !domainReady {
 		writeAPIError(w, r, 409, "ACTION_NOT_READY", "Pengembalian jenis pengajuan ini menunggu handler domain.")
 		return
@@ -156,6 +156,18 @@ func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		rows, _ := result.RowsAffected()
 		if rows != 1 {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data lembur tidak sesuai pengajuan.")
+			return
+		}
+	}
+	if kind == "attendance_correction" && domainReady {
+		result, e := tx.ExecContext(r.Context(), `UPDATE attendance_corrections SET status='returned',version=version+1 WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? AND status='in_review'`, c.tenant.ID, refID.String, requestID, subjectID.String)
+		if e != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengembalikan koreksi.")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count != 1 {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Koreksi sudah berubah.")
 			return
 		}
 	}

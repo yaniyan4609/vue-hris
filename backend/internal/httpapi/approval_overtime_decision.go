@@ -32,7 +32,12 @@ type overtimeDecision struct {
 func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request, tx *sql.Tx, c adminContext, d overtimeDecision) {
 	var proposed int
 	var domainStatus string
-	if d.Kind == "leave" {
+	if d.Kind == "attendance_correction" {
+		if err := tx.QueryRowContext(r.Context(), `SELECT status FROM attendance_corrections WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&domainStatus); err != nil || domainStatus != "in_review" {
+			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status koreksi tidak sesuai pengajuan.")
+			return
+		}
+	} else if d.Kind == "leave" {
 		if err := tx.QueryRowContext(r.Context(), `SELECT status FROM leave_requests WHERE tenant_id=? AND id=? AND request_id=? AND employee_id=? FOR UPDATE`, c.tenant.ID, d.RefID, d.RequestID, d.Employee.ID).Scan(&domainStatus); err != nil || domainStatus != "in_review" {
 			writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Status data cuti tidak sesuai pengajuan.")
 			return
@@ -171,7 +176,25 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 	} else {
 		nextLevel++
 	}
-	if d.Kind == "leave" && resultStatus == "approved" {
+	if d.Kind == "attendance_correction" && (resultStatus == "approved" || resultStatus == "rejected") {
+		if resultStatus == "approved" {
+			if err := a.applyApprovedAttendanceCorrection(r, tx, c, d); err != nil {
+				writeAPIError(w, r, 409, "CORRECTION_CONFLICT", err.Error())
+				return
+			}
+		} else {
+			result, err := tx.ExecContext(r.Context(), `UPDATE attendance_corrections SET status='rejected',version=version+1 WHERE tenant_id=? AND id=? AND request_id=? AND status='in_review'`, c.tenant.ID, d.RefID, d.RequestID)
+			if err != nil {
+				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menolak koreksi.")
+				return
+			}
+			count, _ := result.RowsAffected()
+			if count != 1 {
+				writeAPIError(w, r, 409, "DOMAIN_CONFLICT", "Koreksi sudah berubah.")
+				return
+			}
+		}
+	} else if d.Kind == "leave" && resultStatus == "approved" {
 		if err := approveLeaveLedger(r, tx, c.tenant.ID, d); err != nil {
 			writeLeaveIssue(w, r, err)
 			return

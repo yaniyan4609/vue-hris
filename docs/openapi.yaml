@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.34.0
+  version: 0.35.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -3104,6 +3104,73 @@ paths:
       responses:
         '200': { description: Tanggal lokal, shift instance bila ada, event, dan kantor diizinkan }
         '404': { description: Akun ESS belum memiliki profil karyawan aktif }
+  /api/v1/ess/attendance/clock-in:
+    post:
+      tags: [Schedule]
+      operationId: clockInEss
+      summary: Catat presensi masuk berdasarkan waktu server dan shift terbit
+      description: client_event_id unik per percobaan. Retry mengembalikan event lama. GPS maksimal 100 meter bila lokasi wajib; selfie harus berkas clean milik sendiri. Shift yang meminta face recognition mengembalikan 503 hingga provider tersedia.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttendanceClockInput' }
+      responses:
+        '201': { description: Event masuk baru dengan timing_status dan location_status }
+        '200': { description: Retry idempotent, event yang sama }
+        '403': { description: Di luar geofence kantor yang diizinkan }
+        '404': { description: Shift terbit tidak tersedia }
+        '409': { description: Di luar jendela, sudah clock-in, atau ID percobaan bentrok }
+        '422': { description: Akurasi lokasi rendah atau selfie wajib belum tersedia }
+        '503': { description: Provider face recognition wajib belum tersedia }
+  /api/v1/ess/attendance/clock-out:
+    post:
+      tags: [Schedule]
+      operationId: clockOutEss
+      summary: Catat presensi pulang dan hitung ulang rekap harian
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttendanceClockInput' }
+      responses:
+        '201': { description: Event pulang baru, reminder dibatalkan }
+        '200': { description: Retry idempotent, event yang sama }
+        '403': { description: Di luar geofence }
+        '404': { description: Shift terbit tidak tersedia }
+        '409': { description: Di luar jendela, belum clock-in, atau sudah clock-out }
+        '422': { description: Akurasi atau selfie tidak memenuhi aturan }
+        '503': { description: Provider face recognition wajib belum tersedia }
+  /api/v1/ess/attendance/corrections:
+    get:
+      tags: [Schedule]
+      operationId: listEssAttendanceCorrections
+      summary: Koreksi presensi milik sendiri
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: status, schema: { type: string, enum: [in_review, returned, approved, rejected, cancelled] } }
+      responses:
+        '200': { description: Daftar koreksi dan request_id untuk riwayat approval }
+    post:
+      tags: [Schedule]
+      operationId: createEssAttendanceCorrection
+      summary: Ajukan koreksi pada shift sendiri melalui approval
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttendanceCorrectionInput' }
+      responses:
+        '201': { description: Koreksi dan request approval dibuat dalam satu transaksi }
+        '400': { description: Jenis, waktu, event asli, atau lampiran tidak valid }
+        '409': { description: Koreksi aktif sudah ada atau alur/approver belum tersedia }
   /api/v1/ess/attendance/location-check:
     post:
       tags: [Schedule]
@@ -3164,6 +3231,152 @@ paths:
           schema: { type: string, pattern: '^\d{4}-\d{2}$', example: '2026-11' }
       responses:
         '200': { description: Ringkasan dihitung dari attendance_daily }
+  /api/v1/admin/attendance/today:
+    get:
+      tags: [Schedule]
+      operationId: listAdminAttendanceToday
+      x-permission: absensi.lihat
+      summary: Shift dan status presensi hari lokal tenant dalam scope
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: date, schema: { type: string, format: date } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: office_id, schema: { type: string } }
+        - { in: query, name: department_id, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string, enum: [absent, incomplete, present, late] } }
+      responses:
+        '200': { description: Daftar status shift, kosong bila belum ada }
+  /api/v1/admin/attendance/not-yet:
+    get:
+      tags: [Schedule]
+      operationId: listAdminAttendanceNotYet
+      x-permission: absensi.monitor_bawahan
+      summary: Karyawan tanpa clock-in, termasuk tanpa roster; kategori cuti, libur, menunggu koreksi, belum waktunya, belum absen, atau tidak dijadwalkan
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: date, schema: { type: string, format: date } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: office_id, schema: { type: string } }
+        - { in: query, name: department_id, schema: { type: string } }
+      responses:
+        '200': { description: Daftar karyawan dalam scope yang belum memiliki first_in pada tanggal itu }
+  /api/v1/admin/attendance/events:
+    get:
+      tags: [Schedule]
+      operationId: listAdminAttendanceEvents
+      x-permission: absensi.lihat
+      summary: Event mentah dalam tenant dan scope karyawan
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: event_type, schema: { type: string, enum: [clock_in, clock_out, correction_in, correction_out] } }
+        - { in: query, name: timing_status, schema: { type: string, enum: [on_time, late, early_leave, out_of_window] } }
+        - { in: query, name: location_status, schema: { type: string, enum: [inside, outside, flexible, unknown] } }
+      responses:
+        '200': { description: Event mentah, rentang maksimal 93 hari }
+  /api/v1/admin/attendance/events/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Schedule]
+      operationId: getAdminAttendanceEvent
+      x-permission: absensi.lihat
+      summary: Detail event dalam scope dengan koordinat, geofence, dan selfie_download_url bila ada
+      responses:
+        '200': { description: Event presensi }
+        '404': { description: Event tidak ada dalam scope }
+  /api/v1/admin/attendance/daily:
+    get:
+      tags: [Schedule]
+      operationId: listAdminAttendanceDaily
+      x-permission: absensi.lihat
+      summary: Rekap shift harian dalam scope; shift tanpa event berstatus absent
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: employee_id, schema: { type: string } }
+      responses:
+        '200': { description: Rekap rentang maksimal 93 hari }
+  /api/v1/admin/attendance/summary:
+    get:
+      tags: [Schedule]
+      operationId: getAdminAttendanceSummary
+      x-permission: absensi.lihat
+      summary: Agregat shift, hadir, terlambat, belum hadir, dan menit kerja dalam scope
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: group_by, schema: { type: string, enum: [employee, department] } }
+        - { in: query, name: employee_id, schema: { type: string } }
+        - { in: query, name: office_id, schema: { type: string } }
+        - { in: query, name: department_id, schema: { type: string } }
+      responses:
+        '200': { description: Agregat rentang maksimal 93 hari }
+  /api/v1/admin/attendance/recalculate:
+    post:
+      tags: [Schedule]
+      operationId: recalculateAdminAttendance
+      x-permission: absensi.koreksi
+      summary: Hitung ulang daily dari event immutable dalam scope
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+                employee_id: { type: string }
+      responses:
+        '200': { description: Jumlah shift dihitung ulang dan audit }
+        '422': { description: Lebih dari 1000 shift dalam satu permintaan }
+  /api/v1/admin/attendance/corrections:
+    get:
+      tags: [Schedule]
+      operationId: listAdminAttendanceCorrections
+      x-permission: absensi.lihat
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: Koreksi dalam scope karyawan }
+    post:
+      tags: [Schedule]
+      operationId: createAdminAttendanceCorrection
+      x-permission: absensi.koreksi
+      summary: Ajukan koreksi atas nama karyawan dalam scope, tetap melalui approval
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttendanceCorrectionInput' }
+      responses:
+        '201': { description: Koreksi dan request approval dibuat }
+        '404': { description: Karyawan atau shift di luar scope }
+  /api/v1/admin/attendance/corrections/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Schedule]
+      operationId: getAdminAttendanceCorrection
+      x-permission: absensi.lihat
+      responses:
+        '200': { description: Koreksi, status/versi approval, dan riwayat keputusan }
+        '404': { description: Koreksi di luar scope }
   /api/v1/admin/approvals/inbox:
     get:
       tags: [Approvals]
@@ -4424,9 +4637,8 @@ paths:
     post:
       tags: [Files]
       operationId: createReceiptUpload
-      x-permission: reimbursement.buat
-      summary: Minta unggah kuitansi di staging
-      description: Hanya purpose receipt, PNG/JPEG/PDF hingga 10 MiB. Penyimpanan lokal staging dibatasi 100 MiB per tenant. Endpoint tidak tersedia di luar staging.
+      summary: Minta unggah kuitansi atau selfie di staging
+      description: Receipt memerlukan reimbursement.buat, PNG/JPEG/PDF hingga 10 MiB. Selfie milik ESS menerima PNG/JPEG hingga 5 MiB. Penyimpanan lokal staging dibatasi 100 MiB per tenant.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -4444,7 +4656,7 @@ paths:
     get:
       tags: [Files]
       operationId: getReceiptContent
-      summary: Unduh kuitansi melalui tautan sementara
+      summary: Unduh kuitansi atau selfie melalui tautan sementara
       description: Dipakai oleh redirect download. Signature terikat sesi dan berlaku paling lama lima menit; hak file diperiksa ulang dan unduhan diaudit.
       parameters:
         - { in: query, name: expires, required: true, schema: { type: integer } }
@@ -4455,7 +4667,7 @@ paths:
     put:
       tags: [Files]
       operationId: putReceiptContent
-      summary: Kirim byte kuitansi milik pengunggah
+      summary: Kirim byte kuitansi atau selfie milik pengunggah
       description: Rute tambahan untuk adapter lokal staging; kirim Content-Type sesuai permintaan unggah dan X-CSRF-Token.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
@@ -4878,14 +5090,35 @@ components:
       properties:
         amount: { type: number, multipleOf: 0.01, exclusiveMinimum: 0, description: Nominal kasbon tanpa bunga }
         tenor_months: { type: integer, minimum: 1, maximum: 120 }
+    AttendanceClockInput:
+      type: object
+      required: [client_event_id]
+      properties:
+        client_event_id: { type: string, minLength: 8, maxLength: 96, pattern: '^[A-Za-z0-9_.:-]+$' }
+        lat: { type: number, minimum: -90, maximum: 90, nullable: true }
+        lng: { type: number, minimum: -180, maximum: 180, nullable: true }
+        accuracy_m: { type: number, exclusiveMinimum: 0, nullable: true }
+        device_time: { type: string, format: date-time, nullable: true, description: Informasi saja; waktu resmi berasal dari server }
+        selfie_file_id: { type: string, nullable: true, minLength: 26, maxLength: 26 }
+    AttendanceCorrectionInput:
+      type: object
+      required: [shift_instance_id, requested_type, requested_time, reason]
+      properties:
+        employee_id: { type: string, description: Wajib untuk Admin; diabaikan oleh ESS }
+        shift_instance_id: { type: string, minLength: 26, maxLength: 26 }
+        original_event_id: { type: string, nullable: true, minLength: 26, maxLength: 26 }
+        requested_type: { type: string, enum: [clock_in, clock_out] }
+        requested_time: { type: string, format: date-time, description: Maksimal 32 hari lalu dan sekitar shift }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+        attachment_file_id: { type: string, nullable: true, description: Selfie clean milik pengaju }
     ReceiptUploadInput:
       type: object
       required: [purpose, original_name, mime_type, size_bytes, sha256]
       properties:
-        purpose: { type: string, enum: [receipt] }
+        purpose: { type: string, enum: [receipt, selfie] }
         original_name: { type: string, minLength: 1, maxLength: 255 }
         mime_type: { type: string, enum: [application/pdf, image/jpeg, image/png] }
-        size_bytes: { type: integer, minimum: 1, maximum: 10485760 }
+        size_bytes: { type: integer, minimum: 1, maximum: 10485760, description: Selfie maksimal 5242880 byte }
         sha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
     ReimbursementInput:
       type: object

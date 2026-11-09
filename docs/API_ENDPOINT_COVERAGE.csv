@@ -57,14 +57,14 @@ GET,/api/v1/admin/approvals/inbox,10.1 Admin: inbox dan keputusan,active
 GET,/api/v1/admin/approvals/summary,10.1 Admin: inbox dan keputusan,active
 GET,/api/v1/admin/approvals/{requestId},10.1 Admin: inbox dan keputusan,active
 GET,/api/v1/admin/assets,7.7 Aset karyawan,active
-GET,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,planned
-GET,/api/v1/admin/attendance/corrections/{id},8.2 Admin: monitor dan rekap,planned
-GET,/api/v1/admin/attendance/daily,8.2 Admin: monitor dan rekap,planned
-GET,/api/v1/admin/attendance/events,8.2 Admin: monitor dan rekap,planned
-GET,/api/v1/admin/attendance/events/{id},8.2 Admin: monitor dan rekap,planned
-GET,/api/v1/admin/attendance/not-yet,8.2 Admin: monitor dan rekap,planned
-GET,/api/v1/admin/attendance/summary,8.2 Admin: monitor dan rekap,planned
-GET,/api/v1/admin/attendance/today,8.2 Admin: monitor dan rekap,planned
+GET,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,active
+GET,/api/v1/admin/attendance/corrections/{id},8.2 Admin: monitor dan rekap,active
+GET,/api/v1/admin/attendance/daily,8.2 Admin: monitor dan rekap,active
+GET,/api/v1/admin/attendance/events,8.2 Admin: monitor dan rekap,active
+GET,/api/v1/admin/attendance/events/{id},8.2 Admin: monitor dan rekap,active
+GET,/api/v1/admin/attendance/not-yet,8.2 Admin: monitor dan rekap,active
+GET,/api/v1/admin/attendance/summary,8.2 Admin: monitor dan rekap,active
+GET,/api/v1/admin/attendance/today,8.2 Admin: monitor dan rekap,active
 GET,/api/v1/admin/audit-logs,14.4 Audit dan keamanan,planned
 GET,/api/v1/admin/audit-logs/{id},14.4 Audit dan keamanan,planned
 GET,/api/v1/admin/broadcasts,13.3 Broadcast / pengumuman,planned
@@ -210,7 +210,7 @@ GET,/api/v1/directory/employees/{id},7.9 Direktori (Teman Kantor),planned
 GET,/api/v1/ess/announcements,13.3 Broadcast / pengumuman,planned
 GET,/api/v1/ess/announcements/{id},13.3 Broadcast / pengumuman,planned
 GET,/api/v1/ess/attendance/calendar,8.1 ESS: absensi dan jadwal pribadi,active
-GET,/api/v1/ess/attendance/corrections,8.1 ESS: absensi dan jadwal pribadi,planned
+GET,/api/v1/ess/attendance/corrections,8.1 ESS: absensi dan jadwal pribadi,active
 GET,/api/v1/ess/attendance/history,8.1 ESS: absensi dan jadwal pribadi,active
 GET,/api/v1/ess/attendance/summary,8.1 ESS: absensi dan jadwal pribadi,active
 GET,/api/v1/ess/attendance/today,8.1 ESS: absensi dan jadwal pribadi,active
@@ -338,8 +338,8 @@ POST,/api/v1/admin/approvals/bulk-actions,10.1 Admin: inbox dan keputusan,active
 POST,/api/v1/admin/approvals/{requestId}/actions,10.1 Admin: inbox dan keputusan,active
 POST,/api/v1/admin/approvals/{requestId}/reassign,10.1 Admin: inbox dan keputusan,active
 POST,/api/v1/admin/assets,7.7 Aset karyawan,active
-POST,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,planned
-POST,/api/v1/admin/attendance/recalculate,8.2 Admin: monitor dan rekap,planned
+POST,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,active
+POST,/api/v1/admin/attendance/recalculate,8.2 Admin: monitor dan rekap,active
 POST,/api/v1/admin/audit-logs/export,14.4 Audit dan keamanan,planned
 POST,/api/v1/admin/broadcasts,13.3 Broadcast / pengumuman,planned
 POST,/api/v1/admin/broadcasts/audience-preview,13.3 Broadcast / pengumuman,planned
@@ -438,9 +438,9 @@ POST,/api/v1/auth/password/forgot,"4. Autentikasi, akun, dan sesi",active
 POST,/api/v1/auth/password/reset,"4. Autentikasi, akun, dan sesi",active
 POST,/api/v1/auth/reauth,"4. Autentikasi, akun, dan sesi",active
 POST,/api/v1/auth/switch-tenant,"4. Autentikasi, akun, dan sesi",active
-POST,/api/v1/ess/attendance/clock-in,8.1 ESS: absensi dan jadwal pribadi,planned
-POST,/api/v1/ess/attendance/clock-out,8.1 ESS: absensi dan jadwal pribadi,planned
-POST,/api/v1/ess/attendance/corrections,8.1 ESS: absensi dan jadwal pribadi,planned
+POST,/api/v1/ess/attendance/clock-in,8.1 ESS: absensi dan jadwal pribadi,active
+POST,/api/v1/ess/attendance/clock-out,8.1 ESS: absensi dan jadwal pribadi,active
+POST,/api/v1/ess/attendance/corrections,8.1 ESS: absensi dan jadwal pribadi,active
 POST,/api/v1/ess/attendance/location-check,8.1 ESS: absensi dan jadwal pribadi,active
 POST,/api/v1/ess/documents,12.2 Dokumen,planned
 POST,/api/v1/ess/leave-requests,9.1 ESS: cuti dan izin,active
