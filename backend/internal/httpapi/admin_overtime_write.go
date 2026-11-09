@@ -229,7 +229,7 @@ func (a adminAPI) updateAdminOvertime(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan approver.")
 			return
 		}
-		approvers, e = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, "lembur.approve", candidates)
+		approvers, e = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, "lembur.approve", candidates, "overtime")
 		if e != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa approver.")
 			return
@@ -247,7 +247,7 @@ func (a adminAPI) updateAdminOvertime(w http.ResponseWriter, r *http.Request) {
 					writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca fallback.")
 					return
 				}
-				approvers, e = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, "lembur.approve", candidates)
+				approvers, e = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, "lembur.approve", candidates, "overtime")
 				if e != nil {
 					writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa fallback.")
 					return

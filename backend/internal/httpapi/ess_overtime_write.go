@@ -111,7 +111,7 @@ func (a adminAPI) createOvertimeSubmission(w http.ResponseWriter, r *http.Reques
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan approver.")
 		return
 	}
-	eligible, err := a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "lembur.approve", candidates)
+	eligible, err := a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "lembur.approve", candidates, "overtime")
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak approver.")
 		return
@@ -122,7 +122,7 @@ func (a adminAPI) createOvertimeSubmission(w http.ResponseWriter, r *http.Reques
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan fallback approver.")
 			return
 		}
-		eligible, err = a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "lembur.approve", candidates)
+		eligible, err = a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "lembur.approve", candidates, "overtime")
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak fallback.")
 			return
@@ -135,7 +135,7 @@ func (a adminAPI) createOvertimeSubmission(w http.ResponseWriter, r *http.Reques
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan fallback approver.")
 			return
 		}
-		eligible, err = a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "lembur.approve", candidates)
+		eligible, err = a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "lembur.approve", candidates, "overtime")
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak fallback.")
 			return

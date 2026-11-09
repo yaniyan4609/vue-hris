@@ -94,7 +94,7 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan approver tahap berikutnya.")
 			return
 		}
-		nextAssignees, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, d.Employee, d.Target, approvalPermissions[d.Kind], candidates)
+		nextAssignees, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, d.Employee, d.Target, approvalPermissions[d.Kind], candidates, d.Kind)
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak approver berikutnya.")
 			return
@@ -112,7 +112,7 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 					writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan fallback approver.")
 					return
 				}
-				nextAssignees, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, d.Employee, d.Target, approvalPermissions[d.Kind], candidates)
+				nextAssignees, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, d.Employee, d.Target, approvalPermissions[d.Kind], candidates, d.Kind)
 				if err != nil {
 					writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak fallback.")
 					return
@@ -248,9 +248,14 @@ func (a adminAPI) decideOvertimeApproval(w http.ResponseWriter, r *http.Request,
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mencatat audit.")
 		return
 	}
+	result := map[string]any{"request_id": d.RequestID, "status": resultStatus, "attempt_no": d.AttemptNo, "version": d.RequestVersion + 1, "approval_version": d.InstanceVersion + 1, "current_level": nextLevel, "action_id": actionID}
+	if err := persistApprovalBulkSuccess(r.Context(), tx, result); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyimpan hasil batch persetujuan.")
+		return
+	}
 	if err := tx.Commit(); err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyimpan keputusan.")
 		return
 	}
-	writeAPIData(w, 200, map[string]any{"request_id": d.RequestID, "status": resultStatus, "attempt_no": d.AttemptNo, "version": d.RequestVersion + 1, "approval_version": d.InstanceVersion + 1, "current_level": nextLevel, "action_id": actionID}, nil)
+	writeAPIData(w, 200, result, nil)
 }

@@ -92,7 +92,68 @@ func (a adminAPI) stepApproverCandidates(r *http.Request, tenantID, date string,
 	}
 }
 
-func (a adminAPI) eligibleApprovers(r *http.Request, tenantID, timezone string, employee employee, target access.Target, permission string, candidates []string) ([]string, error) {
+func (a adminAPI) eligibleApprovers(r *http.Request, tenantID, timezone string, employee employee, target access.Target, permission string, candidates []string, requestType ...string) ([]string, error) {
+	selected, err := a.eligibleApproversDirect(r, tenantID, timezone, employee, target, permission, candidates)
+	if err != nil {
+		return nil, err
+	}
+	if len(selected) == 0 {
+		return selected, nil
+	}
+	kind := ""
+	if len(requestType) > 0 {
+		kind = requestType[0]
+	}
+	if kind == "" {
+		for name, code := range approvalPermissions {
+			if code == permission {
+				if kind != "" {
+					kind = ""
+					break
+				}
+				kind = name
+			}
+		}
+	}
+	zone, err := time.LoadLocation(timezone)
+	if err != nil {
+		zone = time.UTC
+	}
+	today := time.Now().In(zone).Format("2006-01-02")
+	resolved := []string{}
+	seen := map[string]bool{}
+	for _, from := range selected {
+		assignee := from
+		var to, delegator string
+		err = a.db.QueryRowContext(r.Context(), `SELECT to_user_id,COALESCE(created_by,'') FROM approval_delegations WHERE tenant_id=? AND from_user_id=? AND revoked_at IS NULL AND valid_from<=? AND (valid_to IS NULL OR valid_to>=?) AND (request_type=? OR request_type IS NULL) ORDER BY request_type IS NULL,created_at DESC,id DESC LIMIT 1`, tenantID, from, today, today, kind).Scan(&to, &delegator)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		if err == nil && delegator != "" && to != employee.UserID {
+			actorSubject, actorRight, e := a.access.Decide(r.Context(), tenantID, delegator, timezone, "persetujuan.delegasikan")
+			if e != nil {
+				return nil, e
+			}
+			if actorRight.Allowed && actorRight.Includes(actorSubject, target) {
+				eligible, e := a.eligibleApproversDirect(r, tenantID, timezone, employee, target, permission, []string{to})
+				if e != nil {
+					return nil, e
+				}
+				if len(eligible) == 1 {
+					assignee = to
+				}
+			}
+		}
+		if !seen[assignee] {
+			seen[assignee] = true
+			resolved = append(resolved, assignee)
+		}
+	}
+	sort.Strings(resolved)
+	return resolved, nil
+}
+
+func (a adminAPI) eligibleApproversDirect(r *http.Request, tenantID, timezone string, employee employee, target access.Target, permission string, candidates []string) ([]string, error) {
 	if len(candidates) > 200 {
 		return nil, errors.New("too many candidate approvers")
 	}
@@ -210,7 +271,7 @@ func (a adminAPI) simulateApprovalFlow(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan approver.")
 			return
 		}
-		eligible, err := a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, permission, candidates)
+		eligible, err := a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, permission, candidates, body.RequestType)
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak approver.")
 			return
@@ -222,7 +283,7 @@ func (a adminAPI) simulateApprovalFlow(w http.ResponseWriter, r *http.Request) {
 				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan fallback.")
 				return
 			}
-			eligible, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, permission, candidates)
+			eligible, err = a.eligibleApprovers(r, c.tenant.ID, c.tenant.Timezone, employee, target, permission, candidates, body.RequestType)
 			if err != nil {
 				writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak fallback.")
 				return

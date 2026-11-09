@@ -103,7 +103,7 @@ func (a adminAPI) fallbackLeaveApprovers(r *http.Request, tenantID, employeeID, 
 	if err != nil {
 		return nil, err
 	}
-	eligible, err := a.eligibleApprovers(r, tenantID, zone, employee, target, "cuti.approve", candidates)
+	eligible, err := a.eligibleApprovers(r, tenantID, zone, employee, target, "cuti.approve", candidates, "leave")
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (a adminAPI) prepareLeave(r *http.Request, q leaveQuery, tenantID, employee
 	if err != nil {
 		return p, err
 	}
-	p.Approvers, err = a.eligibleApprovers(r, tenantID, zone, employee, target, "cuti.approve", candidates)
+	p.Approvers, err = a.eligibleApprovers(r, tenantID, zone, employee, target, "cuti.approve", candidates, "leave")
 	if err != nil {
 		return p, err
 	}
@@ -263,7 +263,7 @@ func (a adminAPI) prepareLeave(r *http.Request, q leaveQuery, tenantID, employee
 		if err != nil {
 			return p, err
 		}
-		p.Approvers, err = a.eligibleApprovers(r, tenantID, zone, employee, target, "cuti.approve", candidates)
+		p.Approvers, err = a.eligibleApprovers(r, tenantID, zone, employee, target, "cuti.approve", candidates, "leave")
 		if err != nil {
 			return p, err
 		}

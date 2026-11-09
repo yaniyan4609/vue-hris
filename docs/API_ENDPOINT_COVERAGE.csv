@@ -1,7 +1,7 @@
 method,path,section,status
 DELETE,/api/v1/admin/agenda-events/{id},12.3 Agenda,planned
 DELETE,/api/v1/admin/api-keys/{id},14.5 Pengaturan tenant dan langganan,planned
-DELETE,/api/v1/admin/approval-delegations/{id},10.3 Pengaturan alur approval,planned
+DELETE,/api/v1/admin/approval-delegations/{id},10.3 Pengaturan alur approval,active
 DELETE,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,active
 DELETE,/api/v1/admin/assets/{id},7.7 Aset karyawan,planned
 DELETE,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
@@ -49,7 +49,7 @@ DELETE,/api/v1/push/subscriptions/{id},13.1 Inbox dan preferensi (semua pengguna
 GET,/api/v1/admin/access-reviews,5.3 Hak akses per pengguna,planned
 GET,/api/v1/admin/agenda-events,12.3 Agenda,planned
 GET,/api/v1/admin/api-keys,14.5 Pengaturan tenant dan langganan,planned
-GET,/api/v1/admin/approval-delegations,10.3 Pengaturan alur approval,planned
+GET,/api/v1/admin/approval-delegations,10.3 Pengaturan alur approval,active
 GET,/api/v1/admin/approval-flows,10.3 Pengaturan alur approval,active
 GET,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,active
 GET,/api/v1/admin/approvals,10.1 Admin: inbox dan keputusan,active
@@ -330,13 +330,13 @@ PATCH,/api/v1/platform/tickets/{id},"15.3 Staf, tiket, analitik, pengaturan",pla
 POST,/api/v1/admin/access-reviews,5.3 Hak akses per pengguna,planned
 POST,/api/v1/admin/agenda-events,12.3 Agenda,planned
 POST,/api/v1/admin/api-keys,14.5 Pengaturan tenant dan langganan,planned
-POST,/api/v1/admin/approval-delegations,10.3 Pengaturan alur approval,planned
+POST,/api/v1/admin/approval-delegations,10.3 Pengaturan alur approval,active
 POST,/api/v1/admin/approval-flows,10.3 Pengaturan alur approval,active
 POST,/api/v1/admin/approval-flows/simulate,10.3 Pengaturan alur approval,active
 POST,/api/v1/admin/approval-flows/{id}/set-default,10.3 Pengaturan alur approval,active
-POST,/api/v1/admin/approvals/bulk-actions,10.1 Admin: inbox dan keputusan,planned
+POST,/api/v1/admin/approvals/bulk-actions,10.1 Admin: inbox dan keputusan,active
 POST,/api/v1/admin/approvals/{requestId}/actions,10.1 Admin: inbox dan keputusan,active
-POST,/api/v1/admin/approvals/{requestId}/reassign,10.1 Admin: inbox dan keputusan,planned
+POST,/api/v1/admin/approvals/{requestId}/reassign,10.1 Admin: inbox dan keputusan,active
 POST,/api/v1/admin/assets,7.7 Aset karyawan,planned
 POST,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,planned
 POST,/api/v1/admin/attendance/recalculate,8.2 Admin: monitor dan rekap,planned

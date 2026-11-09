@@ -236,9 +236,14 @@ func (a adminAPI) decideApprovalRequest(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mencatat audit.")
 		return
 	}
+	result := map[string]any{"request_id": requestID, "status": "returned", "attempt_no": attemptNo, "version": requestVersion + 1, "approval_version": instanceVersion + 1, "action_id": actionID}
+	if err := persistApprovalBulkSuccess(r.Context(), tx, result); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menyimpan hasil batch persetujuan.")
+		return
+	}
 	if err := tx.Commit(); err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengembalikan pengajuan.")
 		return
 	}
-	writeAPIData(w, 200, map[string]any{"request_id": requestID, "status": "returned", "attempt_no": attemptNo, "version": requestVersion + 1, "approval_version": instanceVersion + 1, "action_id": actionID}, nil)
+	writeAPIData(w, 200, result, nil)
 }

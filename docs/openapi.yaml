@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.28.0
+  version: 0.29.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -2658,6 +2658,54 @@ paths:
       responses:
         '200': { description: Alur default baru; alur default sebelumnya dilepas dan diaudit }
         '409': { description: Alur tidak aktif atau belum memiliki tahap }
+  /api/v1/admin/approval-delegations:
+    get:
+      tags: [Approvals]
+      operationId: listApprovalDelegations
+      x-permission: persetujuan.delegasikan
+      summary: Daftar delegasi manual dalam tenant
+      description: Pengguna dengan scope terbatas hanya melihat aturan yang dibuatnya. Filter from_user_id, request_type, dan active tersedia.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - { in: query, name: from_user_id, schema: { type: string } }
+        - { in: query, name: request_type, schema: { type: string } }
+        - { in: query, name: active, schema: { type: boolean } }
+      responses:
+        '200': { description: Aturan delegasi dan metadata paginasi }
+        '403': { description: Permission atau entitlement tidak tersedia }
+    post:
+      tags: [Approvals]
+      operationId: createApprovalDelegation
+      x-permission: persetujuan.delegasikan
+      summary: Jadwalkan delegasi tugas approval baru
+      description: Memerlukan reauth. Aturan berjenis tertentu mengharuskan pembuat, sumber, dan penerima mempunyai permission approve. Pada setiap tugas baru, scope ketiganya diuji kembali; penerima tidak mewarisi hak sumber. Rentang tumpang tindih dan delegasi timbal balik ditolak. Tugas yang sudah terbentuk dialihkan lewat reassign.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalDelegationInput' }
+      responses:
+        '201': { description: Aturan tersimpan dan diaudit }
+        '403': { description: Permission, scope, atau reauth tidak cukup }
+        '409': { description: Keanggotaan tidak aktif, rentang tumpang tindih, atau siklus delegasi }
+  /api/v1/admin/approval-delegations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    delete:
+      tags: [Approvals]
+      operationId: revokeApprovalDelegation
+      x-permission: persetujuan.delegasikan
+      summary: Cabut aturan delegasi untuk tugas baru
+      description: Tugas yang sudah terbentuk tetap mempunyai assignee dan dapat dialihkan lewat reassign.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      responses:
+        '204': { description: Aturan dicabut atau sebelumnya sudah dicabut }
+        '403': { description: Di luar kewenangan pembuat atau scope seluruh tenant }
+        '404': { description: Aturan tidak ditemukan pada tenant }
   /api/v1/admin/approvals/summary:
     get:
       tags: [Approvals]
@@ -2690,7 +2738,7 @@ paths:
       operationId: getApproval
       x-permission: persetujuan.lihat
       responses:
-        '200': { description: Pengajuan, approval instance, tugas, riwayat aksi, dan seluruh revisi per percobaan }
+        '200': { description: Pengajuan, instance, tugas, aksi, pengalihan, dan revisi per percobaan }
         '404': { description: Pengajuan di luar tenant atau scope }
   /api/v1/admin/approvals/{requestId}/actions:
     parameters:
@@ -2723,6 +2771,62 @@ paths:
         '200': { description: Versi naik; tugas lain ditutup; tahap berikutnya atau status akhir terisi }
         '403': { description: Bukan assignee atau tanpa permission }
         '409': { description: Versi atau tahap berubah }
+  /api/v1/admin/approvals/bulk-actions:
+    post:
+      tags: [Approvals]
+      operationId: approvalBulkActions
+      x-permission: persetujuan.lihat
+      summary: Putuskan 1–100 tugas secara terpisah
+      description: Tiap item memakai pemeriksaan assignee, permission approve, scope, versi, transaksi domain, audit, dan outbox yang sama dengan endpoint actions. Hasil per item tetap sama pada retry Idempotency-Key dan respons replay diberi Idempotent-Replay true. Kunci yang dipakai untuk body berbeda ditolak.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { $ref: '#/components/schemas/ApprovalBulkItem' }
+      responses:
+        '200': { description: data.items berisi request_id, status_code, dan respons/error untuk setiap item; data.succeeded dan data.failed berisi jumlah }
+        '400': { description: Idempotency-Key tidak ada atau body tidak valid }
+        '403': { description: persetujuan.lihat tidak tersedia }
+        '409': { description: Idempotency-Key pernah digunakan untuk body berbeda }
+  /api/v1/admin/approvals/{requestId}/reassign:
+    parameters:
+      - { in: path, name: requestId, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
+    post:
+      tags: [Approvals]
+      operationId: reassignApproval
+      x-permission: persetujuan.delegasikan
+      summary: Alihkan satu tugas pending ke approver lain
+      description: Memerlukan reauth, versi approval instance, dan hak approve dalam scope pengalih serta penerima. Pengaju tidak boleh mengalihkan atau menjadi penerima. Tugas lama ditutup, tugas baru dibuat, versi dinaikkan, notifikasi lama dijadikan obsolete, dan pengalihan, audit serta outbox dicatat atomik.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, to_user_id, version, reason]
+              properties:
+                task_id: { type: string, minLength: 26, maxLength: 26 }
+                to_user_id: { type: string, minLength: 26, maxLength: 26 }
+                version: { type: integer, minimum: 1, description: Versi approval instance }
+                reason: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        '200': { description: ID tugas baru dan versi approval/pengajuan }
+        '403': { description: Permission, scope, reauth, atau kewenangan penerima tidak cukup }
+        '404': { description: Pengajuan atau tugas di luar tenant/scope }
+        '409': { description: Tugas, tahap, atau versi berubah; penerima sudah bertugas }
   /api/v1/ess/requests:
     get:
       tags: [Approvals]
@@ -4385,6 +4489,26 @@ components:
         start_date: { type: string, format: date, description: Kontrak lama tetap aktif sampai sehari sebelum tanggal ini }
         end_date: { type: string, format: date, nullable: true }
         file_id: { type: string, nullable: true }
+    ApprovalDelegationInput:
+      type: object
+      required: [from_user_id, to_user_id, valid_from, reason]
+      properties:
+        from_user_id: { type: string, minLength: 26, maxLength: 26 }
+        to_user_id: { type: string, minLength: 26, maxLength: 26 }
+        request_type: { type: string, nullable: true, description: Kosong berarti semua jenis yang benar-benar diizinkan saat penugasan }
+        valid_from: { type: string, format: date }
+        valid_to: { type: string, format: date, nullable: true }
+        reason: { type: string, minLength: 10, maxLength: 500 }
+    ApprovalBulkItem:
+      type: object
+      required: [request_id, action, level_no, version]
+      properties:
+        request_id: { type: string, minLength: 26, maxLength: 26 }
+        action: { type: string, enum: [approve, reject, return] }
+        reason: { type: string, maxLength: 2000, description: Wajib untuk reject atau return }
+        level_no: { type: integer, minimum: 1 }
+        version: { type: integer, minimum: 1, description: Versi approval instance }
+        data: { type: object, nullable: true, description: Data domain seperti approved_minutes pada lembur }
     ApprovalFlowInput:
       type: object
       required: [request_type, name, valid_from]

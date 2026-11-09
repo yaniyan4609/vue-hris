@@ -280,6 +280,7 @@ func (a adminAPI) getApproval(w http.ResponseWriter, r *http.Request) {
 	}
 	var tasks []map[string]any = []map[string]any{}
 	var actions []map[string]any = []map[string]any{}
+	var reassignments []map[string]any = []map[string]any{}
 	if item.Approval != nil {
 		rows, err := a.db.QueryContext(r.Context(), `SELECT id,attempt_no,level_no,assignee_user_id,status,created_at,decided_at FROM approval_tasks WHERE tenant_id=? AND instance_id=? ORDER BY attempt_no,level_no,created_at,id`, c.tenant.ID, item.Approval.ID)
 		if err != nil {
@@ -340,8 +341,29 @@ func (a adminAPI) getApproval(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rows.Close()
+		rows, err = a.db.QueryContext(r.Context(), `SELECT id,from_task_id,to_task_id,actor_user_id,reason,created_at FROM approval_reassignments WHERE tenant_id=? AND instance_id=? ORDER BY created_at,id`, c.tenant.ID, item.Approval.ID)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca riwayat pengalihan.")
+			return
+		}
+		for rows.Next() {
+			var id, fromTask, toTask, actor, reason string
+			var created time.Time
+			if err = rows.Scan(&id, &fromTask, &toTask, &actor, &reason, &created); err != nil {
+				break
+			}
+			reassignments = append(reassignments, map[string]any{"id": id, "from_task_id": fromTask, "to_task_id": toTask, "actor_user_id": actor, "reason": reason, "created_at": created})
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca riwayat pengalihan.")
+			return
+		}
 	}
-	writeAPIData(w, 200, map[string]any{"request": item, "tasks": tasks, "actions": actions}, nil)
+	writeAPIData(w, 200, map[string]any{"request": item, "tasks": tasks, "actions": actions, "reassignments": reassignments}, nil)
 }
 
 func (a adminAPI) listEssRequests(w http.ResponseWriter, r *http.Request) {

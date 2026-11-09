@@ -111,7 +111,7 @@ func (a adminAPI) createLoanSubmission(w http.ResponseWriter, r *http.Request, t
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan approver.")
 		return
 	}
-	eligible, err := a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "kasbon.approve", candidates)
+	eligible, err := a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "kasbon.approve", candidates, "loan")
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak approver.")
 		return
@@ -123,7 +123,7 @@ func (a adminAPI) createLoanSubmission(w http.ResponseWriter, r *http.Request, t
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal menentukan fallback approver.")
 			return
 		}
-		eligible, err = a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "kasbon.approve", candidates)
+		eligible, err = a.eligibleApprovers(r, tenantID, zone.String(), employee, target, "kasbon.approve", candidates, "loan")
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak fallback.")
 			return
