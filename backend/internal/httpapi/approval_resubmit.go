@@ -313,7 +313,7 @@ func (a adminAPI) resubmitEssRequest(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, r, 409, "EMPLOYEE_INVALID", "Karyawan tidak tersedia.")
 			return
 		}
-		prepared, err := a.prepareLeave(r, tx, c.state.SelectedTenantID, subjectID.String, c.zone.String(), in)
+		prepared, err := a.prepareLeave(r, tx, c.state.SelectedTenantID, subjectID.String, c.state.User.ID, c.zone.String(), in)
 		if err != nil {
 			writeLeaveIssue(w, r, err)
 			return

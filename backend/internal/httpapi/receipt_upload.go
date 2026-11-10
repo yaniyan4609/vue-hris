@@ -53,6 +53,43 @@ func (a adminAPI) receiptUploader(w http.ResponseWriter, r *http.Request) (essAt
 }
 
 func (a adminAPI) uploaderForPurpose(w http.ResponseWriter, r *http.Request, purpose string) (essAttendanceContext, bool) {
+	if purpose == "leave" {
+		state, err := a.auth.Current(r.Context(), cookieToken(r))
+		if err != nil {
+			writeAuthError(w, err)
+			return essAttendanceContext{}, false
+		}
+		var zone *time.Location
+		var panel bool
+		for _, tenant := range state.Tenants {
+			if tenant.ID == state.SelectedTenantID {
+				panel = tenant.ESS || tenant.Admin
+				zone, _ = time.LoadLocation(tenant.Timezone)
+				break
+			}
+		}
+		if !panel {
+			writeAPIError(w, r, 403, "PERMISSION_DENIED", "Panel tenant tidak tersedia.")
+			return essAttendanceContext{}, false
+		}
+		if zone == nil {
+			zone = time.UTC
+		}
+		_, decision, err := a.access.Decide(r.Context(), state.SelectedTenantID, state.User.ID, zone.String(), "cuti.buat")
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak unggah lampiran cuti.")
+			return essAttendanceContext{}, false
+		}
+		if !decision.Allowed {
+			writeAPIError(w, r, 403, "PERMISSION_DENIED", "Hak mengajukan cuti tidak tersedia.")
+			return essAttendanceContext{}, false
+		}
+		if receiptStorageRoot() == "" {
+			writeAPIError(w, r, 503, "STORAGE_UNAVAILABLE", "Penyimpanan staging belum dikonfigurasi.")
+			return essAttendanceContext{}, false
+		}
+		return essAttendanceContext{state: state, zone: zone}, true
+	}
 	c, ok := a.essAttendanceContext(w, r)
 	if !ok {
 		return c, false
@@ -82,7 +119,7 @@ func (a adminAPI) existingUploadPurpose(w http.ResponseWriter, r *http.Request) 
 		return "", false
 	}
 	var purpose string
-	err = a.db.QueryRowContext(r.Context(), `SELECT purpose FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND deleted_at IS NULL AND purpose IN ('receipt','selfie')`, state.SelectedTenantID, chi.URLParam(r, "id"), state.User.ID).Scan(&purpose)
+	err = a.db.QueryRowContext(r.Context(), `SELECT purpose FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND deleted_at IS NULL AND purpose IN ('receipt','selfie','leave')`, state.SelectedTenantID, chi.URLParam(r, "id"), state.User.ID).Scan(&purpose)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
 		return "", false
@@ -114,7 +151,7 @@ func (a adminAPI) createReceiptUpload(w http.ResponseWriter, r *http.Request) {
 	if body.Purpose == "selfie" {
 		maxSize = maxSelfieBytes
 	}
-	if (body.Purpose != "receipt" && body.Purpose != "selfie") || !receiptMimes[body.MimeType] || (body.Purpose == "selfie" && body.MimeType == "application/pdf") || body.SizeBytes < 1 || body.SizeBytes > maxSize || body.OriginalName == "" || len([]rune(body.OriginalName)) > 255 || strings.ContainsAny(body.OriginalName, "\\/\x00\r\n") || len(body.SHA256) != 64 {
+	if (body.Purpose != "receipt" && body.Purpose != "selfie" && body.Purpose != "leave") || !receiptMimes[body.MimeType] || (body.Purpose == "selfie" && body.MimeType == "application/pdf") || body.SizeBytes < 1 || body.SizeBytes > maxSize || body.OriginalName == "" || len([]rune(body.OriginalName)) > 255 || strings.ContainsAny(body.OriginalName, "\\/\x00\r\n") || len(body.SHA256) != 64 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Metadata kuitansi tidak valid.")
 		return
 	}

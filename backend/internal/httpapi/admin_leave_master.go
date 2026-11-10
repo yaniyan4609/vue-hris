@@ -235,12 +235,18 @@ type leavePolicyInput struct {
 
 func validPolicy(in leavePolicyInput) bool {
 	from, e := time.Parse("2006-01-02", in.ValidFrom)
-	if len(in.LeaveTypeID) != 26 || e != nil || from.Format("2006-01-02") != in.ValidFrom || in.AccrualType != "manual" || in.CarryOverDays != nil || in.ExpireMonths != nil {
+	if len(in.LeaveTypeID) != 26 || e != nil || from.Format("2006-01-02") != in.ValidFrom || (in.AccrualType != "manual" && in.AccrualType != "annual") || in.CarryOverDays != nil || in.ExpireMonths != nil {
+		return false
+	}
+	if in.AccrualType == "annual" && (from.Month() != time.January || from.Day() != 1 || in.QuotaDays == nil) {
 		return false
 	}
 	if in.ValidTo != nil {
 		to, e := time.Parse("2006-01-02", *in.ValidTo)
 		if e != nil || to.Format("2006-01-02") != *in.ValidTo || to.Before(from) {
+			return false
+		}
+		if in.AccrualType == "annual" && (to.Month() != time.December || to.Day() != 31) {
 			return false
 		}
 	}
@@ -249,7 +255,7 @@ func validPolicy(in leavePolicyInput) bool {
 	}
 	if in.QuotaDays != nil {
 		hundredths, ok := leaveHundredths(in.QuotaDays.String())
-		if !ok || hundredths < 0 || hundredths > 9999999 {
+		if !ok || hundredths < 0 || hundredths > 9999999 || (in.AccrualType == "annual" && hundredths < 100) {
 			return false
 		}
 	}
@@ -322,7 +328,7 @@ func (a adminAPI) createAdminLeavePolicy(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if !validPolicy(in) {
-		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Hanya kebijakan manual tanpa carry-over, masa kedaluwarsa, atau kelayakan khusus yang siap digunakan.")
+		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Kebijakan manual atau annual harus valid; annual memerlukan kuota minimal 1 hari dan batas tahun kalender.")
 		return
 	}
 	id, err := ids.New()
@@ -361,7 +367,7 @@ func (a adminAPI) createAdminLeavePolicy(w http.ResponseWriter, r *http.Request)
 	if in.QuotaDays != nil {
 		quota = in.QuotaDays.String()
 	}
-	if _, err = tx.ExecContext(r.Context(), `INSERT INTO leave_policies (tenant_id,id,leave_type_id,accrual_type,quota_days,valid_from,valid_to) VALUES (?,?,?,?,?,?,?)`, c.tenant.ID, id, in.LeaveTypeID, "manual", quota, in.ValidFrom, in.ValidTo); err != nil {
+	if _, err = tx.ExecContext(r.Context(), `INSERT INTO leave_policies (tenant_id,id,leave_type_id,accrual_type,quota_days,valid_from,valid_to) VALUES (?,?,?,?,?,?,?)`, c.tenant.ID, id, in.LeaveTypeID, in.AccrualType, quota, in.ValidFrom, in.ValidTo); err != nil {
 		writeLeaveIssue(w, r, err)
 		return
 	}
@@ -373,7 +379,7 @@ func (a adminAPI) createAdminLeavePolicy(w http.ResponseWriter, r *http.Request)
 		writeLeaveIssue(w, r, err)
 		return
 	}
-	writeAPIData(w, 201, map[string]any{"id": id, "leave_type_id": in.LeaveTypeID, "accrual_type": "manual", "quota_days": quota, "valid_from": in.ValidFrom, "valid_to": in.ValidTo}, nil)
+	writeAPIData(w, 201, map[string]any{"id": id, "leave_type_id": in.LeaveTypeID, "accrual_type": in.AccrualType, "quota_days": quota, "valid_from": in.ValidFrom, "valid_to": in.ValidTo}, nil)
 }
 
 func (a adminAPI) endAdminLeavePolicy(w http.ResponseWriter, r *http.Request) {
@@ -418,10 +424,10 @@ func (a adminAPI) closeAdminLeavePolicy(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	defer tx.Rollback()
-	var typeID string
+	var typeID, accrualType string
 	var from time.Time
 	var oldTo sql.NullTime
-	if err = tx.QueryRowContext(r.Context(), `SELECT leave_type_id,valid_from,valid_to FROM leave_policies WHERE tenant_id=? AND id=? FOR UPDATE`, c.tenant.ID, id).Scan(&typeID, &from, &oldTo); errors.Is(err, sql.ErrNoRows) {
+	if err = tx.QueryRowContext(r.Context(), `SELECT leave_type_id,accrual_type,valid_from,valid_to FROM leave_policies WHERE tenant_id=? AND id=? FOR UPDATE`, c.tenant.ID, id).Scan(&typeID, &accrualType, &from, &oldTo); errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Kebijakan cuti tidak ditemukan.")
 		return
 	} else if err != nil {
@@ -430,6 +436,10 @@ func (a adminAPI) closeAdminLeavePolicy(w http.ResponseWriter, r *http.Request, 
 	}
 	if end.Before(from) || (oldTo.Valid && end.After(oldTo.Time)) {
 		writeAPIError(w, r, 409, "POLICY_DATE_CONFLICT", "Tanggal akhir harus berada dalam masa berlaku kebijakan saat ini.")
+		return
+	}
+	if accrualType == "annual" && (end.Month() != time.December || end.Day() != 31) {
+		writeAPIError(w, r, 409, "POLICY_DATE_CONFLICT", "Kebijakan annual hanya dapat diakhiri pada 31 Desember.")
 		return
 	}
 	var pending int
@@ -554,6 +564,21 @@ func (a adminAPI) adjustAdminLeaveBalance(w http.ResponseWriter, r *http.Request
 		return
 	}
 	year := date.Year()
+	zone, zoneErr := time.LoadLocation(c.tenant.Timezone)
+	if zoneErr != nil {
+		zone = time.UTC
+	}
+	if year < time.Now().In(zone).Year() {
+		var annualGrant int
+		if err = tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM leave_accrual_grants WHERE tenant_id=? AND employee_id=? AND leave_type_id=? AND period_year=?`, c.tenant.ID, in.EmployeeID, in.LeaveTypeID, year).Scan(&annualGrant); err != nil {
+			writeLeaveIssue(w, r, err)
+			return
+		}
+		if annualGrant > 0 {
+			writeAPIError(w, r, 409, "ANNUAL_LEAVE_EXPIRED", "Saldo cuti tahunan tahun sebelumnya sudah ditutup.")
+			return
+		}
+	}
 	from, to := fmt.Sprintf("%04d-01-01", year), fmt.Sprintf("%04d-01-01", year+1)
 	var balance, reserved int64
 	if err = tx.QueryRowContext(r.Context(), `SELECT COALESCE(CAST(ROUND(SUM(days)*100) AS SIGNED),0) FROM leave_balance_ledger WHERE tenant_id=? AND employee_id=? AND leave_type_id=? AND effective_date>=? AND effective_date<?`, c.tenant.ID, in.EmployeeID, in.LeaveTypeID, from, to).Scan(&balance); err != nil {

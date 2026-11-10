@@ -110,7 +110,7 @@ func (a adminAPI) fallbackLeaveApprovers(r *http.Request, tenantID, employeeID, 
 	return removeApprover(eligible, excluded), nil
 }
 
-func (a adminAPI) prepareLeave(r *http.Request, q leaveQuery, tenantID, employeeID, zone string, in leaveInput) (leavePrepared, error) {
+func (a adminAPI) prepareLeave(r *http.Request, q leaveQuery, tenantID, employeeID, actorID, zone string, in leaveInput) (leavePrepared, error) {
 	var p leavePrepared
 	start, end, err := validateLeaveInput(&in)
 	if err != nil {
@@ -128,7 +128,7 @@ func (a adminAPI) prepareLeave(r *http.Request, q leaveQuery, tenantID, employee
 	}
 	if in.AttachmentFileID != nil {
 		var count int
-		if err = q.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM files WHERE tenant_id=? AND id=? AND purpose IN ('leave','cuti') AND scan_status='clean' AND deleted_at IS NULL`, tenantID, *in.AttachmentFileID).Scan(&count); err != nil {
+		if err = q.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM files f WHERE f.tenant_id=? AND f.id=? AND f.purpose IN ('leave','cuti') AND f.scan_status='clean' AND f.deleted_at IS NULL AND (f.uploaded_by=? OR EXISTS (SELECT 1 FROM leave_requests lr WHERE lr.tenant_id=f.tenant_id AND lr.attachment_file_id=f.id AND lr.employee_id=?)) AND NOT EXISTS (SELECT 1 FROM leave_requests other WHERE other.tenant_id=f.tenant_id AND other.attachment_file_id=f.id AND other.employee_id<>?)`, tenantID, *in.AttachmentFileID, actorID, employeeID, employeeID).Scan(&count); err != nil {
 			return p, err
 		}
 		if count != 1 {
@@ -283,7 +283,7 @@ func (a adminAPI) previewEssLeave(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &in) {
 		return
 	}
-	p, err := a.prepareLeave(r, a.db, c.state.SelectedTenantID, c.employeeID, c.zone.String(), in)
+	p, err := a.prepareLeave(r, a.db, c.state.SelectedTenantID, c.employeeID, c.state.User.ID, c.zone.String(), in)
 	if err != nil {
 		writeLeaveIssue(w, r, err)
 		return
@@ -328,7 +328,7 @@ func (a adminAPI) createLeaveSubmission(w http.ResponseWriter, r *http.Request, 
 		writeAPIError(w, r, 404, "EMPLOYEE_NOT_FOUND", "Karyawan tidak ditemukan.")
 		return
 	}
-	p, err := a.prepareLeave(r, tx, tenantID, employeeID, zone, in)
+	p, err := a.prepareLeave(r, tx, tenantID, employeeID, actorID, zone, in)
 	if err != nil {
 		writeLeaveIssue(w, r, err)
 		return

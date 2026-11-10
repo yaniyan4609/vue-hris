@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.35.0
+  version: 0.36.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -4048,6 +4048,38 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200': { description: Mutasi ledger dalam scope karyawan }
+  /api/v1/admin/leave-balances/accrual-run:
+    post:
+      tags: [Approvals]
+      operationId: startAdminLeaveAccrualRun
+      x-permission: cuti.kelola
+      summary: Jadwalkan akrual cuti tahunan untuk tahun berjalan
+      description: Aman diulang untuk tanggal tenant yang sama. Worker otomatis juga menjadwalkan akrual ketika ada karyawan yang memenuhi syarat. Kuota prorata dihitung dari bulan masuk sampai Desember termasuk bulan masuk, dibulatkan ke 0,01 hari. Saldo negatif dilarang; sisa saldo hangus setelah akhir tahun dan dicatat di ledger.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                year: { type: integer, minimum: 2000, maximum: 2100, description: Jika kosong memakai tahun berjalan menurut zona tenant }
+      responses:
+        '202': { description: Proses terjadwal; gunakan ID untuk melihat hasilnya }
+        '200': { description: Proses tanggal ini sudah selesai }
+        '409': { description: Kebijakan annual belum tersedia }
+  /api/v1/admin/leave-balances/accrual-runs/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Approvals]
+      operationId: getAdminLeaveAccrualRun
+      x-permission: cuti.kelola
+      summary: Lihat status, jumlah diproses, dan jumlah saldo diberikan
+      responses:
+        '200': { description: Proses akrual milik tenant aktif }
+        '404': { description: Proses tidak ada di tenant aktif }
   /api/v1/admin/payroll/rules/tax:
     get:
       tags: [Payroll]
@@ -4637,8 +4669,8 @@ paths:
     post:
       tags: [Files]
       operationId: createReceiptUpload
-      summary: Minta unggah kuitansi atau selfie di staging
-      description: Receipt memerlukan reimbursement.buat, PNG/JPEG/PDF hingga 10 MiB. Selfie milik ESS menerima PNG/JPEG hingga 5 MiB. Penyimpanan lokal staging dibatasi 100 MiB per tenant.
+      summary: Minta unggah kuitansi, selfie, atau lampiran cuti di staging
+      description: Receipt memerlukan reimbursement.buat, PNG/JPEG/PDF hingga 10 MiB. Selfie milik ESS menerima PNG/JPEG hingga 5 MiB. Lampiran cuti memerlukan cuti.buat dan menerima PNG/JPEG/PDF hingga 10 MiB. Penyimpanan lokal staging dibatasi 100 MiB per tenant.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -4836,8 +4868,8 @@ paths:
       tags: [Approvals]
       operationId: createAdminLeavePolicy
       x-permission: cuti.kelola
-      summary: Buat kebijakan manual tanpa masa berlaku yang bertumpang tindih
-      description: Carry-over, masa kedaluwarsa, akrual otomatis, dan eligibility khusus menunggu keputusan aturan bisnis.
+      summary: Buat kebijakan cuti manual atau tahunan tanpa masa berlaku yang bertumpang tindih
+      description: Annual memerlukan tanggal mulai 1 Januari dan kuota minimal 1 hari. Jika diakhiri, tanggal akhir harus 31 Desember. Carry-over, masa kedaluwarsa khusus, dan eligibility khusus belum diaktifkan.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -4849,7 +4881,7 @@ paths:
               required: [leave_type_id, accrual_type, valid_from]
               properties:
                 leave_type_id: { type: string, minLength: 26, maxLength: 26 }
-                accrual_type: { type: string, enum: [manual] }
+                accrual_type: { type: string, enum: [manual, annual] }
                 quota_days: { type: number, nullable: true, multipleOf: 0.01 }
                 valid_from: { type: string, format: date }
                 valid_to: { type: string, format: date, nullable: true }
@@ -4894,7 +4926,7 @@ paths:
       operationId: adjustAdminLeaveBalance
       x-permission: cuti.kelola
       summary: Penyesuaian ledger saldo dalam scope karyawan
-      description: Membutuhkan autentikasi ulang, alasan, saldo tersedia tidak negatif, dan audit atomik. Nilai days boleh positif atau negatif dengan dua desimal.
+      description: Membutuhkan autentikasi ulang, alasan, saldo tersedia tidak negatif, dan audit atomik. Nilai days boleh positif atau negatif dengan dua desimal. Tahun annual yang sudah berlalu tidak dapat disesuaikan lagi.
       parameters:
         - $ref: '#/components/parameters/CSRFToken'
       requestBody:
@@ -5115,7 +5147,7 @@ components:
       type: object
       required: [purpose, original_name, mime_type, size_bytes, sha256]
       properties:
-        purpose: { type: string, enum: [receipt, selfie] }
+        purpose: { type: string, enum: [receipt, selfie, leave] }
         original_name: { type: string, minLength: 1, maxLength: 255 }
         mime_type: { type: string, enum: [application/pdf, image/jpeg, image/png] }
         size_bytes: { type: integer, minimum: 1, maximum: 10485760, description: Selfie maksimal 5242880 byte }

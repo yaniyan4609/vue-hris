@@ -202,7 +202,7 @@ func (a adminAPI) updateAdminLeave(w http.ResponseWriter, r *http.Request) {
 			in.AttachmentFileID = &value
 		}
 	}
-	prepared, err := a.prepareLeave(r, tx, c.tenant.ID, employeeID, c.tenant.Timezone, in)
+	prepared, err := a.prepareLeave(r, tx, c.tenant.ID, employeeID, c.state.User.ID, c.tenant.Timezone, in)
 	if err != nil {
 		writeLeaveIssue(w, r, err)
 		return

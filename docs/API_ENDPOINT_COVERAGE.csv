@@ -380,7 +380,7 @@ POST,/api/v1/admin/holidays,"8.3 Admin: master shift, roster, dan libur",active
 POST,/api/v1/admin/holidays/seed-national,"8.3 Admin: master shift, roster, dan libur",planned
 POST,/api/v1/admin/imports,14.3 Ekspor dan impor (job generik),planned
 POST,/api/v1/admin/imports/{id}/commit,14.3 Ekspor dan impor (job generik),planned
-POST,/api/v1/admin/leave-balances/accrual-run,9.2 Admin: cuti dan izin,planned
+POST,/api/v1/admin/leave-balances/accrual-run,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/leave-balances/adjustments,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/leave-policies,9.2 Admin: cuti dan izin,active
 POST,/api/v1/admin/leave-requests,9.2 Admin: cuti dan izin,active

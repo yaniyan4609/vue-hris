@@ -49,6 +49,13 @@ func main() {
 			if generated > 0 {
 				slog.Info("shift instance mendatang dibuat", "count", generated)
 			}
+			credited, err := httpapi.RunDueLeaveAccruals(workerContext, db)
+			if err != nil {
+				slog.Error("akrual cuti gagal", "error", err)
+			}
+			if credited > 0 {
+				slog.Info("saldo cuti tahunan diberikan", "count", credited)
+			}
 		}
 		run()
 		ticker := time.NewTicker(time.Minute)
