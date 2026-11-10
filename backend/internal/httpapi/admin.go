@@ -149,6 +149,8 @@ func mountAdmin(r chi.Router, db *sql.DB, config Options) {
 		r.With(checkOrigin(config)).Post("/payroll/rules/tax", a.publishPayrollTaxRule)
 		r.Get("/payroll/rules/bpjs", a.getPayrollBPJSRules)
 		r.With(checkOrigin(config)).Post("/payroll/rules/bpjs", a.publishPayrollBPJSRule)
+		r.Get("/payroll/bpjs-wage-basis", a.getBPJSWageBasis)
+		r.With(checkOrigin(config)).Post("/payroll/bpjs-wage-basis", a.publishBPJSWageBasis)
 		r.Get("/employees/{id}/pay-components", a.getEmployeePayComponents)
 		r.With(checkOrigin(config)).Put("/employees/{id}/pay-components", a.putEmployeePayComponents)
 		r.Get("/reimbursements/{id}", a.getAdminReimbursement)

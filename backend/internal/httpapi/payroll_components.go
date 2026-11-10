@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -248,6 +249,39 @@ func (a adminAPI) updatePayrollComponent(w http.ResponseWriter, r *http.Request)
 }
 
 func (a adminAPI) canDeactivatePayrollComponent(w http.ResponseWriter, r *http.Request, tx *sql.Tx, tenantID, componentID string) bool {
+	rows, err := tx.QueryContext(r.Context(), `SELECT data_json FROM bpjs_wage_basis_policies WHERE tenant_id=? AND (effective_to IS NULL OR effective_to>=CURRENT_DATE())`, tenantID)
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa dasar upah BPJS.")
+		return false
+	}
+	usedInBPJS := false
+	for rows.Next() {
+		var raw []byte
+		if err = rows.Scan(&raw); err != nil {
+			break
+		}
+		var data bpjsWageBasisData
+		if err = json.Unmarshal(raw, &data); err != nil {
+			break
+		}
+		for _, program := range data.Programs {
+			for _, id := range program.ComponentIDs {
+				usedInBPJS = usedInBPJS || id == componentID
+			}
+		}
+	}
+	if err == nil {
+		err = rows.Err()
+	}
+	rows.Close()
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa dasar upah BPJS.")
+		return false
+	}
+	if usedInBPJS {
+		writeAPIError(w, r, 409, "COMPONENT_IN_BPJS_BASIS", "Komponen masih dipakai pada dasar upah BPJS. Terbitkan aturan baru sebelum menonaktifkannya.")
+		return false
+	}
 	var active int
 	if err := tx.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM employee_pay_components WHERE tenant_id=? AND component_id=? AND (valid_to IS NULL OR valid_to>=CURRENT_DATE())`, tenantID, componentID).Scan(&active); err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa penetapan komponen.")

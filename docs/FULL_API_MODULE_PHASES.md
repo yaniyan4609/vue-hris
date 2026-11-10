@@ -28,6 +28,8 @@ Komponen hitung PPh 21 murni kini tersedia dan lulus contoh resmi Tuan R dari PP
 
 Preflight periode kini memeriksa kelima program BPJS pada setiap tanggal, bukan hanya keberadaan satu aturan. Komponen hitung iuran murni memakai tarif dan plafon dari input aturan tenant, dengan tes lima program dan batas upah. Keduanya belum menghasilkan nominal draft; dasar upah per program, upah minimum kesehatan, kelayakan kepesertaan, dan versi plafon masih harus diverifikasi sebelum dipakai oleh payroll run.
 
+Admin tenant kini dapat menerbitkan kebijakan dasar upah BPJS berversi tanggal berlaku untuk lima program, memilih komponen earning fixed per program, dan mengisi minimum Kesehatan setiap kantor aktif. Preflight menandai kebijakan atau minimum yang belum mencakup periode. Migrasi aditif `00061` menampung versi kebijakan; pemilihan komponen dan minimum masih memerlukan validasi terhadap aturan resmi sebelum nominal draft dihitung.
+
 ## Aturan selesai satu modul
 
 Satu modul baru dinyatakan selesai setelah **semua method/path modul dalam spesifikasi** memiliki perilaku server nyata, bukan respons sukses kosong. Kontrak OpenAPI harus mencatat request, respons, error, permission, scope, dan status. Operasi tulis memakai validasi, transaksi, audit, dan idempotensi bila diwajibkan. Uji mencakup hak akses, lintas tenant, scope, konflik, serta alur bisnis utama pada MariaDB staging menggunakan fixture sementara yang dibersihkan. Alias lama tetap diuji agar frontend yang ada tidak putus. Setelah modul lulus, baru pindah ke modul berikutnya. Fitur bertanda `[TERBUKA]` menunggu keputusan produk yang terkait sebelum modulnya dinyatakan selesai.

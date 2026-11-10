@@ -148,7 +148,7 @@ func TestStagingEmployeeTaxBPJSVersionAndEncryption(t *testing.T) {
 		} `json:"data"`
 	}
 	doJSON(t, client, "GET", server.URL+"/api/v1/admin/payroll/periods/"+periodID+"/preflight?employee_id="+employeeID, nil, 200, &preflight)
-	if len(preflight.Data.Checks) != 12 || !preflight.Data.Checks["profile_covered"] || !preflight.Data.Checks["npwp_recorded"] {
+	if len(preflight.Data.Checks) != 14 || !preflight.Data.Checks["profile_covered"] || !preflight.Data.Checks["npwp_recorded"] {
 		t.Fatalf("incomplete tax/BPJS preflight: %#v", preflight.Data.Checks)
 	}
 	allProgramsCovered := true

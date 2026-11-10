@@ -100,6 +100,78 @@ func (a adminAPI) payrollValidation(ctx adminContext, r *http.Request, runID, em
 			add(rule.missing, 0)
 		}
 	}
+	wagePolicies := []payrollBPJSWageBasisStatus{}
+	rows, err := a.db.QueryContext(r.Context(), `SELECT DATE_FORMAT(effective_from,'%Y-%m-%d'),IFNULL(DATE_FORMAT(effective_to,'%Y-%m-%d'),''),data_json FROM bpjs_wage_basis_policies WHERE tenant_id=? AND effective_from<=? AND (effective_to IS NULL OR effective_to>=?) ORDER BY effective_from`, ctx.tenant.ID, to, from)
+	if err != nil {
+		return result, err
+	}
+	wageRanges := []payrollRuleRange{}
+	for rows.Next() {
+		var policy payrollBPJSWageBasisStatus
+		var raw []byte
+		if err = rows.Scan(&policy.From, &policy.To, &raw); err != nil {
+			break
+		}
+		var data bpjsWageBasisData
+		if err = json.Unmarshal(raw, &data); err != nil {
+			break
+		}
+		policy.Minimums = map[string]bool{}
+		for _, minimum := range data.OfficeMinimums {
+			policy.Minimums[minimum.OfficeID] = true
+		}
+		wagePolicies = append(wagePolicies, policy)
+		wageRanges = append(wageRanges, payrollRuleRange{From: policy.From, To: policy.To})
+	}
+	if err == nil {
+		err = rows.Err()
+	}
+	rows.Close()
+	if err != nil {
+		return result, err
+	}
+	if !ruleRangeCovers(wageRanges, from, to) {
+		add("BPJS_WAGE_BASIS_INCOMPLETE", 0)
+	}
+	activeOfficeIDs := []string{}
+	rows, err = a.db.QueryContext(r.Context(), `SELECT id FROM offices WHERE tenant_id=? AND is_active=TRUE AND deleted_at IS NULL`, ctx.tenant.ID)
+	if err != nil {
+		return result, err
+	}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			break
+		}
+		activeOfficeIDs = append(activeOfficeIDs, id)
+	}
+	if err == nil {
+		err = rows.Err()
+	}
+	rows.Close()
+	if err != nil {
+		return result, err
+	}
+	minimumMissing := false
+	for day, end := periodStart, periodEnd; !day.After(end) && !minimumMissing; day = day.AddDate(0, 0, 1) {
+		date := day.Format("2006-01-02")
+		var current *payrollBPJSWageBasisStatus
+		for i := range wagePolicies {
+			if coversDay(wagePolicies[i].From, wagePolicies[i].To, date) {
+				current = &wagePolicies[i]
+			}
+		}
+		if current == nil {
+			minimumMissing = true
+			break
+		}
+		for _, officeID := range activeOfficeIDs {
+			minimumMissing = minimumMissing || !current.Minimums[officeID]
+		}
+	}
+	if minimumMissing {
+		add("BPJS_HEALTH_MINIMUM_MISSING", 0)
+	}
 	scope, scopeArgs := access.EmployeeWhere(ctx.subject, ctx.effective)
 	if employeeID != "" {
 		var matched int

@@ -1,6 +1,8 @@
 # Verifikasi iuran BPJS payroll
 
-Status: komponen hitung terisolasi; **belum dipakai oleh payroll run**. Preflight periode kini mensyaratkan aturan KESEHATAN, JHT, JKK, JKM, dan JP yang mencakup seluruh tanggal periode.
+Status: komponen hitung terisolasi; **belum dipakai oleh payroll run**. Preflight periode mensyaratkan aturan KESEHATAN, JHT, JKK, JKM, dan JP yang mencakup seluruh tanggal periode, serta kebijakan dasar upah dan minimum kantor yang berlaku.
+
+Admin tenant dapat menerbitkan kebijakan melalui `GET/POST /api/v1/admin/payroll/bpjs-wage-basis`. Kebijakan berisi daftar komponen earning fixed per program dan nominal minimum Kesehatan untuk setiap kantor aktif, dengan sumber dan tanggal berlaku. Versi sebelumnya ditutup atomik; aturan yang menyentuh payroll final tidak dapat diterbitkan. Bila belum ada kebijakan, GET menyarankan komponen berkode `GAJI_POKOK` dan `TUNJANGAN_TETAP*`; saran itu harus diperiksa dan diterbitkan Admin sebelum menjadi aturan. Komponen yang dipakai kebijakan aktif tidak dapat dinonaktifkan.
 
 `backend/internal/payrollcalc.MonthlyBPJS` menerima dasar upah, tarif pekerja/pemberi kerja, dan plafon **per program** dalam perseratus rupiah. Tarif memakai *parts per million*; `0` pada plafon berarti tidak ada batas atas. Komponen menghitung kedua bagian secara terpisah tanpa `float` dan menolak aturan yang tidak lengkap atau duplikat. Nilai tarif dan plafon harus datang dari versi aturan tenant yang tepat.
 
@@ -13,4 +15,4 @@ Tes dasar upah Rp6.000.000 per program menghasilkan total iuran pekerja Rp240.00
 
 ## Sebelum dihubungkan ke run
 
-Pastikan dasar upah program dihitung dari komponen yang benar, batas bawah Kesehatan mengikuti kantor/wilayah dan tanggal, kelas risiko JKK serta kepesertaan JP berlaku untuk karyawan, plafon JP dipilih dari versi tenant yang tepat, dan kebijakan pembulatan sesuai data pembayaran nyata. Simpan snapshot aturan yang dipakai agar run lama tidak berubah saat tarif baru diterbitkan.
+Pastikan dasar upah program dihitung dari komponen yang benar, minimum kantor yang diisi Admin sesuai UMK/UMP wilayah dan tanggal, kelas risiko JKK serta kepesertaan JP berlaku untuk karyawan, plafon JP dipilih dari versi tenant yang tepat, dan kebijakan pembulatan sesuai data pembayaran nyata. Simpan snapshot aturan yang dipakai agar run lama tidak berubah saat tarif baru diterbitkan.

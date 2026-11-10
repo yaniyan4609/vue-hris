@@ -29,6 +29,11 @@ type payrollBPJSRuleStatus struct {
 	Program, From, To string
 }
 
+type payrollBPJSWageBasisStatus struct {
+	From, To string
+	Minimums map[string]bool
+}
+
 var requiredPayrollBPJSPrograms = []string{"KESEHATAN", "JHT", "JKK", "JKM", "JP"}
 
 func payrollBPJSProgramCovered(rules []payrollBPJSRuleStatus, program, day string) bool {
@@ -149,9 +154,56 @@ func (a adminAPI) previewPayrollTaxBPJSPreflight(w http.ResponseWriter, r *http.
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca kesiapan aturan BPJS.")
 		return
 	}
+	activeOffices := map[string]bool{}
+	rows, err = a.db.QueryContext(r.Context(), `SELECT id FROM offices WHERE tenant_id=? AND is_active=TRUE AND deleted_at IS NULL`, c.tenant.ID)
+	if err == nil {
+		for rows.Next() {
+			var id string
+			if err = rows.Scan(&id); err != nil {
+				break
+			}
+			activeOffices[id] = true
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+	}
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca kantor aktif.")
+		return
+	}
+	wagePolicies := []payrollBPJSWageBasisStatus{}
+	rows, err = a.db.QueryContext(r.Context(), `SELECT DATE_FORMAT(effective_from,'%Y-%m-%d'),IFNULL(DATE_FORMAT(effective_to,'%Y-%m-%d'),''),data_json FROM bpjs_wage_basis_policies WHERE tenant_id=? AND effective_from<=? AND (effective_to IS NULL OR effective_to>=?) ORDER BY effective_from`, c.tenant.ID, period.End, period.Start)
+	if err == nil {
+		for rows.Next() {
+			var item payrollBPJSWageBasisStatus
+			var raw []byte
+			if err = rows.Scan(&item.From, &item.To, &raw); err != nil {
+				break
+			}
+			var data bpjsWageBasisData
+			if err = json.Unmarshal(raw, &data); err != nil {
+				break
+			}
+			item.Minimums = map[string]bool{}
+			for _, minimum := range data.OfficeMinimums {
+				item.Minimums[minimum.OfficeID] = true
+			}
+			wagePolicies = append(wagePolicies, item)
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+	}
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca dasar upah BPJS.")
+		return
+	}
 	start, _ := time.Parse("2006-01-02", period.Start)
 	end, _ := time.Parse("2006-01-02", period.End)
-	checks := map[string]bool{"profile_covered": true, "ptkp_in_tax_rule": true, "tax_rule_covered": true, "bpjs_rule_present": true, "npwp_recorded": true, "bpjs_kes_recorded": true, "bpjs_tk_recorded": true}
+	checks := map[string]bool{"profile_covered": true, "ptkp_in_tax_rule": true, "tax_rule_covered": true, "bpjs_rule_present": true, "bpjs_wage_basis_covered": true, "bpjs_health_minimum_present": true, "npwp_recorded": true, "bpjs_kes_recorded": true, "bpjs_tk_recorded": true}
 	for _, program := range requiredPayrollBPJSPrograms {
 		checks["bpjs_"+strings.ToLower(program)+"_rule_covered"] = true
 	}
@@ -193,6 +245,22 @@ func (a adminAPI) previewPayrollTaxBPJSPreflight(w http.ResponseWriter, r *http.
 				checks["bpjs_rule_present"] = false
 			}
 		}
+		var wagePolicy *payrollBPJSWageBasisStatus
+		for i := range wagePolicies {
+			if coversDay(wagePolicies[i].From, wagePolicies[i].To, date) {
+				wagePolicy = &wagePolicies[i]
+			}
+		}
+		if wagePolicy == nil {
+			checks["bpjs_wage_basis_covered"] = false
+			checks["bpjs_health_minimum_present"] = false
+		} else {
+			for officeID := range activeOffices {
+				if !wagePolicy.Minimums[officeID] {
+					checks["bpjs_health_minimum_present"] = false
+				}
+			}
+		}
 	}
-	writeAPIData(w, 200, map[string]any{"employee_id": employeeID, "period_id": periodID, "start_date": period.Start, "end_date": period.End, "checks": checks, "note": "Pemeriksaan kelengkapan data dan keberlakuan lima program BPJS saja; belum menghitung atau memfinalisasi payroll."}, nil)
+	writeAPIData(w, 200, map[string]any{"employee_id": employeeID, "period_id": periodID, "start_date": period.Start, "end_date": period.End, "checks": checks, "note": "Pemeriksaan kelengkapan aturan pajak, lima program BPJS, dasar upah, dan minimum kantor; belum menghitung atau memfinalisasi payroll."}, nil)
 }
