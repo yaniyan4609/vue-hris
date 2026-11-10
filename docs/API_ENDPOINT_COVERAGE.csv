@@ -149,14 +149,14 @@ GET,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,active
 GET,/api/v1/admin/payroll/periods/{id},11.2 Periode dan payroll run,active
 GET,/api/v1/admin/payroll/rules/bpjs,11.1 Komponen dan aturan,active
 GET,/api/v1/admin/payroll/rules/tax,11.1 Komponen dan aturan,active
-GET,/api/v1/admin/payroll/runs,11.2 Periode dan payroll run,planned
-GET,/api/v1/admin/payroll/runs/{id},11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/runs,11.2 Periode dan payroll run,active
+GET,/api/v1/admin/payroll/runs/{id},11.2 Periode dan payroll run,active
 GET,/api/v1/admin/payroll/runs/{id}/adjustments,11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/runs/{id}/items,11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/runs/{id}/items/{itemId},11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/runs/{id}/summary,11.2 Periode dan payroll run,planned
-GET,/api/v1/admin/payroll/runs/{id}/validation,11.2 Periode dan payroll run,planned
-GET,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,planned
+GET,/api/v1/admin/payroll/runs/{id}/validation,11.2 Periode dan payroll run,partial
+GET,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,active
 GET,/api/v1/admin/payslips,11.3 Slip gaji,planned
 GET,/api/v1/admin/payslips/{id},11.3 Slip gaji,planned
 GET,/api/v1/admin/payslips/{id}/download,11.3 Slip gaji,planned
@@ -397,7 +397,7 @@ POST,/api/v1/admin/overtime-requests,9.3 Lembur,active
 POST,/api/v1/admin/payroll/components,11.1 Komponen dan aturan,active
 POST,/api/v1/admin/payroll/periods,11.2 Periode dan payroll run,active
 POST,/api/v1/admin/payroll/periods/{id}/close,11.2 Periode dan payroll run,planned
-POST,/api/v1/admin/payroll/periods/{id}/runs,11.2 Periode dan payroll run,planned
+POST,/api/v1/admin/payroll/periods/{id}/runs,11.2 Periode dan payroll run,partial
 POST,/api/v1/admin/payroll/runs/{id}/adjustments,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/payroll/runs/{id}/bank-export,11.2 Periode dan payroll run,planned
 POST,/api/v1/admin/payroll/runs/{id}/finalize,11.2 Periode dan payroll run,planned
@@ -493,7 +493,7 @@ PUT,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,active
 PUT,/api/v1/admin/loan-policies,9.4 Kasbon,active
 PUT,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
 PUT,/api/v1/admin/notification-templates/{id},"13.2 Admin: aturan, template, dan log",planned
-PUT,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,planned
+PUT,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,active
 PUT,/api/v1/admin/position-role-suggestions,5.3 Hak akses per pengguna,planned
 PUT,/api/v1/admin/roles/{id}/permissions,5.2 Role dan registry permission,active
 PUT,/api/v1/admin/roles/{id}/scopes,5.2 Role dan registry permission,active

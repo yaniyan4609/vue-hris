@@ -1,7 +1,7 @@
 """Compare documented API operations with the product specification.
 
-The CSV is an implementation queue, not a list of live routes. OpenAPI only
-contains active operations. Run from any working directory with Python 3.
+The CSV distinguishes complete, partial, and planned operations. Run from
+any working directory with Python 3.
 """
 
 import csv
@@ -18,17 +18,26 @@ RESOURCES = ("regions", "offices", "divisions", "departments", "positions")
 
 def active_operations():
     path = None
-    operations = set()
+    operations = {}
+    current = []
     for line in OPENAPI.read_text(encoding="utf-8").splitlines():
         match = re.match(r"^  (/[^:]+):\s*$", line)
         if match:
             path = match.group(1)
+            current = []
             continue
         match = re.match(r"^    (get|post|put|patch|delete):\s*$", line)
         if path and match:
             expanded = [path.replace("{kind}", name) for name in RESOURCES] if path.startswith("/api/v1/admin/{kind}") else [path]
+            current = []
             for actual_path in expanded:
-                operations.add((match.group(1).upper(), actual_path))
+                operation = (match.group(1).upper(), actual_path)
+                operations[operation] = "active"
+                current.append(operation)
+            continue
+        if re.match(r"^      x-implementation-stage: partial\s*$", line):
+            for operation in current:
+                operations[operation] = "partial"
     return operations
 
 
@@ -62,9 +71,10 @@ def main():
         writer = csv.writer(file)
         writer.writerow(("method", "path", "section", "status"))
         for method, path, heading in specified:
-            writer.writerow((method, path, heading, "active" if (method, path) in active else "planned"))
-    implemented = sum((method, path) in active for method, path, _ in specified)
-    print(f"Specification: {len(specified)} operations; active exact matches: {implemented}; planned: {len(specified)-implemented}; OpenAPI: {len(active)} operations")
+            writer.writerow((method, path, heading, active.get((method, path), "planned")))
+    implemented = sum(active.get((method, path)) == "active" for method, path, _ in specified)
+    partial = sum(active.get((method, path)) == "partial" for method, path, _ in specified)
+    print(f"Specification: {len(specified)} operations; active exact matches: {implemented}; partial: {partial}; planned: {len(specified)-implemented-partial}; OpenAPI: {len(active)} operations")
     print(f"Wrote {OUTPUT}")
 
 
