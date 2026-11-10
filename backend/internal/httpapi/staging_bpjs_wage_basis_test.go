@@ -53,9 +53,14 @@ func TestStagingBPJSWageBasisPublication(t *testing.T) {
 	if _, err = db.ExecContext(ctx, `INSERT INTO users (id,email,email_normalized,display_name,password_hash) VALUES (?,?,?,'QA BPJS Basis',?)`, userID, email, email, hash); err != nil {
 		t.Fatal(err)
 	}
-	var policyID, previousID string
+	var policyID, previousID, previewPeriodID string
 	var previousTo sql.NullTime
 	t.Cleanup(func() {
+		if previewPeriodID != "" {
+			if _, e := db.Exec(`DELETE FROM payroll_periods WHERE tenant_id=? AND id=?`, tenant, previewPeriodID); e != nil {
+				t.Errorf("cleanup preview period: %v", e)
+			}
+		}
 		if policyID == "" {
 			_ = db.QueryRow(`SELECT id FROM bpjs_wage_basis_policies WHERE tenant_id=? AND created_by=? ORDER BY effective_from DESC LIMIT 1`, tenant, userID).Scan(&policyID)
 		}
@@ -155,4 +160,41 @@ func TestStagingBPJSWageBasisPublication(t *testing.T) {
 	}
 	doJSON(t, finance, "DELETE", server.URL+"/api/v1/admin/payroll/components/"+componentID, nil, 409, nil)
 	doJSON(t, finance, "POST", url, input, 409, nil)
+	var employeeID string
+	if err = db.QueryRowContext(ctx, `SELECT employee_id FROM employee_assignments WHERE tenant_id=? AND current_flag=TRUE LIMIT 1`, tenant).Scan(&employeeID); err != nil {
+		t.Fatal(err)
+	}
+	month := 1
+	for ; month <= 12; month++ {
+		var count int
+		if err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM payroll_periods WHERE tenant_id=? AND period_year=2097 AND period_month=?`, tenant, month).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count == 0 {
+			break
+		}
+	}
+	if month > 12 {
+		t.Fatal("no free QA month for BPJS preview")
+	}
+	previewPeriodID, _ = ids.New()
+	periodStart := time.Date(2097, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := periodStart.AddDate(0, 1, -1)
+	if _, err = db.ExecContext(ctx, `INSERT INTO payroll_periods (tenant_id,id,period_year,period_month,start_date,end_date) VALUES (?,?,?,?,?,?)`, tenant, previewPeriodID, 2097, month, periodStart.Format("2006-01-02"), periodEnd.Format("2006-01-02")); err != nil {
+		t.Fatal(err)
+	}
+	var preview struct {
+		Data struct {
+			Ready         bool            `json:"ready"`
+			Issues        []string        `json:"issues"`
+			Contributions json.RawMessage `json:"contributions"`
+			TotalEmployee *string         `json:"total_employee"`
+		} `json:"data"`
+	}
+	previewURL := server.URL + "/api/v1/admin/payroll/periods/" + previewPeriodID + "/bpjs-preview?employee_id=" + employeeID
+	doJSON(t, finance, "GET", previewURL, nil, 200, &preview)
+	if preview.Data.Ready || len(preview.Data.Issues) == 0 || string(preview.Data.Contributions) != "null" || preview.Data.TotalEmployee != nil {
+		t.Fatalf("incomplete period exposed BPJS money: %+v", preview.Data)
+	}
+	doJSON(t, finance, "GET", server.URL+"/api/v1/admin/payroll/periods/"+previewPeriodID+"/bpjs-preview?employee_id="+previewPeriodID, nil, 404, nil)
 }

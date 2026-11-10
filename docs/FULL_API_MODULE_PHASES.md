@@ -30,6 +30,8 @@ Preflight periode kini memeriksa kelima program BPJS pada setiap tanggal, bukan 
 
 Admin tenant kini dapat menerbitkan kebijakan dasar upah BPJS berversi tanggal berlaku untuk lima program, memilih komponen earning fixed per program, dan mengisi minimum Kesehatan setiap kantor aktif. Preflight menandai kebijakan atau minimum yang belum mencakup periode. Migrasi aditif `00061` menampung versi kebijakan; pemilihan komponen dan minimum masih memerlukan validasi terhadap aturan resmi sebelum nominal draft dihitung.
 
+Pratinjau BPJS per karyawan kini dapat menghitung iuran pekerja/pemberi kerja dari komponen, kantor, kebijakan, dan tarif tenant yang stabil sepanjang satu periode. Hak melihat nominal sensitif dan scope diperiksa; perubahan di tengah periode menghasilkan isu tanpa nominal. Pratinjau tidak menulis payroll run dan tidak menggantikan validasi sumber presensi, prorata, pajak, atau snapshot final.
+
 ## Aturan selesai satu modul
 
 Satu modul baru dinyatakan selesai setelah **semua method/path modul dalam spesifikasi** memiliki perilaku server nyata, bukan respons sukses kosong. Kontrak OpenAPI harus mencatat request, respons, error, permission, scope, dan status. Operasi tulis memakai validasi, transaksi, audit, dan idempotensi bila diwajibkan. Uji mencakup hak akses, lintas tenant, scope, konflik, serta alur bisnis utama pada MariaDB staging menggunakan fixture sementara yang dibersihkan. Alias lama tetap diuji agar frontend yang ada tidak putus. Setelah modul lulus, baru pindah ke modul berikutnya. Fitur bertanda `[TERBUKA]` menunggu keputusan produk yang terkait sebelum modulnya dinyatakan selesai.

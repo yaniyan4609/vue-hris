@@ -4,6 +4,8 @@ Status: komponen hitung terisolasi; **belum dipakai oleh payroll run**. Prefligh
 
 Admin tenant dapat menerbitkan kebijakan melalui `GET/POST /api/v1/admin/payroll/bpjs-wage-basis`. Kebijakan berisi daftar komponen earning fixed per program dan nominal minimum Kesehatan untuk setiap kantor aktif, dengan sumber dan tanggal berlaku. Versi sebelumnya ditutup atomik; aturan yang menyentuh payroll final tidak dapat diterbitkan. Bila belum ada kebijakan, GET menyarankan komponen berkode `GAJI_POKOK` dan `TUNJANGAN_TETAP*`; saran itu harus diperiksa dan diterbitkan Admin sebelum menjadi aturan. Komponen yang dipakai kebijakan aktif tidak dapat dinonaktifkan.
 
+`GET /api/v1/admin/payroll/periods/{id}/bpjs-preview?employee_id=...` menampilkan simulasi iuran pekerja dan pemberi kerja dari sumber karyawan yang nyata hanya bila karyawan bekerja penuh dalam periode dan penugasan, komponen, kebijakan, serta lima tarif stabil sepanjang periode. Hak `penggajian.lihat_sensitif` dan scope karyawan diwajibkan. Jika syarat tidak terpenuhi, respons `ready=false` berisi kode isu dan tidak menampilkan nominal. Simulasi ini tidak mengubah run; presensi, prorata, pajak, dan finalisasi belum termasuk.
+
 `backend/internal/payrollcalc.MonthlyBPJS` menerima dasar upah, tarif pekerja/pemberi kerja, dan plafon **per program** dalam perseratus rupiah. Tarif memakai *parts per million*; `0` pada plafon berarti tidak ada batas atas. Komponen menghitung kedua bagian secara terpisah tanpa `float` dan menolak aturan yang tidak lengkap atau duplikat. Nilai tarif dan plafon harus datang dari versi aturan tenant yang tepat.
 
 ## Acuan uji

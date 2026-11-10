@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.39.0
+  version: 0.39.1
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -4495,6 +4495,22 @@ paths:
       responses:
         '200': { description: Empat belas pemeriksaan per karyawan sepanjang periode; tidak mengubah data }
         '404': { description: Periode atau karyawan tidak ditemukan dalam scope payroll }
+  /api/v1/admin/payroll/periods/{id}/bpjs-preview:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Payroll]
+      operationId: previewPayrollBPJS
+      x-permission: penggajian.lihat, penggajian.lihat_sensitif
+      x-implementation-stage: partial
+      summary: Pratinjau iuran BPJS bulanan satu karyawan
+      description: Membaca snapshot konsisten atas komponen fixed, penugasan kantor, kebijakan dasar upah, minimum kantor, dan tarif lima program yang masing-masing harus stabil sepanjang periode. Jika karyawan masuk/keluar, penugasan, komponen, atau aturan berubah di tengah periode, ready=false dan nominal tidak ditampilkan. Hasil ready=true tetap simulasi; belum memasukkan presensi, prorata, pajak, atau finalisasi payroll.
+      parameters:
+        - { in: query, name: employee_id, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
+      responses:
+        '200': { description: Alasan belum siap atau nominal iuran pekerja dan pemberi kerja per program untuk tinjauan }
+        '403': { description: Izin melihat nominal payroll diperlukan }
+        '404': { description: Periode atau karyawan tidak ditemukan dalam scope }
   /api/v1/ess/loans/simulate:
     post:
       tags: [Loans]
