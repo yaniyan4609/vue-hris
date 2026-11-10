@@ -12,5 +12,5 @@ Status: **komponen hitung terisolasi; belum dipakai oleh payroll run**. Validasi
 ## Syarat sebelum mengaktifkan hitung payroll
 
 1. Tambahkan parameter aturan pengurang dan pemetaan komponen gaji ke bruto pajak, BPJS, dan potongan yang berlaku pada tanggal periode. Jangan memakai angka contoh PP sebagai aturan global; aturan tetap dikelola per tenant.
-2. Verifikasi kasus pegawai masuk/keluar tengah tahun, perubahan pemberi kerja, status PTKP, penghasilan tidak teratur, iuran JHT/JP, zakat, serta koreksi lebih potong memakai contoh resmi tambahan.
+2. Verifikasi kasus pegawai masuk/keluar tengah tahun, perubahan pemberi kerja, status PTKP, penghasilan tidak teratur, iuran JHT/JP, zakat, serta koreksi lebih potong memakai contoh resmi tambahan. Untuk periode 2026, periksa juga kelayakan insentif PPh 21 ditanggung pemerintah menurut [PMK 105/2025 di JDIH Kemenkeu](https://jdih.kemenkeu.go.id/dok/pmk-105-tahun-2025/overview); komponen ini belum menghitung insentif tersebut.
 3. Cocokkan hasil *end-to-end* sumber data → PPh 21 → BPJS → kasbon → gaji bersih, termasuk pembulatan uang menurut pengaturan tenant dan snapshot aturan. Baru setelah itu hapus blocker dan buka submit/finalisasi, slip, serta ekspor bank.
