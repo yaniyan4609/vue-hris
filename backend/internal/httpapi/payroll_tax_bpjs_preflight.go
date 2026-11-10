@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"digaji.id/hris/internal/access"
@@ -22,6 +23,21 @@ type payrollDatedStatus struct {
 type payrollTaxRuleStatus struct {
 	From, To string
 	PTKP     map[string]bool
+}
+
+type payrollBPJSRuleStatus struct {
+	Program, From, To string
+}
+
+var requiredPayrollBPJSPrograms = []string{"KESEHATAN", "JHT", "JKK", "JKM", "JP"}
+
+func payrollBPJSProgramCovered(rules []payrollBPJSRuleStatus, program, day string) bool {
+	for _, rule := range rules {
+		if rule.Program == program && coversDay(rule.From, rule.To, day) {
+			return true
+		}
+	}
+	return false
 }
 
 func coversDay(from, to, day string) bool {
@@ -112,15 +128,15 @@ func (a adminAPI) previewPayrollTaxBPJSPreflight(w http.ResponseWriter, r *http.
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Aturan PPh 21 tidak dapat dibaca.")
 		return
 	}
-	bpjs := []payrollDatedStatus{}
-	rows, err = a.db.QueryContext(r.Context(), `SELECT DATE_FORMAT(effective_from,'%Y-%m-%d'),IFNULL(DATE_FORMAT(effective_to,'%Y-%m-%d'),'') FROM bpjs_rules WHERE tenant_id=? AND effective_from<=? AND (effective_to IS NULL OR effective_to>=?)`, c.tenant.ID, period.End, period.Start)
+	bpjs := []payrollBPJSRuleStatus{}
+	rows, err = a.db.QueryContext(r.Context(), `SELECT program,DATE_FORMAT(effective_from,'%Y-%m-%d'),IFNULL(DATE_FORMAT(effective_to,'%Y-%m-%d'),'') FROM bpjs_rules WHERE tenant_id=? AND effective_from<=? AND (effective_to IS NULL OR effective_to>=?)`, c.tenant.ID, period.End, period.Start)
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal membaca kesiapan aturan BPJS.")
 		return
 	}
 	for rows.Next() {
-		var item payrollDatedStatus
-		if err = rows.Scan(&item.From, &item.To); err != nil {
+		var item payrollBPJSRuleStatus
+		if err = rows.Scan(&item.Program, &item.From, &item.To); err != nil {
 			break
 		}
 		bpjs = append(bpjs, item)
@@ -136,6 +152,9 @@ func (a adminAPI) previewPayrollTaxBPJSPreflight(w http.ResponseWriter, r *http.
 	start, _ := time.Parse("2006-01-02", period.Start)
 	end, _ := time.Parse("2006-01-02", period.End)
 	checks := map[string]bool{"profile_covered": true, "ptkp_in_tax_rule": true, "tax_rule_covered": true, "bpjs_rule_present": true, "npwp_recorded": true, "bpjs_kes_recorded": true, "bpjs_tk_recorded": true}
+	for _, program := range requiredPayrollBPJSPrograms {
+		checks["bpjs_"+strings.ToLower(program)+"_rule_covered"] = true
+	}
 	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
 		date := day.Format("2006-01-02")
 		var profile *payrollDatedStatus
@@ -168,16 +187,12 @@ func (a adminAPI) previewPayrollTaxBPJSPreflight(w http.ResponseWriter, r *http.
 		if rule == nil || profile == nil || !rule.PTKP[profile.PTKP] {
 			checks["ptkp_in_tax_rule"] = false
 		}
-		foundBPJS := false
-		for _, item := range bpjs {
-			if coversDay(item.From, item.To, date) {
-				foundBPJS = true
-				break
+		for _, program := range requiredPayrollBPJSPrograms {
+			if !payrollBPJSProgramCovered(bpjs, program, date) {
+				checks["bpjs_"+strings.ToLower(program)+"_rule_covered"] = false
+				checks["bpjs_rule_present"] = false
 			}
 		}
-		if !foundBPJS {
-			checks["bpjs_rule_present"] = false
-		}
 	}
-	writeAPIData(w, 200, map[string]any{"employee_id": employeeID, "period_id": periodID, "start_date": period.Start, "end_date": period.End, "checks": checks, "note": "Pemeriksaan kelengkapan data dan keberlakuan aturan saja; belum menghitung atau memfinalisasi payroll. Program BPJS yang wajib masih perlu ditentukan per tenant."}, nil)
+	writeAPIData(w, 200, map[string]any{"employee_id": employeeID, "period_id": periodID, "start_date": period.Start, "end_date": period.End, "checks": checks, "note": "Pemeriksaan kelengkapan data dan keberlakuan lima program BPJS saja; belum menghitung atau memfinalisasi payroll."}, nil)
 }

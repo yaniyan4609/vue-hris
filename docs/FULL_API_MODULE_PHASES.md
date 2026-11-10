@@ -26,6 +26,8 @@ Status awal: 9 November 2026. Sumber operasi: `full-docs/Spesifikasi API digaji.
 
 Komponen hitung PPh 21 murni kini tersedia dan lulus contoh resmi Tuan R dari PP 58/2023 serta tes batas. Komponen ini belum dihubungkan ke payroll run; cakupan dan syarat pembukaan blocker dicatat di `PAYROLL_TAX_VERIFICATION.md`.
 
+Preflight periode kini memeriksa kelima program BPJS pada setiap tanggal, bukan hanya keberadaan satu aturan. Komponen hitung iuran murni memakai tarif dan plafon dari input aturan tenant, dengan tes lima program dan batas upah. Keduanya belum menghasilkan nominal draft; dasar upah per program, upah minimum kesehatan, kelayakan kepesertaan, dan versi plafon masih harus diverifikasi sebelum dipakai oleh payroll run.
+
 ## Aturan selesai satu modul
 
 Satu modul baru dinyatakan selesai setelah **semua method/path modul dalam spesifikasi** memiliki perilaku server nyata, bukan respons sukses kosong. Kontrak OpenAPI harus mencatat request, respons, error, permission, scope, dan status. Operasi tulis memakai validasi, transaksi, audit, dan idempotensi bila diwajibkan. Uji mencakup hak akses, lintas tenant, scope, konflik, serta alur bisnis utama pada MariaDB staging menggunakan fixture sementara yang dibersihkan. Alias lama tetap diuji agar frontend yang ada tidak putus. Setelah modul lulus, baru pindah ke modul berikutnya. Fitur bertanda `[TERBUKA]` menunggu keputusan produk yang terkait sebelum modulnya dinyatakan selesai.

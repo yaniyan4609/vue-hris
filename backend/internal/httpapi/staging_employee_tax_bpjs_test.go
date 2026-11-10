@@ -8,6 +8,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -147,8 +148,15 @@ func TestStagingEmployeeTaxBPJSVersionAndEncryption(t *testing.T) {
 		} `json:"data"`
 	}
 	doJSON(t, client, "GET", server.URL+"/api/v1/admin/payroll/periods/"+periodID+"/preflight?employee_id="+employeeID, nil, 200, &preflight)
-	if len(preflight.Data.Checks) != 7 || !preflight.Data.Checks["profile_covered"] || !preflight.Data.Checks["npwp_recorded"] {
+	if len(preflight.Data.Checks) != 12 || !preflight.Data.Checks["profile_covered"] || !preflight.Data.Checks["npwp_recorded"] {
 		t.Fatalf("incomplete tax/BPJS preflight: %#v", preflight.Data.Checks)
+	}
+	allProgramsCovered := true
+	for _, program := range requiredPayrollBPJSPrograms {
+		allProgramsCovered = allProgramsCovered && preflight.Data.Checks["bpjs_"+strings.ToLower(program)+"_rule_covered"]
+	}
+	if preflight.Data.Checks["bpjs_rule_present"] != allProgramsCovered {
+		t.Fatalf("BPJS aggregate coverage differs from five programs: %#v", preflight.Data.Checks)
 	}
 	doJSON(t, client, "GET", server.URL+"/api/v1/admin/payroll/periods/"+periodID+"/preflight?employee_id="+written.Data.Version, nil, 404, nil)
 	doJSON(t, client, "GET", server.URL+"/api/v1/admin/employees/"+written.Data.Version+"/tax-bpjs", nil, 404, nil)

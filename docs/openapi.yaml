@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.38.0
+  version: 0.38.1
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -4460,11 +4460,11 @@ paths:
       operationId: previewPayrollTaxBPJSPreflight
       x-permission: penggajian.lihat
       summary: Periksa kelengkapan data pajak dan BPJS sebelum draft payroll
-      description: Memeriksa cakupan profil PTKP, kecocokan status PTKP dengan aturan PPh 21, keberlakuan aturan pajak dan BPJS, serta keberadaan nomor tanpa mengungkap nilainya. Belum menghitung pajak/BPJS atau memfinalisasi payroll. Kewajiban program BPJS per tenant belum diputuskan.
+      description: Memeriksa cakupan profil PTKP, kecocokan status PTKP dengan aturan PPh 21, keberlakuan aturan pajak dan lima program BPJS wajib (KESEHATAN, JHT, JKK, JKM, JP) pada setiap tanggal periode, serta keberadaan nomor tanpa mengungkap nilainya. bpjs_rule_present bernilai true hanya bila kelima program lengkap; tersedia juga satu flag per program. Belum menghitung pajak/BPJS atau memfinalisasi payroll.
       parameters:
         - { in: query, name: employee_id, required: true, schema: { type: string, minLength: 26, maxLength: 26 } }
       responses:
-        '200': { description: Tujuh pemeriksaan per karyawan sepanjang periode; tidak mengubah data }
+        '200': { description: Dua belas pemeriksaan per karyawan sepanjang periode; tidak mengubah data }
         '404': { description: Periode atau karyawan tidak ditemukan dalam scope payroll }
   /api/v1/ess/loans/simulate:
     post:
