@@ -117,8 +117,13 @@ func TestStagingPayrollSettingsVersion(t *testing.T) {
 	input["version"] = version + 1
 	input["pay_day"] = 32
 	doJSON(t, finance, "PUT", server.URL+"/api/v1/admin/payroll/settings", input, 400, nil)
-	var periodID, runID string
+	var periodID, runID, overtimeID string
 	t.Cleanup(func() {
+		if overtimeID != "" {
+			if _, e := db.Exec(`DELETE FROM overtime_requests WHERE tenant_id=? AND id=?`, tenant, overtimeID); e != nil {
+				t.Errorf("cleanup overtime: %v", e)
+			}
+		}
 		if runID != "" {
 			_, _ = db.Exec(`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='payroll_runs' AND entity_id=?`, tenant, runID)
 			if _, e := db.Exec(`DELETE FROM payroll_runs WHERE tenant_id=? AND id=?`, tenant, runID); e != nil {
@@ -211,6 +216,62 @@ func TestStagingPayrollSettingsVersion(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("missing tax blocker: %+v", validation.Data.Issues)
+	}
+	var employeeID string
+	if err = db.QueryRowContext(ctx, `SELECT e.id FROM employees e JOIN users u ON u.id=e.user_id WHERE e.tenant_id=? AND u.email_normalized='ess@digaji.id'`, tenant).Scan(&employeeID); err != nil {
+		t.Fatal(err)
+	}
+	overtimeID, _ = ids.New()
+	if _, err = db.ExecContext(ctx, `INSERT INTO overtime_requests (tenant_id,id,employee_id,work_date,proposed_minutes,status) VALUES (?,?,?,?,60,'in_review')`, tenant, overtimeID, employeeID, period.Data.Start); err != nil {
+		t.Fatal(err)
+	}
+	doJSON(t, finance, "GET", server.URL+"/api/v1/admin/payroll/runs/"+runID+"/validation", nil, 200, &validation)
+	found = false
+	for _, issue := range validation.Data.Issues {
+		if issue.Code == "OVERTIME_PENDING_APPROVAL" && issue.AffectedCount >= 1 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("missing overtime blocker: %+v", validation.Data.Issues)
+	}
+	doJSON(t, finance, "GET", server.URL+"/api/v1/admin/payroll/runs/"+runID+"/validation?employee_id="+employeeID, nil, 200, &validation)
+	if validation.Data.EmployeeID != employeeID || validation.Data.EligibleEmployees != 1 {
+		t.Fatalf("filtered validation: %+v", validation.Data)
+	}
+	doJSON(t, finance, "GET", server.URL+"/api/v1/admin/payroll/runs/"+runID+"/validation?employee_id=bad", nil, 400, nil)
+	doJSON(t, finance, "GET", server.URL+"/api/v1/admin/payroll/runs/"+runID+"/validation?employee_id="+assignmentID, nil, 404, nil)
+	if _, err = db.ExecContext(ctx, `UPDATE overtime_requests SET status='returned' WHERE tenant_id=? AND id=?`, tenant, overtimeID); err != nil {
+		t.Fatal(err)
+	}
+	doJSON(t, finance, "GET", server.URL+"/api/v1/admin/payroll/runs/"+runID+"/validation", nil, 200, &validation)
+	found = false
+	for _, issue := range validation.Data.Issues {
+		if issue.Code == "OVERTIME_PENDING_APPROVAL" && issue.AffectedCount >= 1 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("returned overtime lost from blocker list: %+v", validation.Data.Issues)
+	}
+	if _, err = db.ExecContext(ctx, `UPDATE overtime_requests SET status='approved',approved_minutes=60 WHERE tenant_id=? AND id=?`, tenant, overtimeID); err != nil {
+		t.Fatal(err)
+	}
+	doJSON(t, finance, "GET", server.URL+"/api/v1/admin/payroll/runs/"+runID+"/validation", nil, 200, &validation)
+	if validation.Data.SourceCounts["employees_with_approved_overtime"] < 1 {
+		t.Fatalf("approved overtime source missing: %+v", validation.Data.SourceCounts)
+	}
+	var summary struct {
+		Data struct {
+			TotalGross   *string        `json:"total_gross"`
+			TotalNet     *string        `json:"total_net"`
+			BlockerCount int            `json:"blocker_count"`
+			SourceCounts map[string]int `json:"source_counts"`
+		} `json:"data"`
+	}
+	doJSON(t, finance, "GET", server.URL+"/api/v1/admin/payroll/runs/"+runID+"/summary", nil, 200, &summary)
+	if summary.Data.TotalGross != nil || summary.Data.TotalNet != nil || summary.Data.BlockerCount == 0 || summary.Data.SourceCounts["employees_with_approved_overtime"] < 1 {
+		t.Fatalf("draft summary: %+v", summary.Data)
 	}
 	doJSON(t, admin, "POST", runURL, map[string]any{}, 403, nil)
 }

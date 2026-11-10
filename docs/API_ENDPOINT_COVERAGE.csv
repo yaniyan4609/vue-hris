@@ -154,7 +154,7 @@ GET,/api/v1/admin/payroll/runs/{id},11.2 Periode dan payroll run,active
 GET,/api/v1/admin/payroll/runs/{id}/adjustments,11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/runs/{id}/items,11.2 Periode dan payroll run,planned
 GET,/api/v1/admin/payroll/runs/{id}/items/{itemId},11.2 Periode dan payroll run,planned
-GET,/api/v1/admin/payroll/runs/{id}/summary,11.2 Periode dan payroll run,planned
+GET,/api/v1/admin/payroll/runs/{id}/summary,11.2 Periode dan payroll run,partial
 GET,/api/v1/admin/payroll/runs/{id}/validation,11.2 Periode dan payroll run,partial
 GET,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,active
 GET,/api/v1/admin/payslips,11.3 Slip gaji,planned

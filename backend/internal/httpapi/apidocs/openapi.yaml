@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.37.0
+  version: 0.38.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -4377,9 +4377,24 @@ paths:
       x-permission: penggajian.lihat
       x-implementation-stage: partial
       summary: Periksa kelengkapan awal sebelum perhitungan
-      description: Memeriksa pengaturan, aturan PPh 21 dan lima program BPJS, profil karyawan, rekening utama, komponen penghasilan, serta roster terbit dalam scope pemanggil. TAX_ENGINE_UNVERIFIED selalu menjadi blocker sampai uji perhitungan resmi disepakati. Belum memvalidasi nominal akhir.
+      description: Memeriksa pengaturan, aturan PPh 21 dan lima program BPJS, profil karyawan, rekening utama, komponen penghasilan, roster terbit, shift instance, rekap presensi, pengajuan cuti/lembur tertunda, serta sumber cuti, lembur, dan kasbon dalam scope pemanggil. source_counts menghitung karyawan, bukan jumlah pengajuan. TAX_ENGINE_UNVERIFIED selalu menjadi blocker sampai uji perhitungan resmi disepakati. Belum memvalidasi nominal akhir.
+      parameters:
+        - { in: query, name: employee_id, schema: { type: string, minLength: 26, maxLength: 26 }, description: Opsional; hasil hanya untuk karyawan dalam scope permission }
       responses:
         '200': { description: Daftar blocker awal dan jumlah karyawan terdampak }
+        '404': { description: Run atau karyawan tidak ada dalam tenant/scope aktif }
+  /api/v1/admin/payroll/runs/{id}/summary:
+    parameters:
+      - $ref: '#/components/parameters/ResourceID'
+    get:
+      tags: [Payroll]
+      operationId: getPayrollRunSummary
+      x-permission: penggajian.lihat
+      x-implementation-stage: partial
+      summary: Ringkasan kesiapan draft payroll
+      description: Mengembalikan jumlah karyawan, blocker, dan sumber data. total_gross, total_deduction, total_tax, dan total_net null sampai mesin perhitungan terverifikasi.
+      responses:
+        '200': { description: Ringkasan draft tanpa nominal hasil hitung }
         '404': { description: Run tidak ada di tenant aktif }
   /api/v1/admin/payroll/periods/{id}/loan-deductions:
     parameters:
