@@ -56,6 +56,41 @@ func main() {
 			if credited > 0 {
 				slog.Info("saldo cuti tahunan diberikan", "count", credited)
 			}
+			notified, err := httpapi.RunNotificationOutbox(workerContext, db)
+			if err != nil {
+				slog.Error("dispatcher notifikasi gagal", "error", err)
+			}
+			if notified > 0 {
+				slog.Info("outbox notifikasi diproses", "count", notified)
+			}
+			broadcasts, err := httpapi.RunDueBroadcasts(workerContext, db)
+			if err != nil {
+				slog.Error("pengiriman broadcast gagal", "error", err)
+			}
+			if broadcasts > 0 {
+				slog.Info("broadcast diproses", "count", broadcasts)
+			}
+			pushes, err := httpapi.RunPushDeliveries(workerContext, db)
+			if err != nil {
+				slog.Error("pengiriman push gagal", "error", err)
+			}
+			if pushes > 0 {
+				slog.Info("push diproses", "count", pushes)
+			}
+			reminders, err := httpapi.RunDueReminders(workerContext, db)
+			if err != nil {
+				slog.Error("pengingat presensi gagal", "error", err)
+			}
+			if reminders > 0 {
+				slog.Info("pengingat presensi diproses", "count", reminders)
+			}
+			emails, err := httpapi.RunEmailDeliveries(workerContext, db)
+			if err != nil {
+				slog.Error("pengiriman email notifikasi gagal", "error", err)
+			}
+			if emails > 0 {
+				slog.Info("email notifikasi diproses", "count", emails)
+			}
 		}
 		run()
 		ticker := time.NewTicker(time.Minute)

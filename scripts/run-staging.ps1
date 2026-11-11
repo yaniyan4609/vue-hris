@@ -10,6 +10,7 @@ $credentialFile = Join-Path $workDir 'db-credential.xml'
 $mfaKeyFile = Join-Path $workDir 'platform-mfa-key.xml'
 $tenantMasterKeyFile = Join-Path $workDir 'tenant-master-key.xml'
 $smtpCredentialFile = Join-Path $workDir 'smtp-credential.xml'
+$vapidCredentialFile = Join-Path $workDir 'vapid-keypair.xml'
 $backendProcess = $null
 $frontendProcess = $null
 $state = $null
@@ -133,6 +134,25 @@ try {
         $env:TENANT_MASTER_KEY = ([System.Net.NetworkCredential]::new('', $secureTenantKey)).Password
     }
     if (-not $env:TENANT_MASTER_KEY_ID) { $env:TENANT_MASTER_KEY_ID = 'local-v1' }
+    if (-not $env:VAPID_PUBLIC_KEY -or -not $env:VAPID_PRIVATE_KEY) {
+        if (Test-Path -LiteralPath $vapidCredentialFile) {
+            $vapidPair = Import-Clixml -LiteralPath $vapidCredentialFile
+        } else {
+            Push-Location $backendDir
+            try {
+                $generatedPair = (& $go run ./cmd/vapid-keygen | ConvertFrom-Json)
+                if ($LASTEXITCODE -ne 0 -or -not $generatedPair.public -or -not $generatedPair.private) { throw 'Pembuatan kunci VAPID gagal.' }
+            } finally { Pop-Location }
+            $vapidPair = [PSCustomObject]@{
+                Public = $generatedPair.public
+                Private = (ConvertTo-SecureString -String $generatedPair.private -AsPlainText -Force)
+            }
+            $vapidPair | Export-Clixml -LiteralPath $vapidCredentialFile
+        }
+        $env:VAPID_PUBLIC_KEY = $vapidPair.Public
+        $env:VAPID_PRIVATE_KEY = ([System.Net.NetworkCredential]::new('', $vapidPair.Private)).Password
+    }
+    if (-not $env:VAPID_SUBSCRIBER) { $env:VAPID_SUBSCRIBER = 'mailto:admin@digaji.id' }
     $env:APP_ENV = 'staging'
     $env:FILE_STORAGE_DIR = Join-Path $repoRoot 'work/files'
     New-Item -ItemType Directory -Force -Path $env:FILE_STORAGE_DIR | Out-Null
@@ -163,6 +183,7 @@ try {
     Remove-Item Env:PLATFORM_MFA_KEY -ErrorAction SilentlyContinue
     Remove-Item Env:TENANT_MASTER_KEY -ErrorAction SilentlyContinue
     Remove-Item Env:SMTP_PASSWORD -ErrorAction SilentlyContinue
+    Remove-Item Env:VAPID_PRIVATE_KEY -ErrorAction SilentlyContinue
     if (-not (Wait-HrisURL -Url "http://127.0.0.1:${backendPort}/readyz" -Seconds 30 -Process $backendProcess)) {
         throw "Backend gagal siap. Periksa $(Join-Path $instanceDir 'backend.err.log')"
     }
@@ -209,6 +230,7 @@ try {
     Remove-Item Env:PLATFORM_MFA_KEY -ErrorAction SilentlyContinue
     Remove-Item Env:TENANT_MASTER_KEY -ErrorAction SilentlyContinue
     Remove-Item Env:SMTP_PASSWORD -ErrorAction SilentlyContinue
+    Remove-Item Env:VAPID_PRIVATE_KEY -ErrorAction SilentlyContinue
     if ($ready -and $state) {
         Stop-HrisOwnedProcess -ProcessId $state.frontendPid -StartedUtcTicks $state.frontendStartedUtcTicks
         Stop-HrisOwnedProcess -ProcessId $state.backendPid -StartedUtcTicks $state.backendStartedUtcTicks

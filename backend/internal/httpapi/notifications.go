@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -75,6 +76,7 @@ func notificationIdentity(w http.ResponseWriter, r *http.Request, db *sql.DB) (n
 
 func mountNotifications(r chi.Router, db *sql.DB, config Options) {
 	r.Route("/api/v1/notifications", func(r chi.Router) {
+		mountNotificationPreferences(r, db, config)
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) { listNotifications(w, req, db, false) })
 		r.Get("/sync", func(w http.ResponseWriter, req *http.Request) { listNotifications(w, req, db, true) })
 		r.Get("/unread-count", func(w http.ResponseWriter, req *http.Request) {
@@ -103,6 +105,10 @@ func mountNotifications(r chi.Router, db *sql.DB, config Options) {
 				writeAPIError(w, req, 500, "INTERNAL_ERROR", "Gagal membaca notifikasi.")
 				return
 			}
+			if !notificationDetailAllowed(req, db, identity, item) {
+				writeAPIError(w, req, 404, "NOT_FOUND", "Notifikasi tidak tersedia.")
+				return
+			}
 			writeAPIData(w, 200, item, nil)
 		})
 		r.With(checkOrigin(config), requireCSRF).Post("/{id}/read", func(w http.ResponseWriter, req *http.Request) { mutateNotification(w, req, db, "read") })
@@ -113,7 +119,7 @@ func mountNotifications(r chi.Router, db *sql.DB, config Options) {
 				return
 			}
 			category := strings.TrimSpace(req.URL.Query().Get("category"))
-			if len(category) > 48 {
+			if category != "" && !validNotificationCategory(category) {
 				writeAPIError(w, req, 400, "VALIDATION_FAILED", "Kategori tidak valid.")
 				return
 			}
@@ -123,7 +129,25 @@ func mountNotifications(r chi.Router, db *sql.DB, config Options) {
 				query += " AND category=?"
 				args = append(args, category)
 			}
-			if _, err := db.ExecContext(req.Context(), query, args...); err != nil {
+			tx, err := db.BeginTx(req.Context(), nil)
+			if err != nil {
+				writeAPIError(w, req, 500, "INTERNAL_ERROR", "Gagal menandai notifikasi.")
+				return
+			}
+			defer tx.Rollback()
+			if _, err := tx.ExecContext(req.Context(), query, args...); err != nil {
+				writeAPIError(w, req, 500, "INTERNAL_ERROR", "Gagal menandai notifikasi.")
+				return
+			}
+			if _, err := tx.ExecContext(req.Context(), `UPDATE broadcast_recipients br JOIN notifications n ON n.tenant_id=br.tenant_id AND n.id=br.notification_id SET br.read_at=COALESCE(br.read_at,n.read_at) WHERE br.tenant_id=? AND br.user_id=? AND n.read_at IS NOT NULL AND br.read_at IS NULL`, identity.TenantID, identity.UserID); err != nil {
+				writeAPIError(w, req, 500, "INTERNAL_ERROR", "Gagal memperbarui status pengumuman.")
+				return
+			}
+			if err := emitNotificationStream(req.Context(), tx, identity.TenantID, identity.UserID, "notification.unread_count", nil, map[string]any{"refresh": true}); err != nil {
+				writeAPIError(w, req, 500, "INTERNAL_ERROR", "Gagal memperbarui notifikasi.")
+				return
+			}
+			if err := tx.Commit(); err != nil {
 				writeAPIError(w, req, 500, "INTERNAL_ERROR", "Gagal menandai notifikasi.")
 				return
 			}
@@ -175,12 +199,23 @@ func listNotifications(w http.ResponseWriter, r *http.Request, db *sql.DB, syncM
 		query += " AND sequence_no>?"
 		args = append(args, seq)
 	} else {
-		query += " AND archived_at IS NULL"
+		if archived := r.URL.Query().Get("archived"); archived == "true" {
+			query += " AND archived_at IS NOT NULL"
+		} else if archived == "" || archived == "false" {
+			query += " AND archived_at IS NULL"
+		} else {
+			writeAPIError(w, r, 400, "VALIDATION_FAILED", "Filter archived tidak valid.")
+			return
+		}
 		if id != "" {
 			query += " AND sequence_no<?"
 			args = append(args, seq)
 		}
 		if category := r.URL.Query().Get("category"); category != "" {
+			if !validNotificationCategory(category) {
+				writeAPIError(w, r, 400, "VALIDATION_FAILED", "Kategori tidak valid.")
+				return
+			}
 			query += " AND category=?"
 			args = append(args, category)
 		}
@@ -272,7 +307,13 @@ func mutateNotification(w http.ResponseWriter, r *http.Request, db *sql.DB, acti
 	if action == "archive" {
 		column = "archived_at"
 	}
-	result, err := db.ExecContext(r.Context(), `UPDATE notifications SET `+column+`=COALESCE(`+column+`,UTC_TIMESTAMP(6)) WHERE tenant_id=? AND recipient_user_id=? AND id=?`, p.TenantID, p.UserID, id)
+	tx, err := db.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengubah notifikasi.")
+		return
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(r.Context(), `UPDATE notifications SET `+column+`=COALESCE(`+column+`,UTC_TIMESTAMP(6)) WHERE tenant_id=? AND recipient_user_id=? AND id=?`, p.TenantID, p.UserID, id)
 	if err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengubah notifikasi.")
 		return
@@ -292,5 +333,50 @@ func mutateNotification(w http.ResponseWriter, r *http.Request, db *sql.DB, acti
 			return
 		}
 	}
+	if action == "read" {
+		if _, err = tx.ExecContext(r.Context(), `UPDATE broadcast_recipients SET read_at=COALESCE(read_at,UTC_TIMESTAMP(6)) WHERE tenant_id=? AND user_id=? AND notification_id=?`, p.TenantID, p.UserID, id); err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengubah notifikasi.")
+			return
+		}
+	}
+	ref := id
+	if err = emitNotificationStream(r.Context(), tx, p.TenantID, p.UserID, "notification.updated", &ref, map[string]any{"id": id, "action": action}); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengubah notifikasi.")
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mengubah notifikasi.")
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func notificationDetailAllowed(r *http.Request, db *sql.DB, p notificationPrincipal, item notificationItem) bool {
+	if item.DeepLink == nil {
+		return true
+	}
+	if !strings.HasPrefix(*item.DeepLink, "/") || strings.HasPrefix(*item.DeepLink, "//") {
+		return false
+	}
+	if item.Category == "broadcast" {
+		var count int
+		err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM broadcast_recipients br JOIN broadcasts b ON b.tenant_id=br.tenant_id AND b.id=br.broadcast_id WHERE br.tenant_id=? AND br.user_id=? AND br.notification_id=? AND br.delivery_status='delivered' AND b.status IN ('sending','sent')`, p.TenantID, p.UserID, item.ID).Scan(&count)
+		return err == nil && count > 0
+	}
+	if item.Category == "request" {
+		var raw []byte
+		if err := db.QueryRowContext(r.Context(), `SELECT payload_json FROM notifications WHERE tenant_id=? AND id=? AND recipient_user_id=?`, p.TenantID, item.ID, p.UserID).Scan(&raw); err != nil || len(raw) == 0 {
+			return false
+		}
+		var payload struct {
+			RequestID string `json:"request_id"`
+		}
+		if json.Unmarshal(raw, &payload) != nil || !fileIDPattern.MatchString(payload.RequestID) {
+			return false
+		}
+		var count int
+		err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM requests q WHERE q.tenant_id=? AND q.id=? AND (q.requested_by=? OR EXISTS (SELECT 1 FROM approval_instances i JOIN approval_tasks t ON t.tenant_id=i.tenant_id AND t.instance_id=i.id WHERE i.tenant_id=q.tenant_id AND i.request_id=q.id AND i.status='in_review' AND t.assignee_user_id=? AND t.status='pending'))`, p.TenantID, payload.RequestID, p.UserID, p.UserID).Scan(&count)
+		return err == nil && count > 0
+	}
+	return true
 }

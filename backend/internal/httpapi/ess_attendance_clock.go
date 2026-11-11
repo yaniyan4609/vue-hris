@@ -271,6 +271,14 @@ func (a adminAPI) clockAttendance(w http.ResponseWriter, r *http.Request, kind s
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memberi notifikasi atasan.")
 			return
 		}
+		if err = emitNotificationStream(r.Context(), tx, tenantID, managerUser.String, "attendance.event.created", &notificationID, map[string]any{"event_id": id, "employee_id": c.employeeID, "event_type": kind, "occurred_at": now, "timing_status": timing}); err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memberi pembaruan presensi.")
+			return
+		}
+		if err = emitNotificationStream(r.Context(), tx, tenantID, managerUser.String, "reminder.summary.updated", nil, map[string]any{"event_id": id, "refresh": true}); err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memberi pembaruan pengingat.")
+			return
+		}
 	}
 	if err = audit(r.Context(), tx, tenantID, c.state.User.ID, "create", "attendance_events", id, nil, map[string]any{"event_type": kind, "shift_instance_id": instance.ID, "timing_status": timing}); err != nil {
 		writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal mencatat audit presensi.")

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: digaji.id API
-  version: 0.39.1
+  version: 0.40.0
   description: >-
     Kontrak endpoint yang sudah tersedia. Endpoint lama dipertahankan selama transisi
     ke spesifikasi REST + WebSocket. Tenant bisnis berasal dari sesi, bukan body atau
@@ -42,6 +42,8 @@ tags:
     description: Operasi staf platform
   - name: Notifications
     description: Inbox notifikasi milik akun yang masuk
+  - name: Broadcast
+    description: Pengumuman tenant dan bacaan ESS
   - name: Realtime
     description: Handshake dan protokol WebSocket
 paths:
@@ -2288,6 +2290,7 @@ paths:
         - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
         - { in: query, name: category, schema: { type: string } }
         - { in: query, name: unread, schema: { type: boolean } }
+        - { in: query, name: archived, schema: { type: boolean } }
       responses:
         '200':
           description: Daftar diurutkan dari terbaru; cursor adalah ID item terakhir
@@ -5146,15 +5149,493 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200': { description: Total dan rincian karyawan dalam scope }
+  /api/v1/notifications/preferences:
+    get:
+      tags: [Notifications]
+      summary: Preferensi efektif untuk semua kategori dan kanal
+      operationId: getNotificationPreferences
+      description: 'Hak: notifikasi.lihat_sendiri. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+    put:
+      tags: [Notifications]
+      summary: Simpan preferensi jenis dan kanal; system wajib aktif
+      operationId: putNotificationPreferences
+      description: 'Hak: notifikasi.lihat_sendiri. Tenant berasal dari sesi.'
+      parameters:
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [items], properties: { items: { type: array, items: { type: object, required: [category, channel, enabled], properties: { category: { type: string, enum: [request, reminder, broadcast, system] }, channel: { type: string, enum: [inapp, push, email] }, enabled: { type: boolean } } } } } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/push/vapid-public-key:
+    get:
+      tags: [Notifications]
+      summary: Kunci publik VAPID untuk Web Push
+      operationId: getVapidPublicKey
+      description: 'Hak: sesi. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/push/subscriptions:
+    get:
+      tags: [Notifications]
+      summary: Perangkat Push milik pengguna dan tenant aktif
+      operationId: listPushSubscriptions
+      description: 'Hak: sesi. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+    post:
+      tags: [Notifications]
+      summary: Daftarkan endpoint Push yang dienkripsi per tenant
+      operationId: createPushSubscription
+      description: 'Hak: sesi. Tenant berasal dari sesi.'
+      parameters:
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [endpoint, p256dh, auth], properties: { endpoint: { type: string, format: uri }, p256dh: { type: string }, auth: { type: string } } }
+      responses:
+        '201': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/push/subscriptions/{id}:
+    delete:
+      tags: [Notifications]
+      summary: Cabut perangkat Push milik pengguna
+      operationId: deletePushSubscription
+      description: 'Hak: sesi. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '204': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/push/test:
+    post:
+      tags: [Notifications]
+      summary: Kirim Push uji ke perangkat milik pengguna
+      operationId: testPushSubscription
+      description: 'Hak: sesi. Tenant berasal dari sesi.'
+      parameters:
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [subscription_id], properties: { subscription_id: { type: string } } }
+      responses:
+        '200': { description: Push berhasil diterima provider }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-event-types:
+    get:
+      tags: [Notifications]
+      summary: Katalog event notifikasi dan reminder
+      operationId: listNotificationEventTypes
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-rules:
+    get:
+      tags: [Notifications]
+      summary: Aturan notifikasi tenant yang tersimpan
+      operationId: listNotificationRules
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-rules/{eventType}:
+    get:
+      tags: [Notifications]
+      summary: Aturan atau default event tenant
+      operationId: getNotificationRule
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: eventType, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+    put:
+      tags: [Notifications]
+      summary: Aktifkan dan atur offset, pengulangan, jam tenang, ringkasan
+      operationId: putNotificationRule
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: eventType, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { enabled: { type: boolean }, offset_minutes: { type: integer }, repeat_minutes: { type: integer }, max_repeats: { type: integer }, quiet_start: { type: string }, quiet_end: { type: string }, summary_recipient: { type: string, enum: ['', manager, hr] } } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-templates:
+    get:
+      tags: [Notifications]
+      summary: Template efektif seluruh event dan kanal
+      operationId: listNotificationTemplates
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-templates/{id}:
+    put:
+      tags: [Notifications]
+      summary: Ubah judul dan isi template tenant
+      operationId: putNotificationTemplate
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [title_tpl, body_tpl], properties: { title_tpl: { type: string }, body_tpl: { type: string } } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-templates/{id}/preview:
+    post:
+      tags: [Notifications]
+      summary: Render template dengan data contoh
+      operationId: previewNotificationTemplate
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-deliveries:
+    get:
+      tags: [Notifications]
+      summary: Log pengiriman dengan filter kanal, status, tanggal
+      operationId: listNotificationDeliveries
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-deliveries/{id}/retry:
+    post:
+      tags: [Notifications]
+      summary: Antrekan kembali Push atau email yang gagal
+      operationId: retryNotificationDelivery
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '202': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/notification-stats:
+    get:
+      tags: [Notifications]
+      summary: Agregat delivered, failed, pending, unread tenant
+      operationId: getNotificationStats
+      description: 'Hak: notifikasi.kelola. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/reminders/summary:
+    get:
+      tags: [Notifications]
+      summary: Karyawan belum clock-in dan clock-out dalam scope
+      operationId: getReminderSummary
+      description: 'Hak: absensi.monitor_bawahan. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts:
+    get:
+      tags: [Broadcast]
+      summary: Daftar broadcast tenant dengan filter status
+      operationId: listBroadcasts
+      description: 'Hak: broadcast.lihat / broadcast.buat. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+    post:
+      tags: [Broadcast]
+      summary: Buat draft dengan target dan combine_mode
+      operationId: createBroadcast
+      description: 'Hak: broadcast.lihat / broadcast.buat. Tenant berasal dari sesi.'
+      parameters:
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [title, body, targets], properties: { title: { type: string }, body: { type: string }, combine_mode: { type: string, enum: [and, or] }, version: { type: integer }, targets: { type: array, items: { type: object, properties: { target_type: { type: string, enum: [all, region, office, division, department, position, user] }, ref_id: { type: string } } } } } }
+      responses:
+        '201': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/audience-preview:
+    post:
+      tags: [Broadcast]
+      summary: Hitung target dalam scope tanpa menyimpan draft
+      operationId: previewBroadcastAudience
+      description: 'Hak: broadcast.buat. Tenant berasal dari sesi.'
+      parameters:
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [targets], properties: { combine_mode: { type: string, enum: [and, or] }, targets: { type: array, items: { type: object, properties: { target_type: { type: string, enum: [all, region, office, division, department, position, user] }, ref_id: { type: string } } } } } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/{id}:
+    get:
+      tags: [Broadcast]
+      summary: Detail draft atau hasil broadcast
+      operationId: getBroadcast
+      description: 'Hak: broadcast.lihat / broadcast.ubah. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+    patch:
+      tags: [Broadcast]
+      summary: Ubah draft atau jadwal dengan version
+      operationId: updateBroadcast
+      description: 'Hak: broadcast.lihat / broadcast.ubah. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [title, body, targets], properties: { title: { type: string }, body: { type: string }, combine_mode: { type: string, enum: [and, or] }, version: { type: integer }, targets: { type: array, items: { type: object, properties: { target_type: { type: string, enum: [all, region, office, division, department, position, user] }, ref_id: { type: string } } } } } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+    delete:
+      tags: [Broadcast]
+      summary: Hapus draft yang belum dikirim
+      operationId: deleteBroadcast
+      description: 'Hak: broadcast.lihat / broadcast.ubah. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '204': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/{id}/audience-preview:
+    post:
+      tags: [Broadcast]
+      summary: Hitung audience dari draft tersimpan
+      operationId: previewSavedBroadcastAudience
+      description: 'Hak: broadcast.buat. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/{id}/attachments:
+    post:
+      tags: [Broadcast]
+      summary: Lampirkan file bersih purpose broadcast dengan version
+      operationId: attachBroadcastFile
+      description: 'Hak: broadcast.ubah. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [file_id, version], properties: { file_id: { type: string }, version: { type: integer } } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/{id}/send:
+    post:
+      tags: [Broadcast]
+      summary: Antrekan kirim dengan Idempotency-Key; snapshot saat eksekusi
+      operationId: sendBroadcast
+      description: 'Hak: broadcast.kirim. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string, minLength: 1, maxLength: 128 } }
+      responses:
+        '202': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/{id}/schedule:
+    post:
+      tags: [Broadcast]
+      summary: Jadwalkan kirim RFC3339; audience saat eksekusi
+      operationId: scheduleBroadcast
+      description: 'Hak: broadcast.kirim. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [send_at], properties: { send_at: { type: string, format: date-time }, version: { type: integer } } }
+      responses:
+        '202': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/{id}/cancel:
+    post:
+      tags: [Broadcast]
+      summary: Batalkan jadwal atau sisa pengiriman
+      operationId: cancelBroadcast
+      description: 'Hak: broadcast.kirim. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/CSRFToken' }
+      responses:
+        '202': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/{id}/recipients:
+    get:
+      tags: [Broadcast]
+      summary: Penerima, status kirim, dan status baca dalam scope
+      operationId: listBroadcastRecipients
+      description: 'Hak: broadcast.lihat_penerima. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/admin/broadcasts/{id}/stats:
+    get:
+      tags: [Broadcast]
+      summary: Total, terkirim, gagal, dan dibaca
+      operationId: getBroadcastStats
+      description: 'Hak: broadcast.lihat. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/ess/announcements:
+    get:
+      tags: [Broadcast]
+      summary: Pengumuman yang diterima pengguna aktif
+      operationId: listMyAnnouncements
+      description: 'Hak: sesi tenant. Tenant berasal dari sesi.'
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/ess/announcements/{id}:
+    get:
+      tags: [Broadcast]
+      summary: Detail dan tanda baca pengumuman milik pengguna
+      operationId: getMyAnnouncement
+      description: 'Hak: sesi tenant. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
+  /api/v1/jobs/{id}:
+    get:
+      tags: [Broadcast]
+      summary: Progres pengiriman broadcast async
+      operationId: getBroadcastJob
+      description: 'Hak: pembuat broadcast. Tenant berasal dari sesi.'
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Operasi berhasil }
+        '401': { description: Sesi tidak sah }
+        '403': { description: Permission, scope, atau CSRF ditolak }
+        '422': { description: Validasi atau aturan bisnis ditolak }
   /api/v1/realtime/ws:
     get:
       tags: [Realtime]
       summary: Sambungan WebSocket notifikasi tenant aktif
       operationId: realtimeWebSocket
-      description: Cookie sesi dan Origin wajib. Klien memakai hello/resume, ping, dan ack. Setelah reconnect, pulihkan event melalui /notifications/sync. Implementasi saat ini mengirim notification.created dan notification.unread_count.
+      description: Cookie sesi dan Origin wajib. Klien memakai hello/resume, ping, dan ack. Setelah reconnect, pulihkan inbox melalui /notifications/sync dan muat ulang unread-count. Server mengirim notification.created, notification.updated, notification.unread_count, approval.task.created, approval.task.closed, approval.request.updated, attendance.event.created, reminder.summary.updated, broadcast.progress, job.updated, access.changed, dan session.revoked. Perubahan akses menutup koneksi agar klien memuat ulang /me/access.
       x-websocket-close-codes:
         '4401': Sesi tidak sah atau dicabut
         '4408': Hak akses berubah
+        '4429': Terlalu banyak koneksi
       responses:
         '101': { description: Koneksi WebSocket diterima }
         '401': { description: Sesi tidak sah }

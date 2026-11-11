@@ -82,7 +82,10 @@ func TestStagingNotificationRealtimeAndOwnerBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.ExecContext(context.Background(), `DELETE FROM notifications WHERE tenant_id=? AND id=?`, admin.SelectedTenantID, id)
+	defer func() {
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM notification_stream_events WHERE tenant_id=? AND notification_id=?`, admin.SelectedTenantID, id)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM notifications WHERE tenant_id=? AND id=?`, admin.SelectedTenantID, id)
+	}()
 	var event realtimeEvent
 	if err := wsjson.Read(ctx, conn, &event); err != nil {
 		t.Fatal(err)

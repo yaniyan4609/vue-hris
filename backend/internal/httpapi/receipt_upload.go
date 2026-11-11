@@ -53,7 +53,7 @@ func (a adminAPI) receiptUploader(w http.ResponseWriter, r *http.Request) (essAt
 }
 
 func (a adminAPI) uploaderForPurpose(w http.ResponseWriter, r *http.Request, purpose string) (essAttendanceContext, bool) {
-	if purpose == "leave" {
+	if purpose == "leave" || purpose == "broadcast" {
 		state, err := a.auth.Current(r.Context(), cookieToken(r))
 		if err != nil {
 			writeAuthError(w, err)
@@ -64,6 +64,9 @@ func (a adminAPI) uploaderForPurpose(w http.ResponseWriter, r *http.Request, pur
 		for _, tenant := range state.Tenants {
 			if tenant.ID == state.SelectedTenantID {
 				panel = tenant.ESS || tenant.Admin
+				if purpose == "broadcast" {
+					panel = tenant.Admin
+				}
 				zone, _ = time.LoadLocation(tenant.Timezone)
 				break
 			}
@@ -75,7 +78,11 @@ func (a adminAPI) uploaderForPurpose(w http.ResponseWriter, r *http.Request, pur
 		if zone == nil {
 			zone = time.UTC
 		}
-		_, decision, err := a.access.Decide(r.Context(), state.SelectedTenantID, state.User.ID, zone.String(), "cuti.buat")
+		permission := "cuti.buat"
+		if purpose == "broadcast" {
+			permission = "broadcast.buat"
+		}
+		_, decision, err := a.access.Decide(r.Context(), state.SelectedTenantID, state.User.ID, zone.String(), permission)
 		if err != nil {
 			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa hak unggah lampiran cuti.")
 			return essAttendanceContext{}, false
@@ -119,7 +126,7 @@ func (a adminAPI) existingUploadPurpose(w http.ResponseWriter, r *http.Request) 
 		return "", false
 	}
 	var purpose string
-	err = a.db.QueryRowContext(r.Context(), `SELECT purpose FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND deleted_at IS NULL AND purpose IN ('receipt','selfie','leave')`, state.SelectedTenantID, chi.URLParam(r, "id"), state.User.ID).Scan(&purpose)
+	err = a.db.QueryRowContext(r.Context(), `SELECT purpose FROM files WHERE tenant_id=? AND id=? AND uploaded_by=? AND deleted_at IS NULL AND purpose IN ('receipt','selfie','leave','broadcast')`, state.SelectedTenantID, chi.URLParam(r, "id"), state.User.ID).Scan(&purpose)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
 		return "", false
@@ -151,7 +158,7 @@ func (a adminAPI) createReceiptUpload(w http.ResponseWriter, r *http.Request) {
 	if body.Purpose == "selfie" {
 		maxSize = maxSelfieBytes
 	}
-	if (body.Purpose != "receipt" && body.Purpose != "selfie" && body.Purpose != "leave") || !receiptMimes[body.MimeType] || (body.Purpose == "selfie" && body.MimeType == "application/pdf") || body.SizeBytes < 1 || body.SizeBytes > maxSize || body.OriginalName == "" || len([]rune(body.OriginalName)) > 255 || strings.ContainsAny(body.OriginalName, "\\/\x00\r\n") || len(body.SHA256) != 64 {
+	if (body.Purpose != "receipt" && body.Purpose != "selfie" && body.Purpose != "leave" && body.Purpose != "broadcast") || !receiptMimes[body.MimeType] || (body.Purpose == "selfie" && body.MimeType == "application/pdf") || body.SizeBytes < 1 || body.SizeBytes > maxSize || body.OriginalName == "" || len([]rune(body.OriginalName)) > 255 || strings.ContainsAny(body.OriginalName, "\\/\x00\r\n") || len(body.SHA256) != 64 {
 		writeAPIError(w, r, 400, "VALIDATION_FAILED", "Metadata kuitansi tidak valid.")
 		return
 	}

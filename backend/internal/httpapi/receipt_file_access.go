@@ -44,7 +44,7 @@ func (a adminAPI) authorizedReceiptFile(w http.ResponseWriter, r *http.Request) 
 		return item, state, false
 	}
 	var uploader, claim, leave sql.NullString
-	err = a.db.QueryRowContext(r.Context(), `SELECT f.id,f.original_name,f.mime_type,f.size_bytes,f.purpose,f.scan_status,f.created_at,f.uploaded_by,rr.reimbursement_id,(SELECT lr.id FROM leave_requests lr WHERE lr.tenant_id=f.tenant_id AND lr.attachment_file_id=f.id ORDER BY lr.id LIMIT 1) FROM files f LEFT JOIN reimbursement_receipts rr ON rr.tenant_id=f.tenant_id AND rr.file_id=f.id WHERE f.tenant_id=? AND f.id=? AND f.purpose IN ('receipt','selfie','leave') AND f.deleted_at IS NULL`, state.SelectedTenantID, id).Scan(&item.ID, &item.OriginalName, &item.MimeType, &item.SizeBytes, &item.Purpose, &item.ScanStatus, &item.CreatedAt, &uploader, &claim, &leave)
+	err = a.db.QueryRowContext(r.Context(), `SELECT f.id,f.original_name,f.mime_type,f.size_bytes,f.purpose,f.scan_status,f.created_at,f.uploaded_by,rr.reimbursement_id,(SELECT lr.id FROM leave_requests lr WHERE lr.tenant_id=f.tenant_id AND lr.attachment_file_id=f.id ORDER BY lr.id LIMIT 1) FROM files f LEFT JOIN reimbursement_receipts rr ON rr.tenant_id=f.tenant_id AND rr.file_id=f.id WHERE f.tenant_id=? AND f.id=? AND f.purpose IN ('receipt','selfie','leave','broadcast') AND f.deleted_at IS NULL`, state.SelectedTenantID, id).Scan(&item.ID, &item.OriginalName, &item.MimeType, &item.SizeBytes, &item.Purpose, &item.ScanStatus, &item.CreatedAt, &uploader, &claim, &leave)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
 		return item, state, false
@@ -64,6 +64,19 @@ func (a adminAPI) authorizedReceiptFile(w http.ResponseWriter, r *http.Request) 
 	}
 	if uploader.Valid && uploader.String == state.User.ID {
 		return item, state, true
+	}
+	if item.Purpose == "broadcast" {
+		var allowed int
+		err = a.db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM broadcasts b JOIN broadcast_recipients br ON br.tenant_id=b.tenant_id AND br.broadcast_id=b.id WHERE b.tenant_id=? AND b.attachment_file_id=? AND br.user_id=? AND br.delivery_status='delivered' AND b.status IN ('sending','sent')`, state.SelectedTenantID, id, state.User.ID).Scan(&allowed)
+		if err != nil {
+			writeAPIError(w, r, 500, "INTERNAL_ERROR", "Gagal memeriksa lampiran.")
+			return item, state, false
+		}
+		if allowed > 0 {
+			return item, state, true
+		}
+		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")
+		return item, state, false
 	}
 	if (!claim.Valid && item.Purpose == "receipt") || (!leave.Valid && item.Purpose == "leave") {
 		writeAPIError(w, r, 404, "NOT_FOUND", "Berkas tidak ditemukan.")

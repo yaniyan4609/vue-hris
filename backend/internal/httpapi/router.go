@@ -65,6 +65,24 @@ func Router(db *sql.DB, options ...Options) http.Handler {
 		mountESS(r, db)
 		mountPlatform(r, db, config)
 		mountNotifications(r, db, config)
+		mountPush(r, db, config)
+		mountAnnouncements(r, db, config)
+		r.Get("/api/v1/jobs/{id}", func(w http.ResponseWriter, req *http.Request) {
+			p, ok := notificationIdentity(w, req, db)
+			if !ok {
+				return
+			}
+			item, err := BroadcastJobStatus(req.Context(), db, p.TenantID, p.UserID, chi.URLParam(req, "id"))
+			if err == sql.ErrNoRows {
+				writeAPIError(w, req, 404, "NOT_FOUND", "Job tidak ditemukan.")
+				return
+			}
+			if err != nil {
+				writeAPIError(w, req, 500, "INTERNAL_ERROR", "Gagal membaca job.")
+				return
+			}
+			writeAPIData(w, 200, item, nil)
+		})
 		mountRealtime(r, db, config)
 	}
 	return r

@@ -4,7 +4,7 @@ DELETE,/api/v1/admin/api-keys/{id},14.5 Pengaturan tenant dan langganan,planned
 DELETE,/api/v1/admin/approval-delegations/{id},10.3 Pengaturan alur approval,active
 DELETE,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,active
 DELETE,/api/v1/admin/assets/{id},7.7 Aset karyawan,active
-DELETE,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
+DELETE,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,active
 DELETE,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 DELETE,/api/v1/admin/contracts/{id},7.3 Kontrak,active
 DELETE,/api/v1/admin/departments/{id},6.1 Master organisasi,active
@@ -45,7 +45,7 @@ DELETE,/api/v1/me/sessions/{id},"4. Autentikasi, akun, dan sesi",active
 DELETE,/api/v1/platform/plans/{id},"15.2 Paket, langganan, dan billing",planned
 DELETE,/api/v1/platform/staff/{id},"15.3 Staf, tiket, analitik, pengaturan",planned
 DELETE,/api/v1/platform/support-sessions/{id},"15.1 Dashboard, tenant, dan dukungan",planned
-DELETE,/api/v1/push/subscriptions/{id},13.1 Inbox dan preferensi (semua pengguna),planned
+DELETE,/api/v1/push/subscriptions/{id},13.1 Inbox dan preferensi (semua pengguna),active
 GET,/api/v1/admin/access-reviews,5.3 Hak akses per pengguna,planned
 GET,/api/v1/admin/agenda-events,12.3 Agenda,planned
 GET,/api/v1/admin/api-keys,14.5 Pengaturan tenant dan langganan,planned
@@ -67,10 +67,10 @@ GET,/api/v1/admin/attendance/summary,8.2 Admin: monitor dan rekap,active
 GET,/api/v1/admin/attendance/today,8.2 Admin: monitor dan rekap,active
 GET,/api/v1/admin/audit-logs,14.4 Audit dan keamanan,planned
 GET,/api/v1/admin/audit-logs/{id},14.4 Audit dan keamanan,planned
-GET,/api/v1/admin/broadcasts,13.3 Broadcast / pengumuman,planned
-GET,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
-GET,/api/v1/admin/broadcasts/{id}/recipients,13.3 Broadcast / pengumuman,planned
-GET,/api/v1/admin/broadcasts/{id}/stats,13.3 Broadcast / pengumuman,planned
+GET,/api/v1/admin/broadcasts,13.3 Broadcast / pengumuman,active
+GET,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,active
+GET,/api/v1/admin/broadcasts/{id}/recipients,13.3 Broadcast / pengumuman,active
+GET,/api/v1/admin/broadcasts/{id}/stats,13.3 Broadcast / pengumuman,active
 GET,/api/v1/admin/company-documents,12.2 Dokumen,planned
 GET,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 GET,/api/v1/admin/company-profile,14.5 Pengaturan tenant dan langganan,planned
@@ -129,12 +129,12 @@ GET,/api/v1/admin/loans,9.4 Kasbon,active
 GET,/api/v1/admin/loans/{id},9.4 Kasbon,active
 GET,/api/v1/admin/locations/tree,6.1 Master organisasi,active
 GET,/api/v1/admin/login-events,14.4 Audit dan keamanan,planned
-GET,/api/v1/admin/notification-deliveries,"13.2 Admin: aturan, template, dan log",planned
-GET,/api/v1/admin/notification-event-types,"13.2 Admin: aturan, template, dan log",planned
-GET,/api/v1/admin/notification-rules,"13.2 Admin: aturan, template, dan log",planned
-GET,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
-GET,/api/v1/admin/notification-stats,"13.2 Admin: aturan, template, dan log",planned
-GET,/api/v1/admin/notification-templates,"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/notification-deliveries,"13.2 Admin: aturan, template, dan log",active
+GET,/api/v1/admin/notification-event-types,"13.2 Admin: aturan, template, dan log",active
+GET,/api/v1/admin/notification-rules,"13.2 Admin: aturan, template, dan log",active
+GET,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",active
+GET,/api/v1/admin/notification-stats,"13.2 Admin: aturan, template, dan log",active
+GET,/api/v1/admin/notification-templates,"13.2 Admin: aturan, template, dan log",active
 GET,/api/v1/admin/offices,6.1 Master organisasi,active
 GET,/api/v1/admin/offices/{id},6.1 Master organisasi,active
 GET,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
@@ -169,7 +169,7 @@ GET,/api/v1/admin/regions/{id},6.1 Master organisasi,active
 GET,/api/v1/admin/reimbursement-categories,9.5 Reimbursement,active
 GET,/api/v1/admin/reimbursements,9.5 Reimbursement,active
 GET,/api/v1/admin/reimbursements/{id},9.5 Reimbursement,active
-GET,/api/v1/admin/reminders/summary,"13.2 Admin: aturan, template, dan log",planned
+GET,/api/v1/admin/reminders/summary,"13.2 Admin: aturan, template, dan log",active
 GET,/api/v1/admin/reports,14.2 Laporan,planned
 GET,/api/v1/admin/reports/{key},14.2 Laporan,planned
 GET,/api/v1/admin/roles,5.2 Role dan registry permission,active
@@ -207,8 +207,8 @@ GET,/api/v1/auth/oauth/google/callback,"4. Autentikasi, akun, dan sesi",planned
 GET,/api/v1/auth/oauth/google/start,"4. Autentikasi, akun, dan sesi",planned
 GET,/api/v1/directory/employees,7.9 Direktori (Teman Kantor),planned
 GET,/api/v1/directory/employees/{id},7.9 Direktori (Teman Kantor),planned
-GET,/api/v1/ess/announcements,13.3 Broadcast / pengumuman,planned
-GET,/api/v1/ess/announcements/{id},13.3 Broadcast / pengumuman,planned
+GET,/api/v1/ess/announcements,13.3 Broadcast / pengumuman,active
+GET,/api/v1/ess/announcements/{id},13.3 Broadcast / pengumuman,active
 GET,/api/v1/ess/attendance/calendar,8.1 ESS: absensi dan jadwal pribadi,active
 GET,/api/v1/ess/attendance/corrections,8.1 ESS: absensi dan jadwal pribadi,active
 GET,/api/v1/ess/attendance/history,8.1 ESS: absensi dan jadwal pribadi,active
@@ -253,7 +253,7 @@ GET,/api/v1/me/access,"4. Autentikasi, akun, dan sesi",active
 GET,/api/v1/me/preferences,"4. Autentikasi, akun, dan sesi",active
 GET,/api/v1/me/sessions,"4. Autentikasi, akun, dan sesi",active
 GET,/api/v1/notifications,13.1 Inbox dan preferensi (semua pengguna),active
-GET,/api/v1/notifications/preferences,13.1 Inbox dan preferensi (semua pengguna),planned
+GET,/api/v1/notifications/preferences,13.1 Inbox dan preferensi (semua pengguna),active
 GET,/api/v1/notifications/sync,13.1 Inbox dan preferensi (semua pengguna),active
 GET,/api/v1/notifications/unread-count,13.1 Inbox dan preferensi (semua pengguna),active
 GET,/api/v1/notifications/{id},13.1 Inbox dan preferensi (semua pengguna),active
@@ -279,8 +279,8 @@ GET,/api/v1/platform/tenants/{id}/timeline,"15.1 Dashboard, tenant, dan dukungan
 GET,/api/v1/platform/tenants/{id}/usage,"15.1 Dashboard, tenant, dan dukungan",planned
 GET,/api/v1/platform/tickets,"15.3 Staf, tiket, analitik, pengaturan",planned
 GET,/api/v1/platform/tickets/{id},"15.3 Staf, tiket, analitik, pengaturan",planned
-GET,/api/v1/push/subscriptions,13.1 Inbox dan preferensi (semua pengguna),planned
-GET,/api/v1/push/vapid-public-key,13.1 Inbox dan preferensi (semua pengguna),planned
+GET,/api/v1/push/subscriptions,13.1 Inbox dan preferensi (semua pengguna),active
+GET,/api/v1/push/vapid-public-key,13.1 Inbox dan preferensi (semua pengguna),active
 GET,/api/v1/search,14.6 Pencarian global (Command Palette),planned
 GET,/api/v1/version,16. Webhook dan kesehatan layanan,planned
 GET,/healthz,16. Webhook dan kesehatan layanan,active
@@ -288,7 +288,7 @@ GET,/readyz,16. Webhook dan kesehatan layanan,active
 PATCH,/api/v1/admin/agenda-events/{id},12.3 Agenda,planned
 PATCH,/api/v1/admin/approval-flows/{id},10.3 Pengaturan alur approval,active
 PATCH,/api/v1/admin/assets/{id},7.7 Aset karyawan,active
-PATCH,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,planned
+PATCH,/api/v1/admin/broadcasts/{id},13.3 Broadcast / pengumuman,active
 PATCH,/api/v1/admin/company-documents/{id},12.2 Dokumen,planned
 PATCH,/api/v1/admin/company-profile,14.5 Pengaturan tenant dan langganan,planned
 PATCH,/api/v1/admin/contracts/{id},7.3 Kontrak,active
@@ -341,13 +341,13 @@ POST,/api/v1/admin/assets,7.7 Aset karyawan,active
 POST,/api/v1/admin/attendance/corrections,8.2 Admin: monitor dan rekap,active
 POST,/api/v1/admin/attendance/recalculate,8.2 Admin: monitor dan rekap,active
 POST,/api/v1/admin/audit-logs/export,14.4 Audit dan keamanan,planned
-POST,/api/v1/admin/broadcasts,13.3 Broadcast / pengumuman,planned
-POST,/api/v1/admin/broadcasts/audience-preview,13.3 Broadcast / pengumuman,planned
-POST,/api/v1/admin/broadcasts/{id}/attachments,13.3 Broadcast / pengumuman,planned
-POST,/api/v1/admin/broadcasts/{id}/audience-preview,13.3 Broadcast / pengumuman,planned
-POST,/api/v1/admin/broadcasts/{id}/cancel,13.3 Broadcast / pengumuman,planned
-POST,/api/v1/admin/broadcasts/{id}/schedule,13.3 Broadcast / pengumuman,planned
-POST,/api/v1/admin/broadcasts/{id}/send,13.3 Broadcast / pengumuman,planned
+POST,/api/v1/admin/broadcasts,13.3 Broadcast / pengumuman,active
+POST,/api/v1/admin/broadcasts/audience-preview,13.3 Broadcast / pengumuman,active
+POST,/api/v1/admin/broadcasts/{id}/attachments,13.3 Broadcast / pengumuman,active
+POST,/api/v1/admin/broadcasts/{id}/audience-preview,13.3 Broadcast / pengumuman,active
+POST,/api/v1/admin/broadcasts/{id}/cancel,13.3 Broadcast / pengumuman,active
+POST,/api/v1/admin/broadcasts/{id}/schedule,13.3 Broadcast / pengumuman,active
+POST,/api/v1/admin/broadcasts/{id}/send,13.3 Broadcast / pengumuman,active
 POST,/api/v1/admin/company-documents,12.2 Dokumen,planned
 POST,/api/v1/admin/company-documents/{id}/publish,12.2 Dokumen,planned
 POST,/api/v1/admin/company-profile/logo,14.5 Pengaturan tenant dan langganan,planned
@@ -389,8 +389,8 @@ POST,/api/v1/admin/loans,9.4 Kasbon,active
 POST,/api/v1/admin/loans/{id}/disburse,9.4 Kasbon,active
 POST,/api/v1/admin/loans/{id}/installments/{seq}/waive,9.4 Kasbon,active
 POST,/api/v1/admin/loans/{id}/settle,9.4 Kasbon,active
-POST,/api/v1/admin/notification-deliveries/{id}/retry,"13.2 Admin: aturan, template, dan log",planned
-POST,/api/v1/admin/notification-templates/{id}/preview,"13.2 Admin: aturan, template, dan log",planned
+POST,/api/v1/admin/notification-deliveries/{id}/retry,"13.2 Admin: aturan, template, dan log",active
+POST,/api/v1/admin/notification-templates/{id}/preview,"13.2 Admin: aturan, template, dan log",active
 POST,/api/v1/admin/offices,6.1 Master organisasi,active
 POST,/api/v1/admin/offices/{id}/geofences,6.2 Geofence kantor,active
 POST,/api/v1/admin/overtime-requests,9.3 Lembur,active
@@ -484,15 +484,15 @@ POST,/api/v1/platform/tickets,"15.3 Staf, tiket, analitik, pengaturan",planned
 POST,/api/v1/platform/tickets/{id}/assign,"15.3 Staf, tiket, analitik, pengaturan",planned
 POST,/api/v1/platform/tickets/{id}/close,"15.3 Staf, tiket, analitik, pengaturan",planned
 POST,/api/v1/platform/tickets/{id}/messages,"15.3 Staf, tiket, analitik, pengaturan",planned
-POST,/api/v1/push/subscriptions,13.1 Inbox dan preferensi (semua pengguna),planned
-POST,/api/v1/push/test,13.1 Inbox dan preferensi (semua pengguna),planned
+POST,/api/v1/push/subscriptions,13.1 Inbox dan preferensi (semua pengguna),active
+POST,/api/v1/push/test,13.1 Inbox dan preferensi (semua pengguna),active
 POST,/api/v1/webhooks/payments/{gateway},16. Webhook dan kesehatan layanan,planned
 PUT,/api/v1/admin/approval-flows/{id}/steps,10.3 Pengaturan alur approval,active
 PUT,/api/v1/admin/employees/{id}/pay-components,11.1 Komponen dan aturan,active
 PUT,/api/v1/admin/employees/{id}/tax-bpjs,7.2 Data pendukung karyawan,active
 PUT,/api/v1/admin/loan-policies,9.4 Kasbon,active
-PUT,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",planned
-PUT,/api/v1/admin/notification-templates/{id},"13.2 Admin: aturan, template, dan log",planned
+PUT,/api/v1/admin/notification-rules/{eventType},"13.2 Admin: aturan, template, dan log",active
+PUT,/api/v1/admin/notification-templates/{id},"13.2 Admin: aturan, template, dan log",active
 PUT,/api/v1/admin/payroll/settings,11.1 Komponen dan aturan,active
 PUT,/api/v1/admin/position-role-suggestions,5.3 Hak akses per pengguna,planned
 PUT,/api/v1/admin/roles/{id}/permissions,5.2 Role dan registry permission,active
@@ -501,7 +501,7 @@ PUT,/api/v1/admin/settings/{group},14.5 Pengaturan tenant dan langganan,planned
 PUT,/api/v1/admin/terminations/{id}/checklist,7.6 Resign dan terminasi,active
 PUT,/api/v1/admin/users/{id}/permission-overrides,5.3 Hak akses per pengguna,active
 PUT,/api/v1/admin/users/{id}/scopes/{module},5.3 Hak akses per pengguna,planned
-PUT,/api/v1/notifications/preferences,13.1 Inbox dan preferensi (semua pengguna),planned
+PUT,/api/v1/notifications/preferences,13.1 Inbox dan preferensi (semua pengguna),active
 PUT,/api/v1/platform/plans/{id}/entitlements,"15.2 Paket, langganan, dan billing",planned
 PUT,/api/v1/platform/settings/{key},"15.3 Staf, tiket, analitik, pengaturan",planned
 PUT,/api/v1/platform/tenants/{id}/branding,"15.1 Dashboard, tenant, dan dukungan",planned

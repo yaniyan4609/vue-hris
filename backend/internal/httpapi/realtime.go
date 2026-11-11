@@ -3,9 +3,12 @@ package httpapi
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"digaji.id/hris/internal/access"
@@ -27,6 +30,29 @@ type realtimeEvent struct {
 	Event string         `json:"event"`
 	TS    time.Time      `json:"ts"`
 	Data  map[string]any `json:"data"`
+}
+
+var realtimeConnections = struct {
+	sync.Mutex
+	count map[string]int
+}{count: map[string]int{}}
+
+func claimRealtimeConnection(key string) bool {
+	realtimeConnections.Lock()
+	defer realtimeConnections.Unlock()
+	if realtimeConnections.count[key] >= 5 {
+		return false
+	}
+	realtimeConnections.count[key]++
+	return true
+}
+func releaseRealtimeConnection(key string) {
+	realtimeConnections.Lock()
+	defer realtimeConnections.Unlock()
+	realtimeConnections.count[key]--
+	if realtimeConnections.count[key] <= 0 {
+		delete(realtimeConnections.count, key)
+	}
 }
 
 func allowedRealtimeOrigin(r *http.Request, configured string) bool {
@@ -56,8 +82,19 @@ func mountRealtime(r interface {
 		if !ok {
 			return
 		}
+		connectionKey := p.TenantID + ":" + p.UserID
+		if !claimRealtimeConnection(connectionKey) {
+			writeAPIError(w, req, 429, "TOO_MANY_CONNECTIONS", "Terlalu banyak koneksi real-time.")
+			return
+		}
+		defer releaseRealtimeConnection(connectionKey)
 		var seq uint64
 		if err := db.QueryRowContext(req.Context(), `SELECT COALESCE(MAX(sequence_no),0) FROM notifications WHERE tenant_id=? AND recipient_user_id=?`, p.TenantID, p.UserID).Scan(&seq); err != nil {
+			writeAPIError(w, req, 500, "INTERNAL_ERROR", "Koneksi real-time tidak tersedia.")
+			return
+		}
+		var streamSeq uint64
+		if err := db.QueryRowContext(req.Context(), `SELECT COALESCE(MAX(sequence_no),0) FROM notification_stream_events WHERE tenant_id=? AND recipient_user_id=?`, p.TenantID, p.UserID).Scan(&streamSeq); err != nil {
 			writeAPIError(w, req, 500, "INTERNAL_ERROR", "Koneksi real-time tidak tersedia.")
 			return
 		}
@@ -131,8 +168,18 @@ func mountRealtime(r interface {
 				if err := streamNotifications(ctx, conn, db, p, &seq); err != nil {
 					return
 				}
+				if err := streamRealtimeEvents(ctx, conn, db, p, &streamSeq); err != nil {
+					return
+				}
 			case <-verify.C:
 				if code := realtimeAccessStatus(ctx, db, cookieToken(req), p); code != 0 {
+					if code == 4401 {
+						_ = wsjson.Write(ctx, conn, realtimeEvent{Type: "event", Event: "session.revoked", TS: time.Now().UTC(), Data: map[string]any{}})
+					} else if code == 4408 {
+						var version uint64
+						_ = db.QueryRowContext(ctx, `SELECT access_version FROM tenant_memberships WHERE tenant_id=? AND user_id=?`, p.TenantID, p.UserID).Scan(&version)
+						_ = wsjson.Write(ctx, conn, realtimeEvent{Type: "event", Event: "access.changed", TS: time.Now().UTC(), Data: map[string]any{"access_version": version}})
+					}
 					_ = conn.Close(websocket.StatusCode(code), "access changed")
 					return
 				}
@@ -145,6 +192,32 @@ func mountRealtime(r interface {
 			}
 		}
 	})
+}
+
+func streamRealtimeEvents(ctx context.Context, conn *websocket.Conn, db *sql.DB, p notificationPrincipal, seq *uint64) error {
+	rows, err := db.QueryContext(ctx, `SELECT sequence_no,event_type,payload_json,created_at FROM notification_stream_events WHERE tenant_id=? AND recipient_user_id=? AND sequence_no>? ORDER BY sequence_no LIMIT 100`, p.TenantID, p.UserID, *seq)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id uint64
+		var event string
+		var payload map[string]any
+		var raw []byte
+		var created time.Time
+		if err := rows.Scan(&id, &event, &raw, &created); err != nil {
+			return err
+		}
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return err
+		}
+		if err := wsjson.Write(ctx, conn, realtimeEvent{Type: "event", ID: fmt.Sprintf("stream_%d", id), Event: event, TS: created.UTC(), Data: payload}); err != nil {
+			return err
+		}
+		*seq = id
+	}
+	return rows.Err()
 }
 
 func realtimeAccessStatus(ctx context.Context, db *sql.DB, token string, p notificationPrincipal) int {

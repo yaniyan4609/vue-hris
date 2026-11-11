@@ -112,6 +112,7 @@ func TestStagingAttendanceClockIdempotency(t *testing.T) {
 			query string
 			args  []any
 		}{
+			{`DELETE FROM notification_stream_events WHERE tenant_id=? AND JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.event_id')) IN (?,?)`, []any{state.SelectedTenantID, inEventID, outEventID}},
 			{`DELETE FROM notifications WHERE tenant_id=? AND dedupe_key IN (?,?)`, []any{state.SelectedTenantID, "attendance:" + inEventID, "attendance:" + outEventID}},
 			{`DELETE FROM audit_logs WHERE tenant_id=? AND entity_type='attendance_events' AND entity_id IN (SELECT id FROM attendance_events WHERE tenant_id=? AND shift_instance_id=?)`, []any{state.SelectedTenantID, state.SelectedTenantID, instanceID}},
 			{`DELETE FROM attendance_daily WHERE tenant_id=? AND shift_instance_id=?`, []any{state.SelectedTenantID, instanceID}},
